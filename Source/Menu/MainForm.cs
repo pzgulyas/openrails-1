@@ -479,7 +479,7 @@ namespace ORTS
         void comboBoxTimetableTrain_SelectedIndexChanged(object sender, EventArgs e)
         {
             var selectedTrain = comboBoxTimetableTrain.SelectedItem as TimetableFileLite.TrainInformation;
-            SelectedTimetableConsist = Consist.GetConsist(SelectedFolder, selectedTrain.LeadingConsist, selectedTrain.ReverseConsist);
+            SelectedTimetableConsist = Consist.GetConsist(SelectedFolder, Folders, selectedTrain.LeadingConsist, selectedTrain.ReverseConsist);
             SelectedTimetablePath = Path.GetPath(SelectedRoute, selectedTrain.Path, false);
             ShowDetails();
         }
@@ -847,7 +847,7 @@ namespace ORTS
 
             var selectedFolder = SelectedFolder;
             var selectedRoute = SelectedRoute;
-            ActivityLoader = new Task<List<Activity>>(this, () => Activity.GetActivities(selectedFolder, selectedRoute).OrderBy(a => a.ToString()).ToList(), (activities) =>
+            ActivityLoader = new Task<List<Activity>>(this, () => Activity.GetActivities(selectedFolder, Folders, selectedRoute).OrderBy(a => a.ToString()).ToList(), (activities) =>
             {
                 Activities = activities;
                 ShowActivityList();
@@ -888,7 +888,7 @@ namespace ORTS
             ShowConsistList();
 
             var selectedFolder = SelectedFolder;
-            ConsistLoader = new Task<List<Consist>>(this, () => Consist.GetConsists(selectedFolder).OrderBy(a => a.ToString()).ToList(), (consists) =>
+            ConsistLoader = new Task<List<Consist>>(this, () => Consist.GetConsists(selectedFolder, Folders).OrderBy(a => a.ToString()).ToList(), (consists) =>
             {
                 Consists = consists;
                 if (SelectedActivity == null || SelectedActivity is ExploreActivity)
