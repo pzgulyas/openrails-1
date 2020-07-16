@@ -163,6 +163,10 @@ namespace ORTS
                         continue;
                     }
 
+                    if (MainForm.SelectedConsist.Locomotives.Count > 1)
+                        parameters.Add($"-preferredLocomotive=\"{MainForm.SelectedLocomotive.FilePath}\"");
+
+
                     var processStartInfo = new ProcessStartInfo()
                     {
                         FileName = MainForm.RunActivityProgram,

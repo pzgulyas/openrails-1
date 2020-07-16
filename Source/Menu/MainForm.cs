@@ -92,6 +92,7 @@ namespace ORTS
         // Activity mode items
         public Activity SelectedActivity { get { return (Activity)comboBoxActivity.SelectedItem; } }
         public Consist SelectedConsist { get { return (Consist)comboBoxConsist.SelectedItem; } }
+        public Locomotive SelectedLocomotive { get => (Locomotive)comboBoxLocomotive.SelectedItem; }
         public Path SelectedPath { get { return (Path)comboBoxHeadTo.SelectedItem; } }
         public string SelectedStartTime { get { return comboBoxStartTime.Text; } }
 
@@ -244,8 +245,8 @@ namespace ORTS
                         // include any non-English documents that match the chosen language
                         if (code == Settings.Language)
                             LoadDocuments(docs, codePath, code);
+                        }
                     }
-                }
                 else
                     buttonDocuments.Enabled = false;
             }
@@ -736,7 +737,7 @@ namespace ORTS
             comboBoxFolder.Enabled = comboBoxFolder.Items.Count > 0;
             comboBoxRoute.Enabled = comboBoxRoute.Items.Count > 0;
             comboBoxActivity.Enabled = comboBoxActivity.Items.Count > 0;
-            comboBoxLocomotive.Enabled = comboBoxLocomotive.Items.Count > 0 && SelectedActivity is ExploreActivity;
+            comboBoxLocomotive.Enabled = comboBoxLocomotive.Items.Count > 0 && (SelectedActivity is ExploreActivity || comboBoxLocomotive.Items.Count > 1);
             comboBoxConsist.Enabled = comboBoxConsist.Items.Count > 0 && SelectedActivity is ExploreActivity;
             comboBoxStartAt.Enabled = comboBoxStartAt.Items.Count > 0 && SelectedActivity is ExploreActivity;
             comboBoxHeadTo.Enabled = comboBoxHeadTo.Items.Count > 0 && SelectedActivity is ExploreActivity;
@@ -902,7 +903,14 @@ namespace ORTS
             {
                 comboBoxLocomotive.Items.Clear();
                 comboBoxLocomotive.Items.Add(new Locomotive());
-                foreach (var loco in Consists.Where(c => c.Locomotive != null).Select(c => c.Locomotive).Distinct().OrderBy(l => l.ToString()))
+                ISet<Locomotive> allLocomotives = Consists
+                    .Select((Consist c) => c.Locomotives)
+                    .Aggregate(new HashSet<Locomotive>(), (ISet<Locomotive> accum, ISet<Locomotive> choices) =>
+                    {
+                        accum.UnionWith(choices);
+                        return accum;
+                    });
+                foreach (var loco in allLocomotives.Distinct().OrderBy(l => l.ToString()))
                     comboBoxLocomotive.Items.Add(loco);
                 if (comboBoxLocomotive.Items.Count == 1)
                     comboBoxLocomotive.Items.Clear();
@@ -912,7 +920,7 @@ namespace ORTS
             {
                 var consist = SelectedActivity.Consist;
                 comboBoxLocomotive.Items.Clear();
-                comboBoxLocomotive.Items.Add(consist.Locomotive);
+                comboBoxLocomotive.Items.AddRange(consist.Locomotives.ToArray());
                 comboBoxLocomotive.SelectedIndex = 0;
                 comboBoxConsist.Items.Clear();
                 comboBoxConsist.Items.Add(consist);
@@ -926,7 +934,7 @@ namespace ORTS
             if (SelectedActivity == null || SelectedActivity is ExploreActivity)
             {
                 comboBoxConsist.Items.Clear();
-                foreach (var consist in Consists.Where(c => comboBoxLocomotive.SelectedItem.Equals(c.Locomotive)).OrderBy(c => c.Name))
+                foreach (var consist in Consists.Where(c => c.Locomotives.Contains(comboBoxLocomotive.SelectedItem)).OrderBy(c => c.Name))
                     comboBoxConsist.Items.Add(consist);
                 UpdateFromMenuSelection<Consist>(comboBoxConsist, UserSettings.Menu_SelectionIndex.Consist, c => c.FilePath);
             }
@@ -1139,10 +1147,8 @@ namespace ORTS
 
             if (radioButtonModeActivity.Checked)
             {
-                if (SelectedConsist != null && SelectedConsist.Locomotive != null && SelectedConsist.Locomotive.Description != null)
-                {
-                    ShowDetail(catalog.GetStringFmt("Locomotive: {0}", SelectedConsist.Locomotive.Name), SelectedConsist.Locomotive.Description.Split('\n'));
-                }
+                if (SelectedConsist != null && SelectedLocomotive != null)
+                    ShowDetail(catalog.GetStringFmt("Locomotive: {0}", SelectedLocomotive?.Name ?? ""), (SelectedLocomotive?.Description ?? "").Split('\n'));
                 if (SelectedActivity != null && SelectedActivity.Description != null)
                 {
                     ShowDetail(catalog.GetStringFmt("Activity: {0}", SelectedActivity.Name), SelectedActivity.Description.Split('\n'));
@@ -1172,13 +1178,14 @@ namespace ORTS
                     if (SelectedTimetableConsist != null)
                     {
                         ShowDetail(catalog.GetStringFmt("Consist: {0}", SelectedTimetableConsist.Name), new string[0]);
-                        if (SelectedTimetableConsist.Locomotive != null && SelectedTimetableConsist.Locomotive.Description != null)
-                            ShowDetail(catalog.GetStringFmt("Locomotive: {0}", SelectedTimetableConsist.Locomotive.Name), SelectedTimetableConsist.Locomotive.Description.Split('\n'));
-                    }
+                        if (SelectedTimetableConsist.Locomotives.Count == 1)
+                            Locomotive loco = SelectedTimetableConsist.Locomotives.First();
+                            ShowDetail(catalog.GetStringFmt("Locomotive: {0}", loco.Name ?? ""), (loco.Description ?? "").Split('\n'));
+                        }
                     if (SelectedTimetablePath != null)
                         ShowDetail(catalog.GetStringFmt("Path: {0}", SelectedTimetablePath.Name), SelectedTimetablePath.ToInfo());
+                    }
                 }
-            }
 
             FlowDetails();
             Win32.LockWindowUpdate(IntPtr.Zero);
