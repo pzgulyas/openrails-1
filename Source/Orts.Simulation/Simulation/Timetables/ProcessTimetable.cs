@@ -25,7 +25,6 @@
 
 //
 
-using Orts.Formats.Msts;
 using Orts.Formats.OR;
 using Orts.Parsers.OR;
 using Orts.Simulation.AIs;
@@ -33,9 +32,7 @@ using Orts.Simulation.Physics;
 using Orts.Simulation.RollingStocks;
 using Orts.Simulation.Signalling;
 using Orts.Simulation.Simulation;
-using Orts.Simulation.Timetables;
 using ORTS.Common;
-using ORTS.Settings;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -77,6 +74,15 @@ namespace Orts.Simulation.Timetables
             invalid,
         }
 
+        /// <summary>
+        /// Used to identify player trains.
+        /// </summary>
+        private struct TTTrainSpec
+        {
+            public string Name;
+            public string TTDescription;
+        }
+
         Dictionary<string, AIPath> Paths = new Dictionary<string, AIPath>();                                  // original path referenced by path name
         List<string> reportedPaths = new List<string>();                                                      // reported path fails
         Dictionary<int, string> TrainRouteXRef = new Dictionary<int, string>();                               // path name referenced from train index    
@@ -110,6 +116,17 @@ namespace Orts.Simulation.Timetables
             List<string> filenames;
             int indexcount = 0;
 
+            // get startinfo for player train
+            TTTrainSpec playerTrainDetails;
+            {
+                string[] split = arguments[1].Split(':');
+                playerTrainDetails = new TTTrainSpec
+                {
+                    Name = split[1],
+                    TTDescription = split[0]
+                };
+            }
+
             // get filenames to process
             filenames = GetFilenames(arguments[0]);
 
@@ -126,7 +143,9 @@ namespace Orts.Simulation.Timetables
 #endif
 
                 // convert to train info
-                indexcount = ConvertFileContents(fileContents, simulator.Signals, ref trainInfoList, indexcount, filePath);
+                indexcount = ConvertFileContents(fileContents, simulator.Signals, ref trainInfoList, indexcount, filePath, playerTrainDetails, out TTTrainInfo thisPlayerTrain);
+                if (thisPlayerTrain != null)
+                    playerTrain = thisPlayerTrain;
             }
 
             // read and pre-process routes
@@ -136,9 +155,6 @@ namespace Orts.Simulation.Timetables
             loadPathNoFailure = PreProcessRoutes(cancellation);
 
             Trace.Write(" TTTRAINS:" + trainInfoList.Count.ToString() + " ");
-
-            // get startinfo for player train
-            playerTrain = GetPlayerTrain(ref trainInfoList, arguments);
 
             // pre-init player train to abstract alternative paths if set
             if (playerTrain != null)
@@ -321,7 +337,7 @@ namespace Orts.Simulation.Timetables
         /// <param name="signalRef"></param>
         /// <param name="TDB"></param>
         /// <param name="trainInfoList"></param>
-        private int ConvertFileContents(TimetableReader fileContents, Signals signalRef, ref List<TTTrainInfo> trainInfoList, int indexcount, string filePath)
+        private int ConvertFileContents(TimetableReader fileContents, Signals signalRef, ref List<TTTrainInfo> trainInfoList, int indexcount, string filePath, TTTrainSpec playerDetails, out TTTrainInfo playerTrain)
         {
             int consistRow = -1;
             int pathRow = -1;
@@ -337,6 +353,7 @@ namespace Orts.Simulation.Timetables
             Dictionary<int, int> addTrainInfo = new Dictionary<int, int>();                // key int = column no, value int = main train column
             Dictionary<int, List<int>> addTrainColumns = new Dictionary<int, List<int>>(); // key int = main train column, value = add columns
             Dictionary<int, StationInfo> stationNames = new Dictionary<int, StationInfo>();          // key int = row no, value string = station name
+            int? playerTrainCol = null;                                                    // discovered column # of the player train
 
             float actSpeedConv = 1.0f;                                                     // actual set speedconversion
 
@@ -603,7 +620,11 @@ namespace Orts.Simulation.Timetables
                 validFile = false;
             }
 
-            if (!validFile) return (indexcount); // abandone processing
+            if (!validFile) // abandon processing
+            {
+                playerTrain = null;
+                return (indexcount);
+            }
 
             // extract description
 
@@ -660,10 +681,10 @@ namespace Orts.Simulation.Timetables
                         ConcatTrainStrings(fileContents.Strings, iColumn, addColumns);
                     }
 
-                    if (!trainInfo[iColumn].BuildTrain(fileContents.Strings, RowInfo, pathRow, consistRow, startRow, disposeRow, briefingRow, description, stationNames, actSpeedConv, this))
-                    {
+                    if (!trainInfo[iColumn].BuildTrain(fileContents.Strings, RowInfo, pathRow, consistRow, startRow, disposeRow, briefingRow, description, stationNames, actSpeedConv, this, playerDetails, out bool isPlayer))
                         allCorrectBuild = false;
-                    }
+                    if (isPlayer && !playerTrainCol.HasValue)
+                        playerTrainCol = iColumn;
                 }
             }
 
@@ -673,13 +694,11 @@ namespace Orts.Simulation.Timetables
             }
 
             // extract valid trains
-            foreach (KeyValuePair<int, TTTrainInfo> train in trainInfo)
-            {
-                if (train.Value.validTrain)
-                {
-                    trainInfoList.Add(train.Value);
-                }
-            }
+            trainInfoList.AddRange(trainInfo
+                .Where((KeyValuePair<int, TTTrainInfo> train) => !playerTrainCol.HasValue || train.Key != playerTrainCol.Value)
+                .Where((KeyValuePair<int, TTTrainInfo> train) => train.Value.validTrain)
+                .Select((KeyValuePair<int, TTTrainInfo> train) => train.Value));
+            playerTrain = playerTrainCol.HasValue ? trainInfo[playerTrainCol.Value] : null;
 
             return (indexcount);
         }
@@ -705,44 +724,6 @@ namespace Orts.Simulation.Timetables
                     }
                 }
             }
-        }
-
-        //================================================================================================//
-        /// <summary>
-        /// GetPlayerTrain : extract player train from list of all available trains
-        /// </summary>
-        /// <param name="allTrains"></param>
-        /// <param name="arguments"></param>
-        /// <returns></returns>
-        private TTTrainInfo GetPlayerTrain(ref List<TTTrainInfo> allTrains, string[] arguments)
-        {
-            TTTrainInfo reqTrain = null;
-
-            string[] playerTrainDetails = arguments[1].Split(':');
-
-            // loop through all trains to find player train
-            int playerIndex = -1;
-
-            for (int iTrain = 0; iTrain <= allTrains.Count - 1 && playerIndex < 0; iTrain++)
-            {
-                if (String.Compare(allTrains[iTrain].Name, playerTrainDetails[1]) == 0 &&
-                    String.Compare(allTrains[iTrain].TTDescription, playerTrainDetails[0]) == 0)
-                {
-                    playerIndex = iTrain;
-                }
-            }
-
-            if (playerIndex >= 0)
-            {
-                reqTrain = allTrains[playerIndex];
-                allTrains.RemoveAt(playerIndex);
-            }
-            else
-            {
-                throw new InvalidDataException("Player train : " + arguments[1] + " not found in timetables");
-            }
-
-            return (reqTrain);
         }
 
         //================================================================================================//
@@ -1340,8 +1321,10 @@ namespace Orts.Simulation.Timetables
             /// <param name="description"></param>
             /// <param name="stationNames"></param>
             /// <param name="ttInfo"></param>
+            /// <param name="playerDetails">Name and description to match the player train.</param>
+            /// <param name="isPlayerTrain">Indicates whether or not this is the player train.</param>
             public bool BuildTrain(List<string[]> fileStrings, rowType[] RowInfo, int pathRow, int consistRow, int startRow, int disposeRow, int briefingRow, string description,
-                Dictionary<int, StationInfo> stationNames, float actSpeedConv, TimetableInfo ttInfo)
+                Dictionary<int, StationInfo> stationNames, float actSpeedConv, TimetableInfo ttInfo, TTTrainSpec playerDetails, out bool isPlayerTrain)
             {
                 TTDescription = string.Copy(description);
 
@@ -1367,6 +1350,8 @@ namespace Orts.Simulation.Timetables
                 {
                     TTTrain.Name = Name + ":" + TTDescription;
                 }
+
+                isPlayerTrain = Name == playerDetails.Name && TTDescription == playerDetails.TTDescription;
 
                 TTTrain.MovementState = AITrain.AI_MOVEMENT_STATE.AI_STATIC;
 
@@ -1405,7 +1390,7 @@ namespace Orts.Simulation.Timetables
 
                 // build consist
                 bool returnValue = true;
-                returnValue = BuildConsist(consistdetails, ttInfo.simulator);
+                returnValue = BuildConsist(consistdetails, ttInfo.simulator, isPlayerTrain);
 
                 // return if consist could not be loaded
                 if (!returnValue) return (returnValue);
@@ -2323,7 +2308,7 @@ namespace Orts.Simulation.Timetables
             /// <param name="consistFile">Defined consist file</param>
             /// <param name="trainsetDirectory">Consist directory</param>
             /// <param name="simulator">Simulator</param>
-            public bool BuildConsist(List<consistInfo> consistSets, Simulator simulator)
+            public bool BuildConsist(List<consistInfo> consistSets, Simulator simulator, bool playerTrain = false)
             {
                 bool tilt = true;
                 float? confMaxSpeed = null;
@@ -2352,7 +2337,7 @@ namespace Orts.Simulation.Timetables
                     }
 
                     // add wagons
-                    var cars = new List<TrainCar>(conFile.LoadTrainCars(simulator));
+                    var cars = new List<TrainCar>(conFile.LoadTrainCars(simulator, playerTrain));
                     if (consistReverse)
                     {
                         foreach (TrainCar car in cars)
