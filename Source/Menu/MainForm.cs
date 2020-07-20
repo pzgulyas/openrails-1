@@ -716,7 +716,7 @@ namespace ORTS
                     SelectedTimetableTrain != null ? SelectedTimetableTrain.Column.ToString() : "",
                 radioButtonModeActivity.Checked ?
                     SelectedActivity is ExploreActivity && SelectedPath != null ? SelectedPath.FilePath : "" :
-                    "",
+                    SelectedTimetableLocomotive?.FilePath ?? "",
                 radioButtonModeActivity.Checked ?
                     SelectedActivity is ExploreActivity ? SelectedStartTime : "" :
                     SelectedTimetableDay.ToString(),
@@ -1155,7 +1155,7 @@ namespace ORTS
                     .ToArray();
                 Array.Sort(locomotives);
                 comboBoxTimetableLocomotive.Items.AddRange(locomotives);
-                UpdateFromMenuSelection(comboBoxTimetableLocomotive, UserSettings.Menu_SelectionIndex.TimetableLocomotive, (Locomotive loco) => loco.Name);
+                UpdateFromMenuSelection(comboBoxTimetableLocomotive, UserSettings.Menu_SelectionIndex.TimetableLocomotive, (Locomotive loco) => loco.FilePath);
             }
             UpdateEnabled();
         }
