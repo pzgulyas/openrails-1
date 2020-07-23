@@ -2318,14 +2318,14 @@ namespace Orts.Simulation.Timetables
                 foreach (consistInfo consistDetails in consistSets)
                 {
                     bool consistReverse = consistDetails.reversed;
-                    tilt = tilt && GenericConsist.IsTilting(consistDetails.consistFile);
+                    tilt = tilt && GenericTrain.IsTilting(consistDetails.consistFile);
 
-                    IConsist conFile = null;
+                    ITrainFile trainFile = null;
 
                     // try to load config file, exit if failed
                     try
                     {
-                        conFile = GenericConsist.LoadFile(simulator.BasePath, consistDetails.consistFile);
+                        trainFile = GenericTrain.LoadFile(simulator.BasePath, consistDetails.consistFile);
                     }
                     catch (Exception e)
                     {
@@ -2344,27 +2344,27 @@ namespace Orts.Simulation.Timetables
                         // If we have a player-preferred locomotive, we need to look for the first consist in the list that supports it.
                         if (preferenceSatisfied)
                         {
-                            cars = conFile.LoadTrainCars(simulator, flip: consistReverse, playerTrain: true);
+                            cars = trainFile.LoadCars(simulator, flip: consistReverse, playerTrain: true);
                         }
                         else
                         {
                             ISet<PreferredLocomotive> locos;
                             IDictionary<string, string> folders = simulator.Settings.Folders.Folders;
-                            locos = consistReverse ? conFile.GetReverseLocomotiveChoices(simulator.BasePath, folders) : conFile.GetLeadLocomotiveChoices(simulator.BasePath, folders);
+                            locos = consistReverse ? trainFile.GetReverseLocomotiveChoices(simulator.BasePath, folders) : trainFile.GetLeadLocomotiveChoices(simulator.BasePath, folders);
                             if (locos.Contains(simulator.PreferredLocomotive))
                             {
-                                cars = conFile.LoadTrainCars(simulator, flip: consistReverse, playerTrain: true, preference: simulator.PreferredLocomotive);
+                                cars = trainFile.LoadCars(simulator, flip: consistReverse, playerTrain: true, preference: simulator.PreferredLocomotive);
                                 preferenceSatisfied = true;
                             }
                             else
                             {
-                                cars = conFile.LoadTrainCars(simulator, flip: consistReverse, playerTrain: true, preference: PreferredLocomotive.NoLocomotive);
+                                cars = trainFile.LoadCars(simulator, flip: consistReverse, playerTrain: true, preference: PreferredLocomotive.NoLocomotive);
                             }
                         }
                     }
                     else
                     {
-                        cars = conFile.LoadTrainCars(simulator, flip: consistReverse, playerTrain: playerTrain);
+                        cars = trainFile.LoadCars(simulator, flip: consistReverse, playerTrain: playerTrain);
                     }
 
                     // add wagons
@@ -2382,8 +2382,8 @@ namespace Orts.Simulation.Timetables
                     }
 
                     // derive speed
-                    if (conFile.MaxVelocityMpS != null)
-                        confMaxSpeed = Math.Min(confMaxSpeed ?? (float)simulator.TRK.Tr_RouteFile.SpeedLimit, conFile.MaxVelocityMpS.Value);
+                    if (trainFile.MaxVelocityMpS != null)
+                        confMaxSpeed = Math.Min(confMaxSpeed ?? (float)simulator.TRK.Tr_RouteFile.SpeedLimit, trainFile.MaxVelocityMpS.Value);
                 }
 
                 if (TTTrain.Cars.Count <= 0)
