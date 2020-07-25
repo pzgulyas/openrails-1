@@ -120,7 +120,7 @@ namespace Orts.Simulation.Timetables
             // get startinfo for player train
             TTTrainSpec playerTrainDetails;
             {
-                string[] split = arguments[1].Split(':');
+                var split = arguments[1].Split(new[] { ':' }, 2);
                 playerTrainDetails = new TTTrainSpec
                 {
                     Name = split[1],
