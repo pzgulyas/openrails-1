@@ -16,6 +16,7 @@
 // along with Open Rails.  If not, see <http://www.gnu.org/licenses/>.
 
 using ORTS.Scripting.Api;
+using Orts.Common.Scripting;
 using System.Diagnostics;
 
 namespace Orts.Simulation.RollingStocks.SubSystems.Controllers
@@ -38,7 +39,7 @@ namespace Orts.Simulation.RollingStocks.SubSystems.Controllers
         bool BrakeControllerInitialised; // flag to allow PreviousNotchPosition to be initially set.
         MSTSNotch PreviousNotchPosition;
 
-        public MSTSBrakeController()
+		public MSTSBrakeController()
         {
         }
 
@@ -72,16 +73,22 @@ namespace Orts.Simulation.RollingStocks.SubSystems.Controllers
         {
             var epState = -1f;
 
-            if (EmergencyBrakingPushButton() || TCSEmergencyBraking())
+            var trainBrakeIntervention = (int)GetControlValue(ORTSControlType.ORTSTrainBrakeIntervention.ToString(), 1);
+
+            if (EmergencyBrakingPushButton() || TCSEmergencyBraking() || trainBrakeIntervention == 2)
             {
                 pressureBar -= EmergencyRateBarpS() * elapsedClockSeconds;
             }
-            else if (TCSFullServiceBraking())
+            else if (TCSFullServiceBraking() || trainBrakeIntervention == 1)
             {
                 if (pressureBar > MaxPressureBar() - FullServReductionBar())
                     pressureBar -= ApplyRateBarpS() * elapsedClockSeconds;
                 else if (pressureBar < MaxPressureBar() - FullServReductionBar())
                     pressureBar = MaxPressureBar() - FullServReductionBar();
+            }
+            else if (trainBrakeIntervention == 0)
+            {
+                return;
             }
             else
             {
@@ -178,15 +185,22 @@ namespace Orts.Simulation.RollingStocks.SubSystems.Controllers
         // Engine Brake Controllers
         public override void UpdateEngineBrakePressure(ref float pressureBar, float elapsedClockSeconds)
         {
-            MSTSNotch notch = NotchController.GetCurrentNotch();
-            if (notch == null)
+            ControllerState notchType;
+            var engineBrakeIntervention = (int)GetControlValue(ORTSControlType.ORTSEngineBrakeIntervention.ToString(), 1);
+
+            switch (engineBrakeIntervention)
             {
-                pressureBar = (MaxPressureBar() - FullServReductionBar()) * CurrentValue();
+                case 0: return;
+                case 1: notchType = ControllerState.FullServ; break;
+                case 2: notchType = ControllerState.Emergency; break;
+                default:
+                    var notch = NotchController.GetCurrentNotch();
+                    notchType = notch != null ? notch.Type : ControllerState.Dummy;
+                    break;
             }
-            else
-            {                
+
                 float x = NotchController.GetNotchFraction();
-                switch (notch.Type)
+            switch (notchType)
                 {
                     case ControllerState.Neutral:
                     case ControllerState.Running:
@@ -228,7 +242,6 @@ namespace Orts.Simulation.RollingStocks.SubSystems.Controllers
                 if (pressureBar < 0)
                     pressureBar = 0;
             }
-        }
 
         public override void HandleEvent(BrakeControllerEvent evt)
         {

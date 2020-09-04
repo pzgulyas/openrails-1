@@ -23,6 +23,7 @@ using Orts.Parsers.Msts;
 using Orts.Simulation.Physics;
 using Orts.Simulation.Signalling;
 using ORTS.Common;
+using Orts.Common.Scripting;
 using ORTS.Scripting.Api;
 using System;
 using System.Collections.Generic;
@@ -209,41 +210,41 @@ namespace Orts.Simulation.RollingStocks.SubSystems
             {
                 if (!Simulator.Settings.DisableTCSScripts && ScriptName != null && ScriptName != "MSTS" && ScriptName != "")
                 {
-                    var pathArray = new string[] { Path.Combine(Path.GetDirectoryName(Locomotive.WagFilePath), "Script") };
-                    Script = Simulator.ScriptManager.Load(pathArray, ScriptName) as TrainControlSystem;
-                }
+                var pathArray = new string[] { Path.Combine(Path.GetDirectoryName(Locomotive.WagFilePath), "Script") };
+                Script = Simulator.ScriptManager.Load(pathArray, ScriptName) as TrainControlSystem;
+            }
 
-                if (ParametersFileName != null)
-                {
-                    ParametersFileName = Path.Combine(Path.Combine(Path.GetDirectoryName(Locomotive.WagFilePath), "Script"), ParametersFileName);
-                }
+            if (ParametersFileName != null)
+            {
+                ParametersFileName = Path.Combine(Path.Combine(Path.GetDirectoryName(Locomotive.WagFilePath), "Script"), ParametersFileName);
+            }
 
-                if (Script == null)
-                {
-                    Script = new MSTSTrainControlSystem();
-                    ((MSTSTrainControlSystem)Script).VigilanceMonitor = VigilanceMonitor;
-                    ((MSTSTrainControlSystem)Script).OverspeedMonitor = OverspeedMonitor;
-                    ((MSTSTrainControlSystem)Script).EmergencyStopMonitor = EmergencyStopMonitor;
-                    ((MSTSTrainControlSystem)Script).AWSMonitor = AWSMonitor;
-                    ((MSTSTrainControlSystem)Script).EmergencyCausesThrottleDown = Locomotive.EmergencyCausesThrottleDown;
-                    ((MSTSTrainControlSystem)Script).EmergencyEngagesHorn = Locomotive.EmergencyEngagesHorn;
-                }
+            if (Script == null)
+            {
+                Script = new MSTSTrainControlSystem();
+                ((MSTSTrainControlSystem)Script).VigilanceMonitor = VigilanceMonitor;
+                ((MSTSTrainControlSystem)Script).OverspeedMonitor = OverspeedMonitor;
+                ((MSTSTrainControlSystem)Script).EmergencyStopMonitor = EmergencyStopMonitor;
+                ((MSTSTrainControlSystem)Script).AWSMonitor = AWSMonitor;
+                ((MSTSTrainControlSystem)Script).EmergencyCausesThrottleDown = Locomotive.EmergencyCausesThrottleDown;
+                ((MSTSTrainControlSystem)Script).EmergencyEngagesHorn = Locomotive.EmergencyEngagesHorn;
+            }
 
-                if (SoundFileName != null)
-                {
-                    var soundPathArray = new[] {
+            if (SoundFileName != null)
+            {
+                var soundPathArray = new[] {
                     Path.Combine(Path.GetDirectoryName(Locomotive.WagFilePath), "SOUND"),
                     Path.Combine(Simulator.BasePath, "SOUND"),
                 };
-                    var soundPath = ORTSPaths.GetFileFromFolders(soundPathArray, SoundFileName);
-                    if (File.Exists(soundPath))
-                        Sounds.Add(Script, soundPath);
-                }
+                var soundPath = ORTSPaths.GetFileFromFolders(soundPathArray, SoundFileName);
+                if (File.Exists(soundPath))
+                    Sounds.Add(Script, soundPath);
+            }
 
-                // AbstractScriptClass
-                Script.ClockTime = () => (float)Simulator.ClockTime;
-                Script.GameTime = () => (float)Simulator.GameTime;
-                Script.DistanceM = () => Locomotive.DistanceM;
+            // AbstractScriptClass
+            Script.ClockTime = () => (float)Simulator.ClockTime;
+            Script.GameTime = () => (float)Simulator.GameTime;
+            Script.DistanceM = () => Locomotive.DistanceM;
                 Script.Confirm = Locomotive.Simulator.Confirmer.Confirm;
                 Script.Message = Locomotive.Simulator.Confirmer.Message;
                 Script.SignalEvent = Locomotive.SignalEvent;
@@ -256,17 +257,17 @@ namespace Orts.Simulation.RollingStocks.SubSystems
                 };
 
                 // TrainControlSystem getters
-                Script.IsTrainControlEnabled = () => Locomotive == Locomotive.Train.LeadLocomotive && Locomotive.Train.TrainType != Train.TRAINTYPE.AI_PLAYERHOSTING;
+            Script.IsTrainControlEnabled = () => Locomotive == Locomotive.Train.LeadLocomotive && Locomotive.Train.TrainType != Train.TRAINTYPE.AI_PLAYERHOSTING;
                 Script.IsAutopiloted = () => Locomotive == Simulator.PlayerLocomotive && Locomotive.Train.TrainType == Train.TRAINTYPE.AI_PLAYERHOSTING;
-                Script.IsAlerterEnabled = () =>
-                {
-                    return Simulator.Settings.Alerter
+            Script.IsAlerterEnabled = () =>
+            {
+                return Simulator.Settings.Alerter
                         && !(Simulator.Settings.AlerterDisableExternal
                             && !Simulator.PlayerIsInCab
-                        );
-                };
+                    );
+            };
                 Script.IsSpeedControlEnabled = () => Simulator.Settings.SpeedControl;
-                Script.AlerterSound = () => Locomotive.AlerterSnd;
+            Script.AlerterSound = () => Locomotive.AlerterSnd;
                 Script.TrainSpeedLimitMpS = () => TrainInfo.allowedSpeedMpS;
                 Script.TrainMaxSpeedMpS = () => Locomotive.Train.TrainMaxSpeedMpS;
                 Script.CurrentSignalSpeedLimitMpS = () => Locomotive.Train.allowedMaxSpeedSignalMpS;
@@ -322,9 +323,9 @@ namespace Orts.Simulation.RollingStocks.SubSystems
                 Script.Deceleration = (arg1, arg2, arg3) => Deceleration(arg1, arg2, arg3);
 
                 // TrainControlSystem setters
-                Script.SetFullBrake = (value) =>
-                {
-                    if (Locomotive.TrainBrakeController.TCSFullServiceBraking != value)
+            Script.SetFullBrake = (value) =>
+            {
+                if (Locomotive.TrainBrakeController.TCSFullServiceBraking != value)
                     {
                         Locomotive.TrainBrakeController.TCSFullServiceBraking = value;
 
@@ -339,14 +340,14 @@ namespace Orts.Simulation.RollingStocks.SubSystems
                         if (!value)
                             ldbfevalfullbrakeabove16kmh = false;
                     }
-                };
-                Script.SetEmergencyBrake = (value) =>
-                {
-                    if (Locomotive.TrainBrakeController.TCSEmergencyBraking != value)
-                        Locomotive.TrainBrakeController.TCSEmergencyBraking = value;
-                };
+            };
+            Script.SetEmergencyBrake = (value) =>
+            {
+                if (Locomotive.TrainBrakeController.TCSEmergencyBraking != value)
+                    Locomotive.TrainBrakeController.TCSEmergencyBraking = value;
+            };
                 Script.SetFullDynamicBrake = (value) => FullDynamicBrakingOrder = value;
-                Script.SetThrottleController = (value) => Locomotive.ThrottleController.SetValue(value);
+            Script.SetThrottleController = (value) => Locomotive.ThrottleController.SetValue(value);
                 Script.SetDynamicBrakeController = (value) =>
                 {
                 if (Locomotive.DynamicBrakeController == null) return;
@@ -376,22 +377,22 @@ namespace Orts.Simulation.RollingStocks.SubSystems
                 Script.TriggerSoundWarning2 = () => this.SignalEvent(Event.TrainControlSystemWarning2, Script);
                 Script.TriggerSoundSystemActivate = () => this.SignalEvent(Event.TrainControlSystemActivate, Script);
                 Script.TriggerSoundSystemDeactivate = () => this.SignalEvent(Event.TrainControlSystemDeactivate, Script);
-                Script.SetVigilanceAlarmDisplay = (value) => this.VigilanceAlarm = value;
-                Script.SetVigilanceEmergencyDisplay = (value) => this.VigilanceEmergency = value;
-                Script.SetOverspeedWarningDisplay = (value) => this.OverspeedWarning = value;
-                Script.SetPenaltyApplicationDisplay = (value) => this.PenaltyApplication = value;
-                Script.SetMonitoringStatus = (value) => this.MonitoringStatus = value;
-                Script.SetCurrentSpeedLimitMpS = (value) => this.CurrentSpeedLimitMpS = value;
-                Script.SetNextSpeedLimitMpS = (value) => this.NextSpeedLimitMpS = value;
-                Script.SetInterventionSpeedLimitMpS = (value) => this.InterventionSpeedLimitMpS = value;
-                Script.SetNextSignalAspect = (value) => this.CabSignalAspect = (TrackMonitorSignalAspect)value;
+            Script.SetVigilanceAlarmDisplay = (value) => this.VigilanceAlarm = value;
+            Script.SetVigilanceEmergencyDisplay = (value) => this.VigilanceEmergency = value;
+            Script.SetOverspeedWarningDisplay = (value) => this.OverspeedWarning = value;
+            Script.SetPenaltyApplicationDisplay = (value) => this.PenaltyApplication = value;
+            Script.SetMonitoringStatus = (value) => this.MonitoringStatus = value;
+            Script.SetCurrentSpeedLimitMpS = (value) => this.CurrentSpeedLimitMpS = value;
+            Script.SetNextSpeedLimitMpS = (value) => this.NextSpeedLimitMpS = value;
+            Script.SetInterventionSpeedLimitMpS = (value) => this.InterventionSpeedLimitMpS = value;
+            Script.SetNextSignalAspect = (value) => this.CabSignalAspect = (TrackMonitorSignalAspect)value;
                 Script.SetCabDisplayControl = (arg1, arg2) => CabDisplayControls[arg1] = arg2;
                 Script.SetCustomizedTCSControlString = (value) =>
-                {
+            {
                     if (NextCabviewControlNameToEdit == 0)
-                    {
+                {
                         Trace.TraceWarning("SetCustomizedTCSControlString is deprecated. Please use SetCustomizedCabviewControlName.");
-                    }
+                }
 
                     if (NextCabviewControlNameToEdit < TCSCabviewControlCount)
                     {
@@ -399,7 +400,7 @@ namespace Orts.Simulation.RollingStocks.SubSystems
                     }
 
                     NextCabviewControlNameToEdit++;
-                };
+            };
                 Script.SetCustomizedCabviewControlName = (id, value) =>
                 {
                     if (id >= 0 && id < TCSCabviewControlCount)
@@ -410,19 +411,37 @@ namespace Orts.Simulation.RollingStocks.SubSystems
                 Script.RequestToggleManualMode = () => Locomotive.Train.RequestToggleManualMode();
 
                 // TrainControlSystem INI configuration file
-                Script.GetBoolParameter = (arg1, arg2, arg3) => LoadParameter<bool>(arg1, arg2, arg3);
-                Script.GetIntParameter = (arg1, arg2, arg3) => LoadParameter<int>(arg1, arg2, arg3);
-                Script.GetFloatParameter = (arg1, arg2, arg3) => LoadParameter<float>(arg1, arg2, arg3);
-                Script.GetStringParameter = (arg1, arg2, arg3) => LoadParameter<string>(arg1, arg2, arg3);
+            Script.GetBoolParameter = (arg1, arg2, arg3) => LoadParameter<bool>(arg1, arg2, arg3);
+            Script.GetIntParameter = (arg1, arg2, arg3) => LoadParameter<int>(arg1, arg2, arg3);
+            Script.GetFloatParameter = (arg1, arg2, arg3) => LoadParameter<float>(arg1, arg2, arg3);
+            Script.GetStringParameter = (arg1, arg2, arg3) => LoadParameter<string>(arg1, arg2, arg3);
 
-                Script.Initialize();
+            Script.Initialize();
                 Activated = true;
-            }
+        }
         }
 
         public void InitializeMoving()
         {
             Script?.InitializeMoving();
+        }
+
+        public float SignalItem(int forsight, ORTSControlType type)
+        {
+            switch (type)
+            {
+                case ORTSControlType.ORTSSignalAspect: return forsight == 0 ? (int)Aspect.StopAndProceed : 
+                    (int)NextSignalItem<Aspect>(forsight - 1, ref SignalAspects, Train.TrainObjectItem.TRAINOBJECTTYPE.SIGNAL);
+                case ORTSControlType.ORTSSignalSpeedLimitMpS: return forsight == 0 ? Locomotive.Train.allowedMaxSpeedSignalMpS : 
+                    NextSignalItem<float>(forsight - 1, ref SignalSpeedLimits, Train.TrainObjectItem.TRAINOBJECTTYPE.SIGNAL);
+                case ORTSControlType.ORTSPostSpeedLimitMpS: return forsight == 0 ? Locomotive.Train.allowedMaxSpeedLimitMpS :
+                    NextSignalItem<float>(forsight - 1, ref PostSpeedLimits, Train.TrainObjectItem.TRAINOBJECTTYPE.SPEEDPOST);
+                case ORTSControlType.ORTSSignalDistanceM: return forsight == 0 ? -1 :
+                    NextSignalItem<float>(forsight - 1, ref SignalDistances, Train.TrainObjectItem.TRAINOBJECTTYPE.SIGNAL);
+                case ORTSControlType.ORTSPostDistanceM: return forsight == 0 ? -1 :
+                    NextSignalItem<float>(forsight - 1, ref PostDistances, Train.TrainObjectItem.TRAINOBJECTTYPE.SPEEDPOST);
+                default: return 0;
+            }
         }
 
         T NextSignalItem<T>(int forsight, ref List<T> list, Train.TrainObjectItem.TRAINOBJECTTYPE type)
@@ -614,9 +633,9 @@ namespace Orts.Simulation.RollingStocks.SubSystems
         {
             try
             { 
-                foreach (var eventHandler in Locomotive.EventHandlers)
-                    eventHandler.HandleEvent(evt, script);
-            }
+            foreach (var eventHandler in Locomotive.EventHandlers)
+                eventHandler.HandleEvent(evt, script);
+        }
             catch (Exception error)
             {
                 Trace.TraceInformation("Sound event skipped due to thread safety problem " + error.Message);
@@ -1112,7 +1131,7 @@ namespace Orts.Simulation.RollingStocks.SubSystems
                                 break;
 
                             // case VigilanceState.Emergency: do nothing
-                        }
+                    }
                     }
                     break;
             }
@@ -1159,7 +1178,7 @@ namespace Orts.Simulation.RollingStocks.SubSystems
                         }
 
                         if (VigilanceAlarmTimer.Triggered)
-                        {
+            {
                             VigilanceAlarmTimer.Stop();
                             VigilanceMonitorState = MonitorState.Alarm;
                         }
@@ -1168,19 +1187,19 @@ namespace Orts.Simulation.RollingStocks.SubSystems
 
                 case MonitorState.Alarm:
                     if (!VigilanceSystemEnabled)
-                    {
-                        VigilanceEmergencyTimer.Stop();
+                {
+                    VigilanceEmergencyTimer.Stop();
                         VigilanceMonitorState = MonitorState.Disabled;
-                    }
+                }
                     else
                     {
                         if (!VigilanceEmergencyTimer.Started)
                         {
                             VigilanceEmergencyTimer.Start();
-                        }
+            }
 
                         if (VigilanceEmergencyTimer.Triggered)
-                        {
+            {
                             VigilanceEmergencyTimer.Stop();
                             VigilanceMonitorState = MonitorState.Emergency;
                         }
@@ -1189,12 +1208,12 @@ namespace Orts.Simulation.RollingStocks.SubSystems
 
                 case MonitorState.Emergency:
                     if (!VigilancePenaltyTimer.Started)
-                    {
+                {
                         VigilancePenaltyTimer.Start();
-                    }
+                }
 
                     if (VigilancePenaltyTimer.Triggered && VigilanceReset)
-                    {
+                {
                         VigilanceEmergencyTimer.Stop();
                         VigilanceMonitorState = (VigilanceSystemEnabled ? MonitorState.StandBy : MonitorState.Disabled);
                     }
@@ -1203,9 +1222,9 @@ namespace Orts.Simulation.RollingStocks.SubSystems
 
             if (VigilanceMonitorState >= MonitorState.Alarm)
             {
-                if (!AlerterSound())
+                    if (!AlerterSound())
                 {
-                    SetVigilanceAlarm(true);
+                        SetVigilanceAlarm(true);
                 }
             }
             else
@@ -1213,8 +1232,8 @@ namespace Orts.Simulation.RollingStocks.SubSystems
                 if (AlerterSound())
                 {
                     SetVigilanceAlarm(false);
-                }
             }
+        }
 
             SetVigilanceAlarmDisplay(VigilanceMonitorState == MonitorState.Alarm);
             SetVigilanceEmergencyDisplay(VigilanceMonitorState == MonitorState.Emergency);
@@ -1242,7 +1261,7 @@ namespace Orts.Simulation.RollingStocks.SubSystems
 
                 case MonitorState.StandBy:
                     if (!SpeedControlSystemEnabled)
-                    {
+            {
                         OverspeedMonitorState = MonitorState.Disabled;
                     }
                     else
@@ -1280,20 +1299,20 @@ namespace Orts.Simulation.RollingStocks.SubSystems
                     break;
 
                 case MonitorState.Emergency:
-                    if (!OverspeedPenaltyTimer.Started)
+                if (!OverspeedPenaltyTimer.Started)
                     {
-                        OverspeedPenaltyTimer.Start();
-                    }
+                    OverspeedPenaltyTimer.Start();
+            }
 
                     if (OverspeedPenaltyTimer.Triggered && OverspeedReset)
-                    {
-                        OverspeedPenaltyTimer.Stop();
+            {
+                OverspeedPenaltyTimer.Stop();
                         OverspeedMonitorState = MonitorState.StandBy;
-                    }
+            }
                     break;
             }
 
             SetOverspeedWarningDisplay(OverspeedMonitorState >= MonitorState.Alarm);
+            }
         }
-    }
 }

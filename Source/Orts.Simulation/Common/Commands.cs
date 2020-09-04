@@ -21,6 +21,7 @@ using Orts.Simulation;
 using Orts.Simulation.Physics;
 using Orts.Simulation.RollingStocks;
 using ORTS.Common;
+using Orts.Common.Scripting;
 using ORTS.Scripting.Api;
 using System;
 using System.Diagnostics;   // Used by Trace.Warnings
@@ -467,7 +468,7 @@ namespace Orts.Common
         }
     }
 
-     [Serializable()]
+    [Serializable()]
     public sealed class BrakemanBrakeCommand : ContinuousCommand
     {
         public static MSTSLocomotive Receiver { get; set; }
@@ -832,9 +833,9 @@ namespace Orts.Common
         }
 
         public override void Redo()
-        {
+            {
             Receiver.ManualBell = ToState;
-        }
+            }
 
         public override string ToString() {
             return base.ToString() + " " + (ToState ? "ring" : "off");
@@ -968,7 +969,7 @@ namespace Orts.Common
                 Receiver.SteamHeatChangeTo(ToState, Target);
                            }
             // Report();
-        }
+    }
     }
 
     // Large Ejector command
@@ -1516,4 +1517,27 @@ namespace Orts.Common
         }
     }
 
+
+    [Serializable()]
+    public class ScriptedControlCommand : Command
+    {
+        public static MSTSLocomotive Receiver { get; set; }
+        public Scripting.KeyMapCommand Command { get; set; }
+
+        public ScriptedControlCommand(CommandLog log, Scripting.KeyMapCommand command)
+            : base(log)
+        {
+            Command = command;
+            Redo();
+        }
+
+        public override void Redo()
+        {
+            if (Receiver == null) return;
+            if (Command.Index == 1)
+                ContentScript.HandleEvent(Receiver.EventHandlers, Command.SoundTrigger);
+            Receiver.ContentScript.Execute(Command);
+            // Report();
+        }
+    }
 }

@@ -18,6 +18,7 @@
 using Orts.Parsers.Msts;
 using Orts.Simulation.AIs;
 using ORTS.Common;
+using Orts.Common.Scripting;
 using ORTS.Scripting.Api;
 using System;
 using System.Collections.Generic;
@@ -279,6 +280,8 @@ namespace Orts.Simulation.RollingStocks.SubSystems.Controllers
                 Script.ClockTime = () => (float)Simulator.ClockTime;
                 Script.GameTime = () => (float)Simulator.GameTime;
                 Script.DistanceM = () => Locomotive.DistanceM;
+                Script.SetControlValue = (controlName, index, value) => Locomotive.ContentScript.SetControlValue(controlName, index, value);
+                Script.GetControlValue = (controlName, index) => ContentScript.GetControlValue(Locomotive, controlName, index);
 
                 // BrakeController
                 Script.EmergencyBrakingPushButton = () => EmergencyBrakingPushButton;
