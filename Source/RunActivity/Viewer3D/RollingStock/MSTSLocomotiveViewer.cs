@@ -69,24 +69,34 @@ namespace Orts.Viewer3D.RollingStock
             if (Locomotive.TrainControlSystem != null && Locomotive.TrainControlSystem.Sounds.Count > 0)
                 foreach (var script in Locomotive.TrainControlSystem.Sounds.Keys)
                 {
+
                     try
                     {
-                    Viewer.SoundProcess.AddSoundSources(script, new List<SoundSourceBase>() {
+                        Viewer.SoundProcess.AddSoundSources(script, new List<SoundSourceBase>() {
                         new SoundSource(Viewer, Locomotive, Locomotive.TrainControlSystem.Sounds[script])});
-
-            foreach (var script in Locomotive.ContentScript.SoundManagementFiles.Keys)
-                Viewer.SoundProcess.AddSoundSource(script, new SoundSource(Viewer, Locomotive, Locomotive.ContentScript.SoundManagementFiles[script]));
-
-            // Delegate UserInput class methods to ContentScript, so that the script will be able to query input devices states
-            if (ContentScript.UserInputIsDown == null) ContentScript.UserInputIsDown = (command) => UserInput.IsDown(command);
-            if (ContentScript.UserInputIsPressed == null) ContentScript.UserInputIsPressed = (setting) => UserInput.IsPressed(setting);
-            if (ContentScript.UserInputIsReleased == null) ContentScript.UserInputIsReleased = (setting) => UserInput.IsReleased(setting);
-        }
+                    }
                     catch (Exception error)
                     {
                         Trace.TraceInformation("File " + Locomotive.TrainControlSystem.Sounds[script] + " in script of locomotive of train " + Locomotive.Train.Name + " : " + error.Message);
                     }
                 }
+
+            foreach (var script in Locomotive.ContentScript.SoundManagementFiles.Keys)
+            {
+                try
+                {
+                    Viewer.SoundProcess.AddSoundSource(script, new SoundSource(Viewer, Locomotive, Locomotive.ContentScript.SoundManagementFiles[script]));
+                }
+                catch (Exception error)
+                {
+                    Trace.TraceInformation("File " + Locomotive.ContentScript.SoundManagementFiles[script] + " in script of locomotive of train " + Locomotive.Train.Name + " : " + error.Message);
+                }
+            }
+
+            // Delegate UserInput class methods to ContentScript, so that the script will be able to query input devices states
+            if (ContentScript.UserInputIsDown == null) ContentScript.UserInputIsDown = (command) => UserInput.IsDown(command);
+            if (ContentScript.UserInputIsPressed == null) ContentScript.UserInputIsPressed = (setting) => UserInput.IsPressed(setting);
+            if (ContentScript.UserInputIsReleased == null) ContentScript.UserInputIsReleased = (setting) => UserInput.IsReleased(setting);
         }
 
         protected virtual void StartGearBoxIncrease()

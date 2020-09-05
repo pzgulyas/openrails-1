@@ -73,7 +73,7 @@ namespace Orts.Simulation.RollingStocks.SubSystems.Controllers
         {
             var epState = -1f;
 
-            var trainBrakeIntervention = (int)GetControlValue(ORTSControlType.ORTSTrainBrakeIntervention.ToString(), 1);
+            var trainBrakeIntervention = (int)GetControlValue(OrtsControlType.OrtsTrainBrakeIntervention.ToString(), 1);
 
             if (EmergencyBrakingPushButton() || TCSEmergencyBraking() || trainBrakeIntervention == 2)
             {
@@ -186,7 +186,7 @@ namespace Orts.Simulation.RollingStocks.SubSystems.Controllers
         public override void UpdateEngineBrakePressure(ref float pressureBar, float elapsedClockSeconds)
         {
             ControllerState notchType;
-            var engineBrakeIntervention = (int)GetControlValue(ORTSControlType.ORTSEngineBrakeIntervention.ToString(), 1);
+            var engineBrakeIntervention = (int)GetControlValue(OrtsControlType.OrtsEngineBrakeIntervention.ToString(), 1);
 
             switch (engineBrakeIntervention)
             {

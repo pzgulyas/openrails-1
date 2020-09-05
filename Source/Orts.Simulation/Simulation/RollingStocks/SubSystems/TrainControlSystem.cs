@@ -116,7 +116,16 @@ namespace Orts.Simulation.RollingStocks.SubSystems
 
         public bool Activated = false;
 
-        Train.TrainInfo TrainInfo = new Train.TrainInfo();
+        Train.TrainInfo TrainInfo {
+            get 
+            {
+                if (!TrainInfoUpdatedFlag) _trainInfo = Locomotive.Train.GetTrainInfo();
+                TrainInfoUpdatedFlag = true;
+                return _trainInfo;
+            }
+        }
+        Train.TrainInfo _trainInfo = new Train.TrainInfo();
+        bool TrainInfoUpdatedFlag;
 
         readonly MSTSLocomotive Locomotive;
         readonly Simulator Simulator;
@@ -136,11 +145,11 @@ namespace Orts.Simulation.RollingStocks.SubSystems
         MonitoringDevice AWSMonitor;
 
         public bool AlerterButtonPressed { get; private set; }
-        public bool PowerAuthorization { get; private set; }
-        public bool CircuitBreakerClosingOrder { get; private set;  }
-        public bool CircuitBreakerOpeningOrder { get; private set; }
-        public bool TractionAuthorization { get; private set; }
-        public bool FullDynamicBrakingOrder { get; private set; }
+        public bool PowerAuthorization { get; set; }
+        public bool CircuitBreakerClosingOrder { get; set;  }
+        public bool CircuitBreakerOpeningOrder { get; set; }
+        public bool TractionAuthorization { get; set; }
+        public bool FullDynamicBrakingOrder { get; set; }
 
         public float[] CabDisplayControls = new float[TCSCabviewControlCount];
 
@@ -426,19 +435,19 @@ namespace Orts.Simulation.RollingStocks.SubSystems
             Script?.InitializeMoving();
         }
 
-        public float SignalItem(int forsight, ORTSControlType type)
+        public float SignalItem(int forsight, OrtsControlType type)
         {
             switch (type)
             {
-                case ORTSControlType.ORTSSignalAspect: return forsight == 0 ? (int)Aspect.StopAndProceed : 
+                case OrtsControlType.OrtsSignalAspect: return forsight == 0 ? (int)Aspect.StopAndProceed : 
                     (int)NextSignalItem<Aspect>(forsight - 1, ref SignalAspects, Train.TrainObjectItem.TRAINOBJECTTYPE.SIGNAL);
-                case ORTSControlType.ORTSSignalSpeedLimitMpS: return forsight == 0 ? Locomotive.Train.allowedMaxSpeedSignalMpS : 
+                case OrtsControlType.OrtsSignalSpeedLimitMpS: return forsight == 0 ? Locomotive.Train.allowedMaxSpeedSignalMpS : 
                     NextSignalItem<float>(forsight - 1, ref SignalSpeedLimits, Train.TrainObjectItem.TRAINOBJECTTYPE.SIGNAL);
-                case ORTSControlType.ORTSPostSpeedLimitMpS: return forsight == 0 ? Locomotive.Train.allowedMaxSpeedLimitMpS :
+                case OrtsControlType.OrtsSpeedPostSpeedLimitMpS: return forsight == 0 ? Locomotive.Train.allowedMaxSpeedLimitMpS :
                     NextSignalItem<float>(forsight - 1, ref PostSpeedLimits, Train.TrainObjectItem.TRAINOBJECTTYPE.SPEEDPOST);
-                case ORTSControlType.ORTSSignalDistanceM: return forsight == 0 ? -1 :
+                case OrtsControlType.OrtsSignalDistanceM: return forsight == 0 ? -1 :
                     NextSignalItem<float>(forsight - 1, ref SignalDistances, Train.TrainObjectItem.TRAINOBJECTTYPE.SIGNAL);
-                case ORTSControlType.ORTSPostDistanceM: return forsight == 0 ? -1 :
+                case OrtsControlType.OrtsSpeedPostDistanceM: return forsight == 0 ? -1 :
                     NextSignalItem<float>(forsight - 1, ref PostDistances, Train.TrainObjectItem.TRAINOBJECTTYPE.SPEEDPOST);
                 default: return 0;
             }
@@ -454,9 +463,6 @@ namespace Orts.Simulation.RollingStocks.SubSystems
 
         void SearchTrainInfo(float forsight, Train.TrainObjectItem.TRAINOBJECTTYPE searchFor)
         {
-            if (SignalSpeedLimits.Count == 0)
-                TrainInfo = Locomotive.Train.GetTrainInfo();
-
             var signalsFound = 0;
             var postsFound = 0;
 
@@ -644,7 +650,6 @@ namespace Orts.Simulation.RollingStocks.SubSystems
 
         T NextDivergingSwitchItem<T>(float maxDistanceM, ref T retval, Train.TrainObjectItem.TRAINOBJECTTYPE type)
         {
-            var LocalTrainInfo = Locomotive.Train.GetTrainInfo();
             SignalDistance = float.MaxValue;
             foreach (var foundItem in Locomotive.Train.MUDirection == Direction.Reverse ? TrainInfo.ObjectInfoBackward : TrainInfo.ObjectInfoForward)
             {
@@ -739,6 +744,7 @@ namespace Orts.Simulation.RollingStocks.SubSystems
             SignalDistances.Clear();
             PostSpeedLimits.Clear();
             PostDistances.Clear();
+            TrainInfoUpdatedFlag = false;
         }
 
         public void AlerterPressed(bool pressed)

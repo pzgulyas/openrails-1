@@ -22,6 +22,7 @@ using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Input;
 using Orts.Formats.Msts;
 using ORTS.Common;
+using ORTS.Common.Input;
 using ORTS.Scripting.Api;
 using Orts.Simulation;
 using Orts.Simulation.RollingStocks;
@@ -29,75 +30,94 @@ using ORTS.Settings;
 
 namespace Orts.Common.Scripting
 {
-    public enum ORTSControlType
+    public enum OrtsControlType
     {
         // Generally, apart from exceptions, index 0 means all cars in the train except current, 1 means current car.
         //
         // Get or set controller (defined in eng file) positions directly. Should rarely be needed to set.
-        ORTSDirection, // value -1: backwards, 0: neutral, 1: forwards
-        ORTSThrottle, // value 0-1
-        ORTSDynamicBrake, // value 0-1
-        ORTSEngineBrake, // value 0-1
-        ORTSTrainBrake, // value 0-1
+        OrtsDirection, // value -1: backwards, 0: neutral, 1: forwards
+        OrtsThrottle, // value 0-1
+        OrtsDynamicBrake, // value 0-1
+        OrtsEngineBrake, // value 0-1
+        OrtsTrainBrake, // value 0-1
 
         // Controller interventions without actually moving the levers.
         // Can be used for e.g. automatic speed control (like AFB) or train protection brake intervention
-        ORTSThrottleIntervention, // value -1: off, 0-1: active
-        ORTSDynamicBrakeIntervention, // value -1:off, 0-1: active
-        ORTSEngineBrakeIntervention, // value -1: off, 0: neutral, 1: full service, 2: emergency
-        ORTSTrainBrakeIntervention, // value -1: off, 0: neutral, 1: full service, 2: emergency
+        OrtsThrottleIntervention, // value -1: off, 0-1: active
+        OrtsDynamicBrakeIntervention, // value -1:off, 0-1: active
+        OrtsEngineBrakeIntervention, // value -1: off, 0: neutral, 1: full service, 2: emergency
+        OrtsTrainBrakeIntervention, // value -1: off, 0: neutral, 1: full service, 2: emergency
 
         // Subsystems keyboard commands already exist for
-        ORTSPantograph, // index is the pantograph number
-        ORTSBailOff,
-        ORTSInitializeBrakes,
-        ORTSHandbrake,
-        ORTSTrainRetainers,
-        ORTSBrakeHoseConnect,
-        ORTSSander,
-        ORTSWiper,
-        ORTSHorn,
-        ORTSBell,
-        ORTSHeadLight,
-        ORTSCabLight,
-        ORTSPowerOn, // index: dieselEngine nr.; value 0: stopped, 1: starting, 2: running, 3: stopping
-        ORTSMirror,
-        ORTSDoorLeft,
-        ORTSDoorRight,
-        ORTSCylinderCock,
-        ORTSOdoMeter, // index 0: head, 1: tail
+        OrtsPantograph, // index is the pantograph number
+        OrtsBailOff,
+        OrtsInitializeBrakes,
+        OrtsHandbrake,
+        OrtsTrainRetainers,
+        OrtsBrakeHoseConnect,
+        OrtsSander,
+        OrtsWiper,
+        OrtsHorn,
+        OrtsBell,
+        OrtsHeadLight,
+        OrtsCabLight,
+        OrtsPowerOn, // index: dieselEngine nr.; value 0: stopped, 1: starting, 2: running, 3: stopping
+        OrtsMirror,
+        OrtsDoorLeft,
+        OrtsDoorRight,
+        OrtsCylinderCock,
+        OrtsOdoMeter, // index 0: head, 1: tail
 
         // Subsystems no dedicated keyboard assigned for
-        ORTSAuxPowerOn,
-        ORTSPowerAuthorization,
-        ORTSCircuitBraker,
-        ORTSCompressor,
-        ORTSAcceptRemoteControlSignals,
+        OrtsAuxPowerOn,
+        OrtsPowerAuthorization,
+        OrtsCircuitBreakerClosingOrder,
+        OrtsCircuitBreakerOpeningOrder,
+        OrtsTractionAuthorization,
+        OrtsFullDynamicBrakingOrder,
+        OrtsCircuitBraker,
+        OrtsCompressor,
+        OrtsAcceptRemoteControlSignals,
 
         // Physics parameters
-        ORTSSpeedMpS, // read-only
-        ORTSDistanceM, // read-only
-        ORTSClockTimeS, // read-only
-        ORTSBrakeResevoirPressureBar, // read-only, index 0: vacuum, 1: cylinder, 2: main reservoir
-        ORTSBrakeLinePressureBar, // index 0: vacuum, 1: main, 2: equalising, 3: engine brake, 4: EP control
+        OrtsSpeedMpS, // read-only
+        OrtsDistanceM, // read-only
+        OrtsClockTimeS, // read-only
+        OrtsBrakeResevoirPressureBar, // read-only, index 0: vacuum, 1: brake cylinder, 2: main reservoir
+        OrtsBrakeLinePressureBar, // index 1: main (ro), 2: equalising, 3: engine brake, 4: EP control
 
         // Train protection
-        ORTSAlerterButton,
-        ORTSEmergencyPushButton,
-        ORTSVigilanceAlarm,
-        ORTSMonitoringState, // index is 0
-        ORTSInterventionSpeedMpS, // index 0: release, 1: apply
+        OrtsAlerterButton,
+        OrtsEmergencyPushButton,
+        OrtsVigilanceAlarm,
+        OrtsMonitoringState, // index is 0
+        OrtsInterventionSpeedMpS, // index 0: release, 1: apply
 
-        // Signalling data
-        // For these index 0: current, x: next x
-        ORTSSignalAspect,
-        ORTSSignalSpeedLimitMpS,
-        ORTSSignalDistanceM,
-        ORTSPostSpeedLimitMpS,
-        ORTSPostDistanceM,
+        // Signalling data, read-only
+        // For these index 0: current, x: next x. Second index: zero based head number
+        OrtsSignalDistanceM, // (n)
+        OrtsSignalAltitudeM, // (n)
+        OrtsSignalHeadsCount, // (n)
+        OrtsSignalAspect, // (n, h)
+        OrtsSignalSpeedLimitMpS, // (n, h)
+        OrtsSignalAvailableAspects, // (n, h)
+        OrtsSignalType, // (n, h) - enum fn_type
+        OrtsSignalName, // (n, h) - string
+        OrtsSpeedPostDistanceM, // (n)
+        OrtsSpeedPostAltitudeM, // (n)
+        OrtsSpeedPostSpeedLimitMpS, // (n)
+        OrtsMilePostDistanceM, // (n)
+        OrtsMilePostAltitudeM, // (n)
+        OrtsMilePostValue, // (n) ??????????????????????
+        OrtsDivergingSwitchDistanceM, // (n)
+        OrtsDivergingSwitchAltitudeM, // (n)
+        OrtsStationDistanceM, // (n)
+        OrtsStationPlatformLengthM, // (n)
+        OrtsStationName, // (n) - string
+        OrtsTunnelEntranceDistanceM, // (n)
 
         // Sound triggers, write-only
-        ORTSDiscreteTrigger, // value is the trigger number
+        OrtsDiscreteTrigger, // value is the trigger number
     }
 
     public class ContentScript
@@ -158,7 +178,7 @@ namespace Orts.Common.Scripting
         private readonly List<ControllerScript> Scripts = new List<ControllerScript>();
 
         // Receive delegates from Viewer3D.UserInput
-        public static Func<UserCommands, bool> UserInputIsDown;
+        public static Func<UserCommand, bool> UserInputIsDown;
         public static Func<UserCommandInput, bool> UserInputIsPressed;
         public static Func<UserCommandInput, bool> UserInputIsReleased;
 
@@ -203,7 +223,7 @@ namespace Orts.Common.Scripting
         /// A string -> enum lookup table for UserCommands starting with "Control" (e.g. ControlThrottleIncrease),
         /// defined to avoid using code reflection beyond initialization.
         /// </summary>
-        private static readonly Dictionary<string, UserCommands> ORTSKeyboardCommands = new Dictionary<string, UserCommands>();
+        private static readonly Dictionary<string, UserCommand> ORTSKeyboardCommands = new Dictionary<string, UserCommand>();
         
         public ContentScript(MSTSLocomotive locomotive)
         {
@@ -215,12 +235,16 @@ namespace Orts.Common.Scripting
                     MSTSControlTypes.Add(controlType.ToString(), new UserCabViewControl() { ControlType = controlType });
 
             if (ORTSControlTypes.Count == 0)
-                foreach (var controlType in (ORTSControlType[])Enum.GetValues(typeof(ORTSControlType)))
+                foreach (var controlType in (OrtsControlType[])Enum.GetValues(typeof(OrtsControlType)))
                     ORTSControlTypes.Add(controlType.ToString(), new UserCabViewControl() { ORTSControlType = controlType });
 
             if (ORTSKeyboardCommands.Count == 0)
-                foreach (var controlCommand in (UserCommands[])Enum.GetValues(typeof(UserCommands)))
-                    ORTSKeyboardCommands.Add(controlCommand.ToString(), controlCommand);
+                foreach (var controlCommand in (UserCommand[])Enum.GetValues(typeof(UserCommand)))
+                {
+                    var command = controlCommand.ToString();
+                    if (command.StartsWith("Control"))
+                        ORTSKeyboardCommands.Add(controlCommand.ToString(), controlCommand);
+                }
         }
 
         public ContentScript(ContentScript contentScript) : this(contentScript.Locomotive)
@@ -376,7 +400,7 @@ namespace Orts.Common.Scripting
 
         public class UserCabViewControl : CabViewControl
         {
-            public ORTSControlType ORTSControlType;
+            public OrtsControlType ORTSControlType;
 
             public UserCabViewControl() { }
         }
@@ -424,7 +448,7 @@ namespace Orts.Common.Scripting
                     var steamLocomotive = locomotive as MSTSSteamLocomotive;
                     switch (ORTSControlTypes[controlName].ORTSControlType)
                     {
-                        case ORTSControlType.ORTSCylinderCock: return steamLocomotive.CylinderCocksAreOpen ? 1 : 0;
+                        case OrtsControlType.OrtsCylinderCock: return steamLocomotive.CylinderCocksAreOpen ? 1 : 0;
                     }
                 }
                 else if (locomotive is MSTSElectricLocomotive)
@@ -432,31 +456,34 @@ namespace Orts.Common.Scripting
                     var electricLocomotive = locomotive as MSTSElectricLocomotive;
                     switch (ORTSControlTypes[controlName].ORTSControlType)
                     {
-                        case ORTSControlType.ORTSCircuitBraker: return index != 1 ? 0 : electricLocomotive.PowerSupply.CircuitBreaker.State == CircuitBreakerState.Closed ? 1 : 0;
+                        case OrtsControlType.OrtsCircuitBraker: return index == 1 && electricLocomotive.PowerSupply.CircuitBreaker.State == CircuitBreakerState.Closed ? 1 : 0;
                     }
                 }
                 switch (ORTSControlTypes[controlName].ORTSControlType)
                 {
-                    case ORTSControlType.ORTSThrottle: return index != 1 ? 0 : locomotive.ThrottleController.CurrentValue;
-                    case ORTSControlType.ORTSDynamicBrake: return index != 1 ? 0 : locomotive.DynamicBrakeController.CurrentValue;
-                    case ORTSControlType.ORTSEngineBrake: return index != 1 ? 0 : locomotive.EngineBrakeController.CurrentValue;
-                    case ORTSControlType.ORTSTrainBrake: return index != 1 ? 0 : locomotive.TrainBrakeController.CurrentValue;
-                    case ORTSControlType.ORTSDirection: return index != 1 ? 0 : locomotive.Direction == Direction.Reverse ? 0 : locomotive.Direction == Direction.N ? 1 : 2;
-                    case ORTSControlType.ORTSThrottleIntervention: return index != 1 ? 0 : locomotive.ThrottleIntervention;
-                    case ORTSControlType.ORTSDynamicBrakeIntervention: return index != 1 ? 0 : locomotive.DynamicBrakeIntervention;
-                    case ORTSControlType.ORTSEngineBrakeIntervention: return index != 1 ? 0 : locomotive.EngineBrakeIntervention;
-                    case ORTSControlType.ORTSTrainBrakeIntervention: return index != 1 ? 0 : locomotive.TrainBrakeIntervention;
-                    case ORTSControlType.ORTSPowerOn:
+                    case OrtsControlType.OrtsThrottle: return index != 1 ? 0 : locomotive.ThrottleController.CurrentValue;
+                    case OrtsControlType.OrtsDynamicBrake: return index != 1 ? 0 : locomotive.DynamicBrakeController.CurrentValue;
+                    case OrtsControlType.OrtsEngineBrake: return index != 1 ? 0 : locomotive.EngineBrakeController.CurrentValue;
+                    case OrtsControlType.OrtsTrainBrake: return index != 1 ? 0 : locomotive.TrainBrakeController.CurrentValue;
+                    case OrtsControlType.OrtsDirection: return index != 1 ? 0 : locomotive.Direction == Direction.Reverse ? 0 : locomotive.Direction == Direction.N ? 1 : 2;
+                    case OrtsControlType.OrtsThrottleIntervention: return index != 1 ? 0 : locomotive.ThrottleIntervention;
+                    case OrtsControlType.OrtsDynamicBrakeIntervention: return index != 1 ? 0 : locomotive.DynamicBrakeIntervention;
+                    case OrtsControlType.OrtsEngineBrakeIntervention: return index != 1 ? 0 : locomotive.EngineBrakeIntervention;
+                    case OrtsControlType.OrtsTrainBrakeIntervention: return index != 1 ? 0 : locomotive.TrainBrakeIntervention;
+                    case OrtsControlType.OrtsPowerOn:
                         var dieselLocomotive = locomotive as MSTSDieselLocomotive;
                         if (dieselLocomotive == null)
                             return locomotive.PowerOn ? 1 : 0;
                         else
                             return index >= 0 && index < dieselLocomotive.DieselEngines.Count ? 0 : (int)dieselLocomotive.DieselEngines[index].EngineStatus;
-                    case ORTSControlType.ORTSAuxPowerOn: return index != 1 ? 0 : locomotive.AuxPowerOn ? 1 : 0;
-                    case ORTSControlType.ORTSCompressor: return index != 1 ? 0 : locomotive.CompressorIsOn ? 1 : 0;
-                    case ORTSControlType.ORTSPowerAuthorization:
-                        return index != 1 ? 0 : (locomotive.Train != null ? locomotive.Train.LeadLocomotive as MSTSLocomotive : locomotive).TrainControlSystem.PowerAuthorization ? 1 : 0;
-                    case ORTSControlType.ORTSPantograph:
+                    case OrtsControlType.OrtsAuxPowerOn: return index == 1 && locomotive.AuxPowerOn ? 1 : 0;
+                    case OrtsControlType.OrtsCompressor: return index == 1 && locomotive.CompressorIsOn ? 1 : 0;
+                    case OrtsControlType.OrtsPowerAuthorization: return index == 1 && (locomotive.Train?.LeadLocomotive as MSTSLocomotive ?? locomotive).TrainControlSystem.PowerAuthorization ? 1 : 0;
+                    case OrtsControlType.OrtsCircuitBreakerClosingOrder: return index == 1 && (locomotive.Train?.LeadLocomotive as MSTSLocomotive ?? locomotive).TrainControlSystem.CircuitBreakerClosingOrder ? 1 : 0;
+                    case OrtsControlType.OrtsCircuitBreakerOpeningOrder: return index == 1 && (locomotive.Train?.LeadLocomotive as MSTSLocomotive ?? locomotive).TrainControlSystem.CircuitBreakerOpeningOrder ? 1 : 0;
+                    case OrtsControlType.OrtsTractionAuthorization: return index == 1 && (locomotive.Train?.LeadLocomotive as MSTSLocomotive ?? locomotive).TrainControlSystem.TractionAuthorization ? 1 : 0;
+                    case OrtsControlType.OrtsFullDynamicBrakingOrder: return index == 1 && (locomotive.Train?.LeadLocomotive as MSTSLocomotive ?? locomotive).TrainControlSystem.FullDynamicBrakingOrder ? 1 : 0;
+                    case OrtsControlType.OrtsPantograph:
                         if (locomotive.Pantographs[index] == null) return 0;
                         switch (locomotive.Pantographs[index].State)
                         {
@@ -466,53 +493,51 @@ namespace Orts.Common.Scripting
                             case PantographState.Up: return 3;
                         }
                         break;
-                    case ORTSControlType.ORTSBailOff: return index != 1 ? 0 : locomotive.BailOff ? 1 : 0;
-                    case ORTSControlType.ORTSHandbrake: return index != 1 ? 0 : locomotive.BrakeSystem.GetHandbrakeStatus() ? 1 : 0;
-                    case ORTSControlType.ORTSTrainRetainers: return index != 1 ? 0 : locomotive.Train.RetainerPercent / 100;
-                    case ORTSControlType.ORTSBrakeHoseConnect: return index != 1 ? 0 : locomotive.BrakeSystem.BrakeLine1PressurePSI < 0 ? 0 : 1;
-                    case ORTSControlType.ORTSSander: return index != 1 ? 0 : locomotive.Sander ? 1 : 0;
-                    case ORTSControlType.ORTSWiper: return index != 1 ? 0 : locomotive.Wiper ? 1 : 0;
-                    case ORTSControlType.ORTSHorn: return index != 1 ? 0 : locomotive.Horn ? 1 : 0;
-                    case ORTSControlType.ORTSBell: return index != 1 ? 0 : locomotive.Bell ? 1 : 0;
-                    case ORTSControlType.ORTSMirror: return index != 1 ? 0 : locomotive.MirrorOpen ? 1 : 0;
-                    case ORTSControlType.ORTSAcceptRemoteControlSignals: return index != 1 ? 0 : locomotive.AcceptMUSignals ? 1 : 0;
-                    case ORTSControlType.ORTSDoorLeft: return index != 1 ? 0 : locomotive.DoorLeftOpen ? 1 : 0;
-                    case ORTSControlType.ORTSDoorRight: return index != 1 ? 0 : locomotive.DoorRightOpen ? 1 : 0;
-                    case ORTSControlType.ORTSHeadLight: return index != 1 ? 0 : locomotive.Headlight;
-                    case ORTSControlType.ORTSCabLight: return index != 1 ? 0 : locomotive.CabLightOn ? 1 : 0;
-                    case ORTSControlType.ORTSAlerterButton: return index != 1 ? 0 : locomotive.TrainControlSystem.AlerterButtonPressed ? 1 : 0;
-                    case ORTSControlType.ORTSEmergencyPushButton: return index != 1 ? 0 : locomotive.EmergencyButtonPressed ? 1 : 0;
-                    case ORTSControlType.ORTSVigilanceAlarm: return index != 1 ? 0 : locomotive.AlerterSnd ? 1 : 0;
-                    case ORTSControlType.ORTSMonitoringState: return index != 0 ? 0 : (float)locomotive.TrainControlSystem.MonitoringStatus;
-                    case ORTSControlType.ORTSInterventionSpeedMpS: return index == 0 ? 0 : index == 1 ? locomotive.TrainControlSystem.InterventionSpeedLimitMpS : 0;
-                    case ORTSControlType.ORTSSpeedMpS: return index != 1 ? 0 : Math.Abs(locomotive.SpeedMpS);
-                    case ORTSControlType.ORTSDistanceM: return index != 1 ? 0 : locomotive.DistanceM;
-                    case ORTSControlType.ORTSClockTimeS: return index != 1 ? 0 : (float)locomotive.Simulator.ClockTime;
-                    case ORTSControlType.ORTSOdoMeter: return index == 0 ? locomotive.OdometerM : index == 1 && locomotive.Train != null ? locomotive.OdometerM - locomotive.Train.Length : 0;
-                    case ORTSControlType.ORTSBrakeLinePressureBar:
-                        if (locomotive.Train != null)
-                            switch (index)
-                            {
-                                case 0: return -Bar.FromInHg(locomotive.Train.BrakeLine1PressurePSIorInHg);
-                                case 1: return Bar.FromPSI(locomotive.Train.BrakeLine1PressurePSIorInHg);
-                                case 2: return Bar.FromPSI(locomotive.Train.BrakeLine2PressurePSI);
-                                case 3: return Bar.FromPSI(locomotive.Train.BrakeLine3PressurePSI);
-                                case 4: return locomotive.Train.BrakeLine4;
-                            }
-                        return float.MaxValue;
-                    case ORTSControlType.ORTSBrakeResevoirPressureBar:
+                    case OrtsControlType.OrtsBailOff: return index != 1 ? 0 : locomotive.BailOff ? 1 : 0;
+                    case OrtsControlType.OrtsHandbrake: return index != 1 ? 0 : locomotive.BrakeSystem.GetHandbrakeStatus() ? 1 : 0;
+                    case OrtsControlType.OrtsTrainRetainers: return index != 1 ? 0 : locomotive.Train.RetainerPercent / 100;
+                    case OrtsControlType.OrtsBrakeHoseConnect: return index != 1 ? 0 : locomotive.BrakeSystem.BrakeLine1PressurePSI < 0 ? 0 : 1;
+                    case OrtsControlType.OrtsSander: return index != 1 ? 0 : locomotive.Sander ? 1 : 0;
+                    case OrtsControlType.OrtsWiper: return index != 1 ? 0 : locomotive.Wiper ? 1 : 0;
+                    case OrtsControlType.OrtsHorn: return index != 1 ? 0 : locomotive.Horn ? 1 : 0;
+                    case OrtsControlType.OrtsBell: return index != 1 ? 0 : locomotive.Bell ? 1 : 0;
+                    case OrtsControlType.OrtsMirror: return index != 1 ? 0 : locomotive.MirrorOpen ? 1 : 0;
+                    case OrtsControlType.OrtsAcceptRemoteControlSignals: return index != 1 ? 0 : locomotive.AcceptMUSignals ? 1 : 0;
+                    case OrtsControlType.OrtsDoorLeft: return index != 1 ? 0 : locomotive.DoorLeftOpen ? 1 : 0;
+                    case OrtsControlType.OrtsDoorRight: return index != 1 ? 0 : locomotive.DoorRightOpen ? 1 : 0;
+                    case OrtsControlType.OrtsHeadLight: return index != 1 ? 0 : locomotive.Headlight;
+                    case OrtsControlType.OrtsCabLight: return index != 1 ? 0 : locomotive.CabLightOn ? 1 : 0;
+                    case OrtsControlType.OrtsAlerterButton: return index != 1 ? 0 : locomotive.TrainControlSystem.AlerterButtonPressed ? 1 : 0;
+                    case OrtsControlType.OrtsEmergencyPushButton: return index != 1 ? 0 : locomotive.EmergencyButtonPressed ? 1 : 0;
+                    case OrtsControlType.OrtsVigilanceAlarm: return index != 1 ? 0 : locomotive.AlerterSnd ? 1 : 0;
+                    case OrtsControlType.OrtsMonitoringState: return index != 0 ? 0 : (float)locomotive.TrainControlSystem.MonitoringStatus;
+                    case OrtsControlType.OrtsInterventionSpeedMpS: return index == 0 ? 0 : index == 1 ? locomotive.TrainControlSystem.InterventionSpeedLimitMpS : 0;
+                    case OrtsControlType.OrtsSpeedMpS: return index != 1 ? 0 : Math.Abs(locomotive.SpeedMpS);
+                    case OrtsControlType.OrtsDistanceM: return index != 1 ? 0 : locomotive.DistanceM;
+                    case OrtsControlType.OrtsClockTimeS: return index != 1 ? 0 : (float)locomotive.Simulator.ClockTime;
+                    case OrtsControlType.OrtsOdoMeter: return index == 0 ? locomotive.OdometerM : index == 1 && locomotive.Train != null ? locomotive.OdometerM - locomotive.Train.Length : 0;
+                    case OrtsControlType.OrtsBrakeLinePressureBar:
                         switch (index)
                         {
-                            case 0: return -Bar.FromPSI(locomotive.BrakeSystem.GetVacResPressurePSI());
+                            case 1: return Bar.FromPSI(locomotive.BrakeSystem.BrakeLine1PressurePSI);
+                            case 2: return Bar.FromPSI(locomotive.BrakeSystem.BrakeLine2PressurePSI);
+                            case 3: return Bar.FromPSI(locomotive.BrakeSystem.BrakeLine3PressurePSI);
+                            case 4: return locomotive?.Train.BrakeLine4 ?? float.MaxValue;
+                            default: return float.MaxValue;
+                        }
+                    case OrtsControlType.OrtsBrakeResevoirPressureBar:
+                        switch (index)
+                        {
+                            case 0: return Bar.FromPSI(locomotive.BrakeSystem.GetVacResPressurePSI());
                             case 1: return Bar.FromPSI(locomotive.BrakeSystem.GetCylPressurePSI());
-                            case 2: return Bar.FromPSI(locomotive.BrakeSystem.BrakeLine1PressurePSI);
+                            case 2: return Bar.FromPSI(locomotive.MainResPressurePSI);
                             default: return 0;
                         }
-                    case ORTSControlType.ORTSSignalAspect: return locomotive.TrainControlSystem.SignalItem(index, ORTSControlType.ORTSSignalAspect);
-                    case ORTSControlType.ORTSSignalSpeedLimitMpS: return locomotive.TrainControlSystem.SignalItem(index, ORTSControlType.ORTSSignalSpeedLimitMpS);
-                    case ORTSControlType.ORTSSignalDistanceM: return locomotive.TrainControlSystem.SignalItem(index, ORTSControlType.ORTSSignalDistanceM);
-                    case ORTSControlType.ORTSPostSpeedLimitMpS: return locomotive.TrainControlSystem.SignalItem(index, ORTSControlType.ORTSPostSpeedLimitMpS);
-                    case ORTSControlType.ORTSPostDistanceM: return locomotive.TrainControlSystem.SignalItem(index, ORTSControlType.ORTSPostDistanceM);
+                    case OrtsControlType.OrtsSignalAspect: return locomotive.TrainControlSystem.SignalItem(index, OrtsControlType.OrtsSignalAspect);
+                    case OrtsControlType.OrtsSignalSpeedLimitMpS: return locomotive.TrainControlSystem.SignalItem(index, OrtsControlType.OrtsSignalSpeedLimitMpS);
+                    case OrtsControlType.OrtsSignalDistanceM: return locomotive.TrainControlSystem.SignalItem(index, OrtsControlType.OrtsSignalDistanceM);
+                    case OrtsControlType.OrtsSpeedPostSpeedLimitMpS: return locomotive.TrainControlSystem.SignalItem(index, OrtsControlType.OrtsSpeedPostSpeedLimitMpS);
+                    case OrtsControlType.OrtsSpeedPostDistanceM: return locomotive.TrainControlSystem.SignalItem(index, OrtsControlType.OrtsSpeedPostDistanceM);
                     default: return 0;
                 }
                 return 0;
@@ -552,56 +577,58 @@ namespace Orts.Common.Scripting
                 switch (ORTSControlTypes[controlName].ORTSControlType)
                 {
                     // Board computer doesn't normally move levers, just overrides their settings
-                    case ORTSControlType.ORTSThrottle: if (index == 1) Locomotive.ThrottleController.SetValue(MathHelper.Clamp(value, 0, 1)); break;
-                    case ORTSControlType.ORTSDynamicBrake: if (index == 1) Locomotive.DynamicBrakeController.SetValue(MathHelper.Clamp(value, -1, 1)); break;
-                    case ORTSControlType.ORTSEngineBrake: if (index == 1) Locomotive.EngineBrakeController.SetValue(MathHelper.Clamp(value, 0, 1)); break;
-                    case ORTSControlType.ORTSTrainBrake: if (index == 1) Locomotive.TrainBrakeController.SetValue(MathHelper.Clamp(value, 0, 1)); break;
-                    case ORTSControlType.ORTSDirection: if (index == 1) Locomotive.SetDirection(value > 1 ? Direction.Forward : value < 1 ? Direction.Reverse : Direction.N); break;
-                    case ORTSControlType.ORTSThrottleIntervention: TrainCarAction<MSTSLocomotive>(index, l => l.ThrottleIntervention = MathHelper.Clamp(value, -1, 1)); break;
-                    case ORTSControlType.ORTSDynamicBrakeIntervention: TrainCarAction<MSTSLocomotive>(index, l => l.DynamicBrakeIntervention = MathHelper.Clamp(value, -1, 1)); break;
-                    case ORTSControlType.ORTSEngineBrakeIntervention: TrainCarAction<MSTSLocomotive>(index, l => l.EngineBrakeIntervention = (int)MathHelper.Clamp(value, -1, 2)); break;
-                    case ORTSControlType.ORTSTrainBrakeIntervention: TrainCarAction<MSTSLocomotive>(index, l => l.TrainBrakeIntervention = (int)MathHelper.Clamp(value, -1, 2)); break;
-                    case ORTSControlType.ORTSDiscreteTrigger: TrainCarAction<MSTSLocomotive>(index, l => HandleEvent(l.EventHandlers, (int)value)); break;
-                    case ORTSControlType.ORTSPowerOn: TrainCarAction<MSTSLocomotive>(index, l => l.SetPower(value > 0)); break;
-                    case ORTSControlType.ORTSCircuitBraker: TrainCarAction<MSTSLocomotive>(index, l => l.SignalEvent(value > 0 ? PowerSupplyEvent.CloseCircuitBreaker : PowerSupplyEvent.OpenCircuitBreaker, index)); break;
-                    case ORTSControlType.ORTSPowerAuthorization: TrainCarAction<MSTSLocomotive>(index, l => l.TrainControlSystem.SetPowerAuthorization(value > 0)); break;
-                    case ORTSControlType.ORTSAuxPowerOn: TrainCarAction<MSTSElectricLocomotive>(index, l => l.PowerSupply.AuxiliaryState = value > 0 ? PowerSupplyState.PowerOn : PowerSupplyState.PowerOff); break;
-                    case ORTSControlType.ORTSCompressor: if (index == 1) Locomotive.SignalEvent(value > 0 ? Event.CompressorOn : Event.CompressorOff); break;
-                    case ORTSControlType.ORTSPantograph: Locomotive.SignalEvent(value > 0 ? PowerSupplyEvent.RaisePantograph : PowerSupplyEvent.LowerPantograph, index); break;
-                    case ORTSControlType.ORTSBailOff: if (index == 1) Locomotive.SetBailOff(value > 0); break;
-                    case ORTSControlType.ORTSInitializeBrakes: if (index == 0 && value == 1 && Locomotive.Train != null) Locomotive.Train.UnconditionalInitializeBrakes(); break;
-                    case ORTSControlType.ORTSHandbrake: TrainCarAction<MSTSWagon>(index, l => l.BrakeSystem.SetHandbrakePercent(value * 100)); break;
-                    case ORTSControlType.ORTSTrainRetainers: if (index == 0) Locomotive.SetTrainRetainers(value > 0); break;
-                    case ORTSControlType.ORTSBrakeHoseConnect: if (index == 1) Locomotive.BrakeHoseConnect(value > 0); break;
-                    case ORTSControlType.ORTSSander: TrainCarAction<MSTSLocomotive>(index, l => l.SignalEvent(value > 0 ? Event.SanderOn : Event.SanderOff)); break;
-                    case ORTSControlType.ORTSWiper: if (index == 1) Locomotive.SignalEvent(value > 0 ? Event.WiperOn : Event.WiperOff); break;
-                    case ORTSControlType.ORTSHorn: if (index == 1) Locomotive.SignalEvent(value > 0 ? Event.HornOn : Event.HornOff); break;
-                    case ORTSControlType.ORTSBell: if (index == 1) Locomotive.SignalEvent(value > 0 ? Event.BellOn : Event.BellOff); break;
-                    case ORTSControlType.ORTSHeadLight: if (index == 1) Locomotive.Headlight = (int)MathHelper.Clamp(value, 0, 2); break;
-                    case ORTSControlType.ORTSCabLight: if (index == 1) Locomotive.CabLightOn = value > 0; break;
-                    case ORTSControlType.ORTSAlerterButton: if (index == 1) { Locomotive.AlerterPressed(value > 0); if (value > 0) Locomotive.SignalEvent(Event.VigilanceAlarmReset); } break;
-                    case ORTSControlType.ORTSEmergencyPushButton: if (index == 1) { Locomotive.EmergencyButtonPressed = !Locomotive.EmergencyButtonPressed; Locomotive.TrainBrakeController.EmergencyBrakingPushButton = Locomotive.EmergencyButtonPressed; } break;
-                    case ORTSControlType.ORTSVigilanceAlarm: if (index == 1) Locomotive.SignalEvent(value > 0 ? Event.VigilanceAlarmOn : Event.VigilanceAlarmOff); break;
-                    case ORTSControlType.ORTSMonitoringState: if (index == 0) Locomotive.TrainControlSystem.MonitoringStatus = (MonitoringStatus)(int)MathHelper.Clamp(value, 0, 5); break;
-                    case ORTSControlType.ORTSInterventionSpeedMpS: if (index == 0) { } else if (index == 1) Locomotive.TrainControlSystem.InterventionSpeedLimitMpS = value; break;
-                    case ORTSControlType.ORTSSignalAspect: if (index == 0) Locomotive.TrainControlSystem.CabSignalAspect = (TrackMonitorSignalAspect)(int)MathHelper.Clamp(value, 0, 9); break;
-                    case ORTSControlType.ORTSSignalSpeedLimitMpS: if (index == 0) Locomotive.TrainControlSystem.CurrentSpeedLimitMpS = value; else if (index == 1) Locomotive.TrainControlSystem.NextSpeedLimitMpS = value; break;
-                    case ORTSControlType.ORTSMirror: if (index == 1 && (value > 0 != Locomotive.MirrorOpen)) Locomotive.ToggleMirrors(); break;
-                    case ORTSControlType.ORTSAcceptRemoteControlSignals: if (index == 1) Locomotive.AcceptMUSignals = value > 0; break;
-                    case ORTSControlType.ORTSDoorLeft: TrainCarAction<MSTSWagon>(index, l => { if (l.DoorLeftOpen != value > 0) { l.DoorLeftOpen = value > 0; l.SignalEvent(value > 0 ? Event.DoorOpen : Event.DoorClose); } }); break;
-                    case ORTSControlType.ORTSDoorRight: TrainCarAction<MSTSWagon>(index, l => { if (l.DoorRightOpen != value > 0) { l.DoorRightOpen = value > 0; l.SignalEvent(value > 0 ? Event.DoorOpen : Event.DoorClose); } }); break;
-                    case ORTSControlType.ORTSCylinderCock: TrainCarAction<MSTSSteamLocomotive>(index, l => { if (l.CylinderCocksAreOpen != value > 0) l.ToggleCylinderCocks(); }); break;
-                    case ORTSControlType.ORTSOdoMeter: if (index == 0 && value == 0) Locomotive.OdometerReset(); break;
-                    case ORTSControlType.ORTSBrakeLinePressureBar:
-                        if (Locomotive.Train != null && Locomotive.IsLeadLocomotive())
-                            switch (index)
-                            {
-                                case 0: Locomotive.Train.BrakeLine1PressurePSIorInHg = -Bar.ToInHg(value); break;
-                                case 1: Locomotive.Train.BrakeLine1PressurePSIorInHg = Bar.ToPSI(value); break;
-                                case 2: Locomotive.Train.BrakeLine2PressurePSI = Bar.ToPSI(value); break;
-                                case 3: Locomotive.Train.BrakeLine3PressurePSI = Bar.ToPSI(value); break;
-                                case 4: Locomotive.Train.BrakeLine4 = value; break;
-                            }
+                    case OrtsControlType.OrtsThrottle: if (index == 1) Locomotive.ThrottleController.SetValue(MathHelper.Clamp(value, 0, 1)); break;
+                    case OrtsControlType.OrtsDynamicBrake: if (index == 1) Locomotive.DynamicBrakeController.SetValue(MathHelper.Clamp(value, -1, 1)); break;
+                    case OrtsControlType.OrtsEngineBrake: if (index == 1) Locomotive.EngineBrakeController.SetValue(MathHelper.Clamp(value, 0, 1)); break;
+                    case OrtsControlType.OrtsTrainBrake: if (index == 1) Locomotive.TrainBrakeController.SetValue(MathHelper.Clamp(value, 0, 1)); break;
+                    case OrtsControlType.OrtsDirection: if (index == 1) Locomotive.SetDirection(value > 1 ? Direction.Forward : value < 1 ? Direction.Reverse : Direction.N); break;
+                    case OrtsControlType.OrtsThrottleIntervention: TrainCarAction<MSTSLocomotive>(index, l => l.ThrottleIntervention = MathHelper.Clamp(value, -1, 1)); break;
+                    case OrtsControlType.OrtsDynamicBrakeIntervention: TrainCarAction<MSTSLocomotive>(index, l => l.DynamicBrakeIntervention = MathHelper.Clamp(value, -1, 1)); break;
+                    case OrtsControlType.OrtsEngineBrakeIntervention: TrainCarAction<MSTSLocomotive>(index, l => l.EngineBrakeIntervention = (int)MathHelper.Clamp(value, -1, 2)); break;
+                    case OrtsControlType.OrtsTrainBrakeIntervention: TrainCarAction<MSTSLocomotive>(index, l => l.TrainBrakeIntervention = (int)MathHelper.Clamp(value, -1, 2)); break;
+                    case OrtsControlType.OrtsDiscreteTrigger: TrainCarAction<MSTSLocomotive>(index, l => HandleEvent(l.EventHandlers, (int)value)); break;
+                    case OrtsControlType.OrtsPowerOn: TrainCarAction<MSTSLocomotive>(index, l => l.SetPower(value > 0)); break;
+                    case OrtsControlType.OrtsCircuitBraker: TrainCarAction<MSTSLocomotive>(index, l => l.SignalEvent(value > 0 ? PowerSupplyEvent.CloseCircuitBreaker : PowerSupplyEvent.OpenCircuitBreaker, index)); break;
+                    case OrtsControlType.OrtsPowerAuthorization: TrainCarAction<MSTSLocomotive>(index, l => l.TrainControlSystem.PowerAuthorization = value > 0); break;
+                    case OrtsControlType.OrtsCircuitBreakerClosingOrder: TrainCarAction<MSTSLocomotive>(index, l => l.TrainControlSystem.CircuitBreakerClosingOrder = value > 0); break;
+                    case OrtsControlType.OrtsCircuitBreakerOpeningOrder: TrainCarAction<MSTSLocomotive>(index, l => l.TrainControlSystem.CircuitBreakerOpeningOrder = value > 0); break;
+                    case OrtsControlType.OrtsTractionAuthorization: TrainCarAction<MSTSLocomotive>(index, l => l.TrainControlSystem.TractionAuthorization = value > 0); break;
+                    case OrtsControlType.OrtsFullDynamicBrakingOrder: TrainCarAction<MSTSLocomotive>(index, l => l.TrainControlSystem.FullDynamicBrakingOrder = value > 0); break;
+                    case OrtsControlType.OrtsAuxPowerOn: TrainCarAction<MSTSElectricLocomotive>(index, l => l.PowerSupply.AuxiliaryState = value > 0 ? PowerSupplyState.PowerOn : PowerSupplyState.PowerOff); break;
+                    case OrtsControlType.OrtsCompressor: if (index == 1) Locomotive.SignalEvent(value > 0 ? Event.CompressorOn : Event.CompressorOff); break;
+                    case OrtsControlType.OrtsPantograph: Locomotive.SignalEvent(value > 0 ? PowerSupplyEvent.RaisePantograph : PowerSupplyEvent.LowerPantograph, index); break;
+                    case OrtsControlType.OrtsBailOff: if (index == 1) Locomotive.SetBailOff(value > 0); break;
+                    case OrtsControlType.OrtsInitializeBrakes: if (index == 0 && value == 1 && Locomotive.Train != null) Locomotive.Train.UnconditionalInitializeBrakes(); break;
+                    case OrtsControlType.OrtsHandbrake: TrainCarAction<MSTSWagon>(index, l => l.BrakeSystem.SetHandbrakePercent(value * 100)); break;
+                    case OrtsControlType.OrtsTrainRetainers: if (index == 0) Locomotive.SetTrainRetainers(value > 0); break;
+                    case OrtsControlType.OrtsBrakeHoseConnect: if (index == 1) Locomotive.BrakeHoseConnect(value > 0); break;
+                    case OrtsControlType.OrtsSander: TrainCarAction<MSTSLocomotive>(index, l => l.SignalEvent(value > 0 ? Event.SanderOn : Event.SanderOff)); break;
+                    case OrtsControlType.OrtsWiper: if (index == 1) Locomotive.SignalEvent(value > 0 ? Event.WiperOn : Event.WiperOff); break;
+                    case OrtsControlType.OrtsHorn: if (index == 1) Locomotive.SignalEvent(value > 0 ? Event.HornOn : Event.HornOff); break;
+                    case OrtsControlType.OrtsBell: if (index == 1) Locomotive.SignalEvent(value > 0 ? Event.BellOn : Event.BellOff); break;
+                    case OrtsControlType.OrtsHeadLight: if (index == 1) Locomotive.Headlight = (int)MathHelper.Clamp(value, 0, 2); break;
+                    case OrtsControlType.OrtsCabLight: if (index == 1) Locomotive.CabLightOn = value > 0; break;
+                    case OrtsControlType.OrtsAlerterButton: if (index == 1) { Locomotive.AlerterPressed(value > 0); if (value > 0) Locomotive.SignalEvent(Event.VigilanceAlarmReset); } break;
+                    case OrtsControlType.OrtsEmergencyPushButton: if (index == 1) { Locomotive.EmergencyButtonPressed = !Locomotive.EmergencyButtonPressed; Locomotive.TrainBrakeController.EmergencyBrakingPushButton = Locomotive.EmergencyButtonPressed; } break;
+                    case OrtsControlType.OrtsVigilanceAlarm: if (index == 1) Locomotive.SignalEvent(value > 0 ? Event.VigilanceAlarmOn : Event.VigilanceAlarmOff); break;
+                    case OrtsControlType.OrtsMonitoringState: if (index == 0) Locomotive.TrainControlSystem.MonitoringStatus = (MonitoringStatus)(int)MathHelper.Clamp(value, 0, 5); break;
+                    case OrtsControlType.OrtsInterventionSpeedMpS: if (index == 0) { } else if (index == 1) Locomotive.TrainControlSystem.InterventionSpeedLimitMpS = value; break;
+                    case OrtsControlType.OrtsSignalAspect: if (index == 0) Locomotive.TrainControlSystem.CabSignalAspect = (TrackMonitorSignalAspect)(int)MathHelper.Clamp(value, 0, 9); break;
+                    case OrtsControlType.OrtsSignalSpeedLimitMpS: if (index == 0) Locomotive.TrainControlSystem.CurrentSpeedLimitMpS = value; else if (index == 1) Locomotive.TrainControlSystem.NextSpeedLimitMpS = value; break;
+                    case OrtsControlType.OrtsMirror: if (index == 1 && (value > 0 != Locomotive.MirrorOpen)) Locomotive.ToggleMirrors(); break;
+                    case OrtsControlType.OrtsAcceptRemoteControlSignals: if (index == 1) Locomotive.AcceptMUSignals = value > 0; break;
+                    case OrtsControlType.OrtsDoorLeft: TrainCarAction<MSTSWagon>(index, l => { if (l.DoorLeftOpen != value > 0) { l.DoorLeftOpen = value > 0; l.SignalEvent(value > 0 ? Event.DoorOpen : Event.DoorClose); } }); break;
+                    case OrtsControlType.OrtsDoorRight: TrainCarAction<MSTSWagon>(index, l => { if (l.DoorRightOpen != value > 0) { l.DoorRightOpen = value > 0; l.SignalEvent(value > 0 ? Event.DoorOpen : Event.DoorClose); } }); break;
+                    case OrtsControlType.OrtsCylinderCock: TrainCarAction<MSTSSteamLocomotive>(index, l => { if (l.CylinderCocksAreOpen != value > 0) l.ToggleCylinderCocks(); }); break;
+                    case OrtsControlType.OrtsOdoMeter: if (index == 0 && value == 0) Locomotive.OdometerReset(); break;
+                    case OrtsControlType.OrtsBrakeLinePressureBar:
+                        switch (index)
+                        {
+                            case 1: Locomotive.BrakeSystem.BrakeLine1PressurePSI = Bar.ToPSI(value); break;
+                            case 2: Locomotive.BrakeSystem.BrakeLine2PressurePSI = Bar.ToPSI(value); break;
+                            case 3: Locomotive.BrakeSystem.BrakeLine3PressurePSI = Bar.ToPSI(value); break;
+                            case 4: if (Locomotive.Train != null && Locomotive.IsLeadLocomotive()) Locomotive.Train.BrakeLine4 = value; break;
+                        }
                         break;
                 }
                 return;
