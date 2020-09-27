@@ -214,9 +214,8 @@ namespace ORTS.Scripting.Api
         /// Get distance of next station if any, else max float value
         /// </summary>
         public Func<float> NextStationDistanceM;
-        /// <summary>
-        /// Get locomotive handle
-        /// </summary>
+
+        // FIXME: This must be removed, it was a big mistake adding here:
         public Func<MSTSLocomotive> Locomotive;
 
         /// <summary>
@@ -450,16 +449,28 @@ namespace ORTS.Scripting.Api
     // Represents the same enum as TRAIN_CONTROL
 
     public enum TRAIN_CONTROL
-        {
-            AUTO_SIGNAL,
-            AUTO_NODE,
-            MANUAL,
-            EXPLORER,
-            OUT_OF_CONTROL,
-            INACTIVE,
-            TURNTABLE,
-            UNDEFINED
-        }
+    {
+        AUTO_SIGNAL,
+        AUTO_NODE,
+        MANUAL,
+        EXPLORER,
+        OUT_OF_CONTROL,
+        INACTIVE,
+        TURNTABLE,
+        UNDEFINED
+    }
+
+    public enum SignalHeadFunction
+    {
+        NORMAL,
+        DISTANCE,
+        REPEATER,
+        SHUNTING,
+        INFO,
+        SPEED,
+        ALERT,
+        UNKNOWN,
+    }
 
     public enum TCSEvent
     {

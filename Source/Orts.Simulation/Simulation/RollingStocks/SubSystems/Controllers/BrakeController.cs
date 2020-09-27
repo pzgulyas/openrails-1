@@ -280,8 +280,7 @@ namespace Orts.Simulation.RollingStocks.SubSystems.Controllers
                 Script.ClockTime = () => (float)Simulator.ClockTime;
                 Script.GameTime = () => (float)Simulator.GameTime;
                 Script.DistanceM = () => Locomotive.DistanceM;
-                Script.SetControlValue = (controlName, index, value) => Locomotive.ContentScript.SetControlValue(controlName, index, value);
-                Script.GetControlValue = (controlName, index) => ContentScript.GetControlValue(Locomotive, controlName, index);
+                Locomotive.ContentScript.SetVariableDelegates(Script);
 
                 // BrakeController
                 Script.EmergencyBrakingPushButton = () => EmergencyBrakingPushButton;

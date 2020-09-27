@@ -51,22 +51,43 @@ namespace ORTS.Scripting.Api
         /// Sends an event to the train.
         /// </summary>
         public Action<Event> SignalEventToTrain;
+
         /// <summary>
-        /// Either define a new custom control, that will be common for all scripts of a particular locomotive,
-        /// or hide from cab renderer the original calculated value of a predefined control, which then can be exposed by the script.
-        /// Note: the original calculated value will still be available through GetControlValue.
+        /// Helper delegate for the real interface function. This is not intended for being accessed by the script writers.
         /// </summary>
-        public Action<string> RegisterControl;
-        /// <summary>
-        /// Either set the value of a custom control, or set a value for a predefined control.
-        /// ("ControlName", index, value)
-        /// </summary>
-        public Action<string, int, float> SetControlValue;
-        /// <summary>
-        /// Either read the value of a custom control, or read the original value of a taken over predefined control
-        /// ("ControlName", index)
-        /// </summary>
-        public Func<string, int, float> GetControlValue;
+        public Func<string, int, int, int, float> _getFloatDelegate { private get; set; }
+        public Func<string, int, int, int, string> _getStringDelegate { private get; set; }
+        public Func<string, int, int, int, bool> _getBoolDelegate { private get; set; }
+        public Func<string, int, int, int, int> _getIntDelegate { private get; set; }
+        public Action<string, int, float> _setFloatDelegate { private get; set; }
+        public Action<string, int, string> _setStringDelegate { private get; set; }
+        public Action<string, int, bool> _setBoolDelegate { private get; set; }
+        public Action<string, int, int> _setIntDelegate { private get; set; }
+
+        public float GetFloatVariable(string variableName, int index1 = 1, int index2 = 0, int index3 = 0)
+            => _getFloatDelegate(variableName, index1, index2, index3);
+
+        public string GetStringVariable(string variableName, int index1 = 1, int index2 = 0, int index3 = 0)
+            => _getStringDelegate(variableName, index1, index2, index3);
+
+        public bool GetBoolVariable(string variableName, int index1 = 1, int index2 = 0, int index3 = 0)
+            => _getBoolDelegate(variableName, index1, index2, index3);
+
+        public int GetIntVariable(string variableName, int index1 = 1, int index2 = 0, int index3 = 0)
+            => _getIntDelegate(variableName, index1, index2, index3);
+
+        public void SetFloatVariable(string variableName, float value) => SetFloatVariable(variableName, 1, value);
+        public void SetFloatVariable(string variableName, int index, float value) => _setFloatDelegate(variableName, index, value);
+
+        public void SetStringVariable(string variableName, string value) => SetStringVariable(variableName, 1, value);
+        public void SetStringVariable(string variableName, int index, string value) => _setStringDelegate(variableName, index, value);
+
+        public void SetBoolVariable(string variableName, bool value) => SetBoolVariable(variableName, 1, value);
+        public void SetBoolVariable(string variableName, int index, bool value) => _setBoolDelegate(variableName, index, value);
+
+        public void SetIntVariable(string variableName, int value) => SetIntVariable(variableName, 1, value);
+        public void SetIntVariable(string variableName, int index, int value) => _setIntDelegate(variableName, index, value);
+
     }
 
     /// <summary>

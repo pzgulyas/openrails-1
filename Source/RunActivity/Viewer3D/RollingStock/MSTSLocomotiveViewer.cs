@@ -277,7 +277,7 @@ namespace Orts.Viewer3D.RollingStock
                 // Check if a built-in command is disabled by engine script first
                 if (UserInput.IsPressed(command))
                 {
-                    if (Locomotive.ContentScript.SignalEvent(command.ToString(), 1) == 0)
+                    if (!Locomotive.ContentScript.SignalEvent(command.ToString(), 1))
                         UserInputCommands[command][1]();
                     //Debrief eval
                     if (!lemergencybuttonpressed && Locomotive.EmergencyButtonPressed && Locomotive.IsPlayerTrain)
@@ -287,11 +287,11 @@ namespace Orts.Viewer3D.RollingStock
                         if (Math.Abs(Locomotive.SpeedMpS) > 0) DbfEvalEBPBmoving++;
                         lemergencybuttonpressed = true;
                         train.DbfEvalValueChanged = true;//Debrief eval
-                }
+                    }
                 }
                 else if (UserInput.IsReleased(command))
                 {
-                    if (Locomotive.ContentScript.SignalEvent(command.ToString(), 0) == 0)
+                    if (!Locomotive.ContentScript.SignalEvent(command.ToString(), 0))
                         UserInputCommands[command][0]();
                     //Debrief eval
                     if (lemergencybuttonpressed && !Locomotive.EmergencyButtonPressed) lemergencybuttonpressed = false;
