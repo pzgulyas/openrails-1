@@ -157,7 +157,7 @@ namespace Orts.Common.Scripting
         ///      - The script writer must use the additional scripting variables to set these as needed. (See point 4.)
         ///
         /// 2. Custom keyboard commands
-        ///      - Defined in the <see cref="KeyMapFile"/>, e.g. keymap.json.
+        ///      - Defined in the <see cref="KeyMap"/>, e.g. keymap.json.
         ///      - Index: always 1
         ///      - When the assigned key is pressed or released, an event is signalled to the script to handle.
         ///      - Can be StartContinuousChange or StopContinuousChange with predefined speed 1/s.
@@ -192,96 +192,70 @@ namespace Orts.Common.Scripting
         ///      - Get: Get the value of control. Custom name will be registered implicitly at first use.
         ///
 
-        readonly MSTSLocomotive Locomotive;
-        readonly Simulator Simulator;
-        List<KeyMapCommand> KeyMap;
+        private readonly MSTSLocomotive Locomotive;
+        private readonly Simulator Simulator;
 
-        private List<string> ScriptNames = new List<string>();
-        private string KeyMapFileName { get; set; }
-        public readonly Dictionary<ControllerScript, string> SoundManagementFiles = new Dictionary<ControllerScript, string>();
+        private readonly List<string> ScriptNames = new List<string>();
         private readonly List<ControllerScript> Scripts = new List<ControllerScript>();
+        public readonly Dictionary<ControllerScript, string> SoundManagementFiles = new Dictionary<ControllerScript, string>();
 
-        // Receive delegates from Viewer3D.UserInput:
+        // Receives a delegate from Viewer3D.UserInput:
         public static Func<UserCommand, bool> UserInputIsDown;
-        public static Func<UserCommandInput, bool> UserInputIsPressed;
-        public static Func<UserCommandInput, bool> UserInputIsReleased;
-
+        
         /// <summary>
-        /// Command names the script wants to handle, assigned to their keyboard commands.
-        /// It can either be a custom command name defined in keymap.json,
-        /// or a built-in UserCommand "Control" name the execution was taken over by the script.
-        /// In both cases an event is signalled to the script with command name, if associated key is pressed or released.
+        /// Command names the script wants to handle instead.
+        /// It is a built-in UserCommand "ControlXxxx" name the execution was taken over by the script.
+        /// An event is signalled to the script with command name, if associated key is pressed or released.
         /// </summary>
-        public Dictionary<string, UserCommandInput> ScriptedCommands = new Dictionary<string, UserCommandInput>();
-        /// <summary>
-        /// Command names defined in keymap.json, assigned to their { released_command, pressed_command }.
-        /// Only the custom command names are stored here.
-        /// </summary>
-        private Dictionary<string, List<KeyMapCommand>> KeyMapCommands = new Dictionary<string, List<KeyMapCommand>>();
+        private readonly List<string> DisabledBuiltInCommands = new List<string>();
         /// <summary>
         /// Control names the script wants to handle, assigned to a blank or to their cvf-defined cabview configuration.
         /// It can be either a custom control name, or a built-in MSTS cabview control name, for which the script wants to override the visible value.
         /// A name can be added here by RegisterControl script method. Custom controls will be commonly visible among scripts of a particular locomotive.
         /// </summary>
-        public Dictionary<string, CabViewControl> ScriptedControls = new Dictionary<string, CabViewControl>();
+        public readonly Dictionary<string, CabViewControl> ScriptedControls = new Dictionary<string, CabViewControl>();
         /// <summary>
         /// Controls of the <see cref="CABViewControlTypes"/> configured in the cvf files, assigned to their configuration object.
         /// </summary>
-        private Dictionary<string, CabViewControl> ConfiguredCabviewControls = new Dictionary<string, CabViewControl>();
-        /// <summary>
-        /// Commands triggered with <see cref="KeyMapCommand.Events.StartContinuousChange"/>, actually changing continuously with their changing speed [1/s].
-        /// When triggered with <see cref="KeyMapCommand.Events.StopContinuousChange"/>, a command is removed from this list.
-        /// </summary>
-        private Dictionary<KeyMapCommand, float> ChangingControls = new Dictionary<KeyMapCommand, float>();
+        private readonly Dictionary<string, CabViewControl> ConfiguredCabviewControls = new Dictionary<string, CabViewControl>();
 
         /// <summary>
         /// String -> enum lookup table for <see cref="CABViewControlTypes"/> to be used in GetBoolVariable("WIPERS") style script methods,
         /// defined to avoid using code reflection beyond initialization.
         /// </summary>
-        private static readonly Dictionary<string, UserCabViewControl> CabviewControlsEnum = new Dictionary<string, UserCabViewControl>();
+        private static readonly Dictionary<string, UserCabViewControl> AllCabviewControlTypes = new Dictionary<string, UserCabViewControl>();
         /// <summary>
         /// String -> enum lookup table for <see cref="Variable"/> controls to be used in GetFloatVariable("OrtsSpeedMpS") style script methods,
         /// defined to avoid using code reflection beyond initialization.
         /// </summary>
-        private static readonly Dictionary<string, UserCabViewControl> OrtsVariablesEnum = new Dictionary<string, UserCabViewControl>();
+        private static readonly Dictionary<string, UserCabViewControl> AllOrtsVariables = new Dictionary<string, UserCabViewControl>();
         /// <summary>
-        /// A string -> enum lookup table for <see cref="UserCommand"/> starting with "Control" (e.g. ControlThrottleIncrease),
-        /// defined to avoid using code reflection beyond initialization.
+        /// A string -> enum lookup table for <see cref="UserCommand"/> starting with "Control" (e.g. ControlThrottleIncrease).
+        /// This is defined to avoid using code reflection beyond initialization.
         /// </summary>
-        private static readonly Dictionary<string, UserCommand> OrtsCommandsEnum = new Dictionary<string, UserCommand>();
+        public static readonly Dictionary<string, UserCommand> AllUserCommands = new Dictionary<string, UserCommand>();
         
         public ContentScript(MSTSLocomotive locomotive)
         {
             Simulator = locomotive.Simulator;
             Locomotive = locomotive;
 
-            if (CabviewControlsEnum.Count == 0)
+            if (AllCabviewControlTypes.Count == 0)
                 foreach (var controlType in (CABViewControlTypes[])Enum.GetValues(typeof(CABViewControlTypes)))
-                    CabviewControlsEnum.Add(controlType.ToString(), new UserCabViewControl() { ControlType = controlType });
+                    AllCabviewControlTypes.Add(controlType.ToString(), new UserCabViewControl() { ControlType = controlType });
 
-            if (OrtsVariablesEnum.Count == 0)
+            if (AllOrtsVariables.Count == 0)
                 foreach (var controlType in (Variable[])Enum.GetValues(typeof(Variable)))
-                    OrtsVariablesEnum.Add(controlType.ToString(), new UserCabViewControl() { OrtsVariable = controlType });
+                    AllOrtsVariables.Add(controlType.ToString(), new UserCabViewControl() { OrtsVariable = controlType });
 
-            if (OrtsCommandsEnum.Count == 0)
+            if (AllUserCommands.Count == 0)
                 foreach (var controlCommand in (UserCommand[])Enum.GetValues(typeof(UserCommand)))
-                {
-                    var command = controlCommand.ToString();
-                    if (command.StartsWith("Control"))
-                        OrtsCommandsEnum.Add(controlCommand.ToString(), controlCommand);
-                }
+                    AllUserCommands.Add(controlCommand.ToString(), controlCommand);
         }
 
-        public ContentScript(ContentScript contentScript) : this(contentScript.Locomotive)
-        {
-            ScriptNames = contentScript.ScriptNames;
-            KeyMapFileName = contentScript.KeyMapFileName;
-        }
+        public ContentScript(ContentScript contentScript) : this(contentScript.Locomotive) => ScriptNames = contentScript.ScriptNames;
 
-        public ContentScript Clone()
-        {
-            return new ContentScript(this);
-        }
+        public ContentScript Clone() => new ContentScript(this);
 
         public void ParseScripts(string lowercasetoken, Parsers.Msts.STFReader stf)
         {
@@ -291,85 +265,18 @@ namespace Orts.Common.Scripting
                     stf.MustMatch("(");
                     string script;
                     while ((script = stf.ReadItem()) != ")")
-                    {
                         ScriptNames.Add(script);
-                    }
-                    break;
-                case "engine(ortskeymap":
-                    KeyMapFileName = stf.ReadStringBlock(null);
                     break;
             }
         }
         
-        /// <summary>
-        /// Execute action on either the whole train, or just the current locomotive, based on scope parameter
-        /// </summary>
-        /// <typeparam name="T">vehicle type</typeparam>
-        /// <param name="scope">0: train, 1: current locomotive</param>
-        /// <param name="action">action to execute</param>
-        private void TrainCarAction<T>(int scope, Action<T> action) where T : MSTSWagon
-        {
-            if (scope == 0 && Locomotive.Train != null)
-            {
-                foreach (var car in Locomotive.Train.Cars)
-                    if (car != Locomotive && car is T && car.AcceptMUSignals)
-                        action(car as T);
-            }
-            else if (scope == 1 && Locomotive is T)
-                action(Locomotive as T);
-        }
-
         public void Initialize()
         {
             foreach (var cabViewList in Locomotive.CabViewList)
                 foreach (var cabViewControl in cabViewList.CVFFile.CabViewControls)
-                    if (!ConfiguredCabviewControls.ContainsKey(cabViewControl.ControlType.ToString()) && cabViewControl.ControlType != CABViewControlTypes.NONE)
+                    if (cabViewControl.ControlType != CABViewControlTypes.NONE && !ConfiguredCabviewControls.ContainsKey(cabViewControl.ControlType.ToString()))
                         ConfiguredCabviewControls.Add(cabViewControl.ControlType.ToString(), cabViewControl);
 
-            LoadKeyMap();
-            LoadScripts();
-        }
-
-        private void LoadKeyMap()
-        {
-            if (KeyMapFileName == null)
-                return;
-            
-            var keyMapPathArray = new[] {
-                Path.Combine(Path.GetDirectoryName(Locomotive.WagFilePath), "Script"),
-            };
-            var keyMapPath = ORTSPaths.GetFileFromFolders(keyMapPathArray, KeyMapFileName);
-            if (File.Exists(keyMapPath))
-                KeyMap = KeyMapFile.Load(keyMapPath);
-
-            if (KeyMap == null || KeyMap.Count == 0)
-                return;
-
-            // Put an existing command onto an other key, or just register the custom command name
-            foreach (var command in KeyMap)
-            {
-                var modifiers = KeyModifiers.None;
-                foreach (var modifier in command.Modifiers)
-                    modifiers |= modifier;
-                var userCommandKeyInput = new UserCommandKeyInput(command.ScanCode, modifiers);
-
-                if (OrtsCommandsEnum.ContainsKey(command.Name))
-                    Locomotive.Simulator.Settings.Input.Commands[(int)OrtsCommandsEnum[command.Name]] = userCommandKeyInput;
-                else
-                {
-                    ScriptedCommands.Add(CommandKey(command), userCommandKeyInput);
-
-                    if (!KeyMapCommands.ContainsKey(command.Name))
-                        KeyMapCommands.Add(command.Name, new List<KeyMapCommand>());
-
-                    KeyMapCommands[command.Name].Add(command);
-                    DisableByKey(userCommandKeyInput);
-                }
-            }
-        }
-
-        private void LoadScripts()
-        {
             var pathArray = new[] { Path.Combine(Path.GetDirectoryName(Locomotive.WagFilePath), "Script") };
             var soundPathArray = new[] {
                 Path.Combine(Path.GetDirectoryName(Locomotive.WagFilePath), "SOUND"),
@@ -406,28 +313,6 @@ namespace Orts.Common.Scripting
             script._setStringDelegate = (variableName, index, value) => SetStringVariable(variableName, index, value, true);
         }
 
-        /// <summary>
-        /// Search in built-in keymap for key combination, and disable if found
-        /// </summary>
-        public void DisableByKey(UserCommandKeyInput input)
-        {
-            foreach (var command in OrtsCommandsEnum.Values)
-            {
-                var commandKeyInput = Locomotive.Simulator.Settings.Input.Commands[(int)command] as UserCommandKeyInput;
-                if (commandKeyInput != null)
-                {
-                    if (commandKeyInput.ScanCode == input.ScanCode
-                        && commandKeyInput.Control == input.Control
-                        && commandKeyInput.Alt == input.Alt
-                        && commandKeyInput.Shift == input.Shift)
-                    {
-                        RegisterControl(command.ToString(), 1);
-                        break;
-                    }
-                }
-            }
-        }
-
         public class UserCabViewControl : CabViewControl
         {
             public Variable OrtsVariable;
@@ -438,15 +323,15 @@ namespace Orts.Common.Scripting
         /// <summary>
         /// Called to define a new custom control or command, or override a built-in MSTS cabview control value, or disable a built-in keyboard command
         /// </summary>
-        private bool RegisterControl(string controlName, int index)
+        public bool RegisterControl(string controlName, int index)
         {
             if (controlName.ToLower().StartsWith("orts")) return false;
 
-            if (OrtsCommandsEnum.ContainsKey(controlName))
+            if (AllUserCommands.ContainsKey(controlName))
             {
                 // Disable original UserCommand, not to execute automatically, but signal an event to the script instead.
-                if (!ScriptedCommands.ContainsKey(controlName))
-                    ScriptedCommands.Add(controlName, Locomotive.Simulator.Settings.Input.Commands[(int)OrtsCommandsEnum[controlName]]);
+                if (!DisabledBuiltInCommands.Contains(controlName))
+                    DisabledBuiltInCommands.Add(controlName);
             }
             else
             {
@@ -456,15 +341,27 @@ namespace Orts.Common.Scripting
             }
             return true;
         }
-        
-        private void UnregisterControl(string controlName, int index)
-        {
-            if (!ScriptedCommands.ContainsKey(controlName)) return;
 
-            if (OrtsCommandsEnum.ContainsKey(controlName) && index == 1)
-                ScriptedCommands.Remove(controlName);
-        }
+        private void UnregisterControl(string controlName, int index) { if (index == 1) DisabledBuiltInCommands.Remove(controlName); }
         
+        /// <summary>
+        /// Execute action on either the whole train, or just the current locomotive, based on scope parameter
+        /// </summary>
+        /// <typeparam name="T">vehicle type</typeparam>
+        /// <param name="scope">0: train, 1: current locomotive</param>
+        /// <param name="action">action to execute</param>
+        public void TrainCarAction<T>(int scope, Action<T> action) where T : MSTSWagon
+        {
+            if (scope == 0 && Locomotive.Train != null)
+            {
+                foreach (var car in Locomotive.Train.Cars)
+                    if (car != Locomotive && car is T && car.AcceptMUSignals)
+                        action(car as T);
+            }
+            else if (scope == 1 && Locomotive is T)
+                action(Locomotive as T);
+        }
+
         private bool TryUseScriptedControl(string controlName, int index, float value)
         {
             if (ScriptedControls.ContainsKey(controlName))
@@ -478,14 +375,14 @@ namespace Orts.Common.Scripting
             return false;
         }
 
-        private float CurrentAltitudeM() => Locomotive.WorldPosition.Location.Y;
-
         public bool GetFloatVariable(string controlName, int index, int head, int function, out float ret, bool doCast)
         {
             Train.TrainObjectItem sti(TRAINOBJECTTYPE type) => Locomotive.TrainControlSystem.SelectFromTrainInfo(type, index, ref head, ref function);
-            if (OrtsVariablesEnum.ContainsKey(controlName))
+            Func<float> currentAltitudeM = () => Locomotive.WorldPosition.Location.Y;
+            
+            if (AllOrtsVariables.ContainsKey(controlName))
             {
-                switch (OrtsVariablesEnum[controlName].OrtsVariable)
+                switch (AllOrtsVariables[controlName].OrtsVariable)
                 {
                     case Variable.OrtsThrottle: ret = index != 1 ? 0 : Locomotive.ThrottleController.CurrentValue; return true;
                     case Variable.OrtsDynamicBrake: ret = index != 1 ? 0 : Locomotive.DynamicBrakeController.CurrentValue; return true;
@@ -522,17 +419,17 @@ namespace Orts.Common.Scripting
                         }
                         return true;
                     case Variable.OrtsSignalDistanceM: ret = index <= 0 ? -1 : sti(TRAINOBJECTTYPE.SIGNAL)?.DistanceToTrainM ?? float.MaxValue; return true;
-                    case Variable.OrtsSignalAltitudeM: ret = index <= 0 ? CurrentAltitudeM() : sti(TRAINOBJECTTYPE.SIGNAL)?.AltitudeM ?? float.MaxValue; return true;
+                    case Variable.OrtsSignalAltitudeM: ret = index <= 0 ? currentAltitudeM() : sti(TRAINOBJECTTYPE.SIGNAL)?.AltitudeM ?? float.MaxValue; return true;
                     case Variable.OrtsSignalHeadSpeedLimitMpS: ret = index <= 0 ? Locomotive.Train?.allowedMaxSpeedSignalMpS ?? -1 : sti(TRAINOBJECTTYPE.SIGNAL)?.AllowedSpeedMpS ?? -1; return true;
                     case Variable.OrtsSpeedPostDistanceM: ret = index <= 0 ? -1 : sti(TRAINOBJECTTYPE.SPEEDPOST)?.DistanceToTrainM ?? float.MaxValue; return true;
-                    case Variable.OrtsSpeedPostAltitudeM: ret = index <= 0 ? CurrentAltitudeM() : sti(TRAINOBJECTTYPE.SPEEDPOST)?.AltitudeM ?? float.MaxValue; return true;
+                    case Variable.OrtsSpeedPostAltitudeM: ret = index <= 0 ? currentAltitudeM() : sti(TRAINOBJECTTYPE.SPEEDPOST)?.AltitudeM ?? float.MaxValue; return true;
                     case Variable.OrtsSpeedPostSpeedLimitMpS: ret = index <= 0 ? Locomotive.Train?.allowedMaxSpeedLimitMpS ?? -1 : sti(TRAINOBJECTTYPE.SPEEDPOST)?.AllowedSpeedMpS ?? -1; return true;
                     case Variable.OrtsMilePostDistanceM: ret = index <= 0 ? -1 : sti(TRAINOBJECTTYPE.MILEPOST)?.DistanceToTrainM ?? float.MaxValue; return true;
-                    case Variable.OrtsMilePostAltitudeM: ret = index <= 0 ? CurrentAltitudeM() : sti(TRAINOBJECTTYPE.MILEPOST)?.AltitudeM ?? float.MaxValue; return true;
+                    case Variable.OrtsMilePostAltitudeM: ret = index <= 0 ? currentAltitudeM() : sti(TRAINOBJECTTYPE.MILEPOST)?.AltitudeM ?? float.MaxValue; return true;
                     case Variable.OrtsFacingDivergingSwitchDistanceM: ret = index <= 0 ? -1 : sti(TRAINOBJECTTYPE.FACING_SWITCH)?.DistanceToTrainM ?? float.MaxValue; return true;
-                    case Variable.OrtsFacingDivergingSwitchAltitudeM: ret = index <= 0 ? CurrentAltitudeM() : sti(TRAINOBJECTTYPE.MILEPOST)?.AltitudeM ?? float.MaxValue; return true;
+                    case Variable.OrtsFacingDivergingSwitchAltitudeM: ret = index <= 0 ? currentAltitudeM() : sti(TRAINOBJECTTYPE.MILEPOST)?.AltitudeM ?? float.MaxValue; return true;
                     case Variable.OrtsTrailingDivergingSwitchDistanceM: ret = index <= 0 ? -1 : sti(TRAINOBJECTTYPE.TRAILING_SWITCH)?.DistanceToTrainM ?? float.MaxValue; return true;
-                    case Variable.OrtsTrailingDivergingSwitchAltitudeM: ret = index <= 0 ? CurrentAltitudeM() : sti(TRAINOBJECTTYPE.MILEPOST)?.AltitudeM ?? float.MaxValue; return true;
+                    case Variable.OrtsTrailingDivergingSwitchAltitudeM: ret = index <= 0 ? currentAltitudeM() : sti(TRAINOBJECTTYPE.MILEPOST)?.AltitudeM ?? float.MaxValue; return true;
                     case Variable.OrtsStationDistanceM: ret = index <= 0 ? -1 : sti(TRAINOBJECTTYPE.STATION)?.DistanceToTrainM ?? float.MaxValue; return true;
                     case Variable.OrtsStationPlatformLengthM: ret = index <= 0 ? -1 : sti(TRAINOBJECTTYPE.STATION)?.StationPlatformLength ?? float.MaxValue; return true;
                     case Variable.OrtsTunnelEntranceDistanceM: ret = index <= 0 ? -1 : sti(TRAINOBJECTTYPE.TUNNEL)?.DistanceToTrainM ?? float.MaxValue; return true;
@@ -541,7 +438,7 @@ namespace Orts.Common.Scripting
             }
             // Make the original data available for scripts in first place, even if the control is taken over
             if (ConfiguredCabviewControls.ContainsKey(controlName)) { ret = index != 1 ? 0 : Locomotive.GetDataOf(ConfiguredCabviewControls[controlName]); return true; }
-            else if (CabviewControlsEnum.ContainsKey(controlName)) { ret = index != 1 ? 0 : Locomotive.GetDataOf(CabviewControlsEnum[controlName]); return true; }
+            else if (AllCabviewControlTypes.ContainsKey(controlName)) { ret = index != 1 ? 0 : Locomotive.GetDataOf(AllCabviewControlTypes[controlName]); return true; }
             else if (ScriptedControls.ContainsKey(controlName)) { ret = (float)ScriptedControls[controlName].OldValue; return true; }
             if (doCast)
             {
@@ -557,9 +454,9 @@ namespace Orts.Common.Scripting
         public bool GetIntVariable(string controlName, int index, int head, int function, out int ret, bool doCast)
         {
             Train.TrainObjectItem sti(TRAINOBJECTTYPE type) => Locomotive.TrainControlSystem.SelectFromTrainInfo(type, index, ref head, ref function);
-            if (OrtsVariablesEnum.ContainsKey(controlName))
+            if (AllOrtsVariables.ContainsKey(controlName))
             {
-                switch (OrtsVariablesEnum[controlName].OrtsVariable)
+                switch (AllOrtsVariables[controlName].OrtsVariable)
                 {
                     case Variable.OrtsDirection: ret = index != 1 ? 0 : Locomotive.Direction == Direction.Reverse ? -1 : Locomotive.Direction == Direction.N ? 0 : 1; return true;
                     case Variable.OrtsHeadLight: ret = index != 1 ? 0 : Locomotive.Headlight; return true;
@@ -607,9 +504,9 @@ namespace Orts.Common.Scripting
 
         public bool GetBoolVariable(string controlName, int index, int head, int function, out bool ret, bool doCast)
         {
-            if (OrtsVariablesEnum.ContainsKey(controlName))
+            if (AllOrtsVariables.ContainsKey(controlName))
             {
-                switch (OrtsVariablesEnum[controlName].OrtsVariable)
+                switch (AllOrtsVariables[controlName].OrtsVariable)
                 {
                     case Variable.OrtsCylinderCock: ret = (Locomotive as MSTSSteamLocomotive)?.CylinderCocksAreOpen ?? false; return true;
                     case Variable.OrtsCircuitBraker: ret = index == 1 && ((Locomotive as MSTSElectricLocomotive)?.PowerSupply.CircuitBreaker.State ?? CircuitBreakerState.Open) == CircuitBreakerState.Closed; return true;
@@ -639,7 +536,7 @@ namespace Orts.Common.Scripting
                     default: break;
                 }
             }
-            if (OrtsCommandsEnum.ContainsKey(controlName)) { ret = UserInputIsDown(OrtsCommandsEnum[controlName]); return true; }
+            if (AllUserCommands.ContainsKey(controlName)) { ret = UserInputIsDown(AllUserCommands[controlName]); return true; }
             if (doCast)
             {
                 if (GetIntVariable(controlName, index, head, function, out var intResult, false)) { ret = intResult > 0; return true; }
@@ -654,9 +551,9 @@ namespace Orts.Common.Scripting
         public bool GetStringVariable(string controlName, int index, int head, int function, out string ret, bool doCast)
         {
             Train.TrainObjectItem sti(TRAINOBJECTTYPE type) => Locomotive.TrainControlSystem.SelectFromTrainInfo(type, index, ref head, ref function);
-            if (OrtsVariablesEnum.ContainsKey(controlName))
+            if (AllOrtsVariables.ContainsKey(controlName))
             {
-                switch (OrtsVariablesEnum[controlName].OrtsVariable)
+                switch (AllOrtsVariables[controlName].OrtsVariable)
                 {
                     // The following enum-s are handled as int-s too:
                     case Variable.OrtsMonitoringState: ret = index != 1 ? string.Empty : Locomotive.TrainControlSystem.MonitoringStatus.ToString(); return true;
@@ -687,9 +584,9 @@ namespace Orts.Common.Scripting
 
         public bool SetFloatVariable(string controlName, int index, float value, bool doCast)
         {
-            if (OrtsVariablesEnum.ContainsKey(controlName))
+            if (AllOrtsVariables.ContainsKey(controlName))
             {
-                switch (OrtsVariablesEnum[controlName].OrtsVariable)
+                switch (AllOrtsVariables[controlName].OrtsVariable)
                 {
                     // Board computer doesn't normally move levers, just overrides their settings
                     case Variable.OrtsThrottle: if (index == 1) Locomotive.ThrottleController.SetValue(MathHelper.Clamp(value, 0, 1)); return true;
@@ -728,9 +625,9 @@ namespace Orts.Common.Scripting
 
         public bool SetIntVariable(string controlName, int index, int value, bool doCast)
         {
-            if (OrtsVariablesEnum.ContainsKey(controlName))
+            if (AllOrtsVariables.ContainsKey(controlName))
             {
-                switch (OrtsVariablesEnum[controlName].OrtsVariable)
+                switch (AllOrtsVariables[controlName].OrtsVariable)
                 {
                     case Variable.OrtsDirection: if (index == 1) Locomotive.SetDirection(value > 0 ? Direction.Forward : value < 0 ? Direction.Reverse : Direction.N); return true;
                     case Variable.OrtsDiscreteTrigger: TrainCarAction<MSTSLocomotive>(index, l => HandleEvent(l.EventHandlers, (int)value)); return true;
@@ -745,7 +642,7 @@ namespace Orts.Common.Scripting
                 }
             }
             // Enable/disable built-in keyboard commands
-            if (OrtsCommandsEnum.ContainsKey(controlName))
+            if (AllUserCommands.ContainsKey(controlName))
             {
                 if (index == 1)
                 {
@@ -770,9 +667,9 @@ namespace Orts.Common.Scripting
 
         public bool SetBoolVariable(string controlName, int index, bool value, bool doCast)
         {
-            if (OrtsVariablesEnum.ContainsKey(controlName))
+            if (AllOrtsVariables.ContainsKey(controlName))
             {
-                switch (OrtsVariablesEnum[controlName].OrtsVariable)
+                switch (AllOrtsVariables[controlName].OrtsVariable)
                 {
                     // Board computer doesn't normally move levers, just overrides their settings
                     case Variable.OrtsPowerAuthorization: TrainCarAction<MSTSLocomotive>(index, l => l.TrainControlSystem.PowerAuthorization = value); return true;
@@ -818,9 +715,9 @@ namespace Orts.Common.Scripting
 
         public bool SetStringVariable(string controlName, int index, string value, bool doCast)
         {
-            if (OrtsVariablesEnum.ContainsKey(controlName))
+            if (AllOrtsVariables.ContainsKey(controlName))
             {
-                switch (OrtsVariablesEnum[controlName].OrtsVariable)
+                switch (AllOrtsVariables[controlName].OrtsVariable)
                 {
                     case Variable.OrtsConfirmMessage:
                         if (Locomotive == Locomotive.Simulator.PlayerLocomotive)
@@ -866,20 +763,6 @@ namespace Orts.Common.Scripting
                     return;
             }
 
-            foreach (var command in ChangingControls.Keys)
-            {
-                GetFloatVariable(command.Name, 1, 0, 0, out var oldValue, true);
-                var speed = ChangingControls[command];
-                var newValue = oldValue + speed * elapsedSeconds;
-                newValue = speed > 0 ? Math.Min(newValue, command.ToValue) : Math.Max(newValue, command.ToValue);
-
-                if (newValue != oldValue)
-                {
-                    TrainCarAction<MSTSLocomotive>(1, l => l.ContentScript.SignalEvent(command.Name, newValue));
-                    SetFloatVariable(command.Name, 1, newValue, true);
-                }
-            }
-
             foreach (var script in Scripts)
                 script.Update(elapsedSeconds);
 
@@ -899,7 +782,7 @@ namespace Orts.Common.Scripting
 
         public bool SignalEvent(string controlName, float? value)
         {
-            if (ScriptedCommands.ContainsKey(controlName) || ScriptedControls.ContainsKey(controlName))
+            if (DisabledBuiltInCommands.Contains(controlName) || ScriptedControls.ContainsKey(controlName))
             {
                 foreach (var script in Scripts)
                 {
@@ -918,73 +801,6 @@ namespace Orts.Common.Scripting
         public void Restore(BinaryReader inf)
         {
             //SendEvent(BrakeControllerEvent.SetCurrentValue, inf.ReadSingle());
-        }
-
-        private static string CommandKey(KeyMapCommand command)
-        {
-            return command.GetHashCode().ToString();
-        }
-
-        private Dictionary<string, KeyMapCommand> ActivatedKeyMapCommands = new Dictionary<string, KeyMapCommand>();
-        
-        /// <summary>
-        // Called from MSTSLocomotiveViewer.HandleUserInput. Handles custom commands only.
-        /// </summary>
-        public void HandleUserInput(ElapsedTime elapsedTime)
-        {
-            if (KeyMap == null || KeyMap.Count == 0)
-                return;
-
-            ActivatedKeyMapCommands.Clear();
-
-            foreach (var command in KeyMap)
-            {
-                if (OrtsCommandsEnum.ContainsKey(command.Name)
-                    || ActivatedKeyMapCommands.ContainsKey(command.Name)
-                    || command.ButtonState == KeyMapCommand.ButtonStates.Pressed && !UserInputIsPressed(ScriptedCommands[CommandKey(command)])
-                    || command.ButtonState == KeyMapCommand.ButtonStates.Released && !UserInputIsReleased(ScriptedCommands[CommandKey(command)])
-                    || command.Event == KeyMapCommand.Events.StartContinuousChange && ChangingControls.ContainsKey(command)
-                    || command.Event == KeyMapCommand.Events.StopContinuousChange && !ChangingControls.ContainsKey(command))
-                    continue;
-                GetFloatVariable(command.Name, command.Index, 0, 0, out var floatResult, true);
-                // Value is a "from value" in this case. When the variable is not there, the command is not triggered.
-                if (command.Event == KeyMapCommand.Events.ChangeTo && command.Value != float.MinValue && command.Value != floatResult)
-                    continue;
-
-                ActivatedKeyMapCommands.Add(command.Name, command);
-            }
-
-            // Must be rolled through the command pattern for the replay to stay working correctly.
-            foreach (var command in ActivatedKeyMapCommands.Values)
-            {
-                new ScriptedControlCommand(Simulator.Log, command);
-            }
-        }
-        
-        /// <summary>
-        /// When a key of a custom command defined in keymap was pressed, signal an event to the script and store the resulting value.
-        /// </summary>
-        public void Execute(KeyMapCommand command)
-        {
-            switch (command.Event)
-            {
-                case KeyMapCommand.Events.ChangeTo:
-                    var toValue = command.ToValue == float.MaxValue && command.Index == 1
-                        ? 1 - MathHelper.Clamp((float)ScriptedControls[command.Name].OldValue, 0, 1)
-                        : command.ToValue;
-                    TrainCarAction<MSTSLocomotive>(command.Index, l => l.ContentScript.SignalEvent(command.Name, toValue));
-                    if (command.Index == 1)
-                        SetFloatVariable(command.Name, command.Index, toValue, true);
-                    break;
-                case KeyMapCommand.Events.StartContinuousChange:
-                    if (command.Index == 1 && !ChangingControls.ContainsKey(command))
-                        ChangingControls.Add(command, command.Value == float.MinValue ? 0.1f : command.Value);
-                    break;
-                case KeyMapCommand.Events.StopContinuousChange:
-                    if (command.Index == 1 && ChangingControls.ContainsKey(command))
-                        ChangingControls.Remove(command);
-                    break;
-            }
         }
     }
 

@@ -382,6 +382,7 @@ namespace Orts.Simulation.RollingStocks
         public float DynamicBrakeIntervention = -1;
         protected float PreviousDynamicBrakeIntervention = -1;
 
+        public KeyMap KeyMap;
         public ContentScript ContentScript;
         public ScriptedTrainControlSystem TrainControlSystem;
 
@@ -889,8 +890,8 @@ namespace Orts.Simulation.RollingStocks
                 case "engine(ortsmaxtracksanderboxcapacity": MaxTrackSandBoxCapacityM3 = stf.ReadFloatBlock(STFReader.UNITS.Volume, null); break;
                 case "engine(ortsmaxtracksandersandconsumption": TrackSanderSandConsumptionM3pS = stf.ReadFloatBlock(STFReader.UNITS.Volume, null); break;
                 case "engine(ortsmaxtracksanderairconsumption": TrackSanderAirComsumptionM3pS = stf.ReadFloatBlock(STFReader.UNITS.Volume, null); break;
-                case "engine(ortsscripts":
-                case "engine(ortskeymap": ContentScript.ParseScripts(lowercasetoken, stf); break;
+                case "engine(ortsscripts": ContentScript.ParseScripts(lowercasetoken, stf); break;
+                case "engine(ortskeymap": KeyMap.ParseScripts(lowercasetoken, stf); break;
                 default: base.Parse(lowercasetoken, stf); break;
                     
             }
@@ -981,6 +982,7 @@ namespace Orts.Simulation.RollingStocks
             DynamicBrakeController = locoCopy.DynamicBrakeController != null ? (MSTSNotchController)locoCopy.DynamicBrakeController.Clone() : null;
             TrainControlSystem.Copy(locoCopy.TrainControlSystem);
             ContentScript = locoCopy.ContentScript.Clone();
+            KeyMap = locoCopy.KeyMap.Clone();
 
             LocomotiveName = locoCopy.LocomotiveName;
             MaxVaccuumMaxPressurePSI = locoCopy.MaxVaccuumMaxPressurePSI;
@@ -1169,7 +1171,7 @@ namespace Orts.Simulation.RollingStocks
         /// </summary>
         public override void Initialize()
         {
-            
+            KeyMap.Initialize();
             TrainBrakeController.Initialize();
             EngineBrakeController.Initialize();
             BrakemanBrakeController.Initialize();
@@ -1476,6 +1478,7 @@ namespace Orts.Simulation.RollingStocks
         /// </summary>
         public override void Update(float elapsedClockSeconds)
         {
+            KeyMap.Update(elapsedClockSeconds);
             TrainControlSystem.Update();
             ContentScript.Update(elapsedClockSeconds);
 

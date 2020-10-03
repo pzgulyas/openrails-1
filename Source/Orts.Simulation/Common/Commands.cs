@@ -1536,7 +1536,7 @@ namespace Orts.Common
             if (Receiver == null) return;
             if (Command.Index == 1)
                 ContentScript.HandleEvent(Receiver.EventHandlers, Command.SoundTrigger);
-            Receiver.ContentScript.Execute(Command);
+            Receiver.KeyMap.Redo(Command);
             // Report();
         }
     }

@@ -93,10 +93,10 @@ namespace Orts.Viewer3D.RollingStock
                 }
             }
 
-            // Delegate UserInput class methods to ContentScript, so that the script will be able to query input devices states
             if (ContentScript.UserInputIsDown == null) ContentScript.UserInputIsDown = (command) => UserInput.IsDown(command);
-            if (ContentScript.UserInputIsPressed == null) ContentScript.UserInputIsPressed = (setting) => UserInput.IsPressed(setting);
-            if (ContentScript.UserInputIsReleased == null) ContentScript.UserInputIsReleased = (setting) => UserInput.IsReleased(setting);
+            if (KeyMap.UserInputIsPressed == null) KeyMap.UserInputIsPressed = (setting) => UserInput.IsPressed(setting);
+            if (KeyMap.UserInputIsReleased == null) KeyMap.UserInputIsReleased = (setting) => UserInput.IsReleased(setting);
+            if (KeyMap.UserInputCommands == null) KeyMap.UserInputCommands = (command, index) => UserInputCommands[command][index]();
         }
 
         protected virtual void StartGearBoxIncrease()
@@ -299,7 +299,7 @@ namespace Orts.Viewer3D.RollingStock
             }
             
             // Execute custom commands defined in keymap
-            Locomotive.ContentScript.HandleUserInput(elapsedTime);
+            Locomotive.KeyMap.HandleUserInput(elapsedTime);
         }
 
         /// <summary>
@@ -2599,19 +2599,19 @@ namespace Orts.Viewer3D.RollingStock
                                     var cvfBasePath = Path.Combine(Path.GetDirectoryName(Locomotive.WagFilePath), "CABVIEW");
                                     var cvfFilePath = Path.Combine(cvfBasePath, Locomotive.CVFFileName);
                                     Trace.TraceWarning($"Cabview control {tmp[0].Trim()} has not been defined in CVF file {cvfFilePath}");
-                    }
+                                }
                                 break;
                         }
                     }
+                    else if (Locomotive.ContentScript.ScriptedControls.ContainsKey(tmp[0].Trim()))
+                    {
+                        key = (tmp[0].Trim()).GetHashCode();
+                    }
                     else
                     {
-                        if (Locomotive.ContentScript.ScriptedControls.ContainsKey(tmp[0].Trim()))
-                            key = (tmp[0].Trim()).GetHashCode();
-                        else
-                            continue;
+                        continue;
                     }
 
-                    key = 1000 * (int)type + order;
                     if (style != null && style is CabViewDigitalRenderer)//digits?
                     {
                         //DigitParts.Add(key, new DigitalDisplay(viewer, TrainCarShape, iMatrix, parameter, locoViewer.ThreeDimentionCabRenderer.ControlMap[key]));
