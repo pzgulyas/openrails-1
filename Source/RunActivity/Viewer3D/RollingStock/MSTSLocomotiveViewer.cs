@@ -299,7 +299,7 @@ namespace Orts.Viewer3D.RollingStock
             }
             
             // Execute custom commands defined in keymap
-            Locomotive.KeyMap.HandleUserInput(elapsedTime);
+            Locomotive.KeyMap?.HandleUserInput(elapsedTime);
         }
 
         /// <summary>

@@ -419,17 +419,17 @@ namespace Orts.Common.Scripting
                         }
                         return true;
                     case Variable.OrtsSignalDistanceM: ret = index <= 0 ? -1 : sti(TRAINOBJECTTYPE.SIGNAL)?.DistanceToTrainM ?? float.MaxValue; return true;
-                    case Variable.OrtsSignalAltitudeM: ret = index <= 0 ? currentAltitudeM() : sti(TRAINOBJECTTYPE.SIGNAL)?.AltitudeM ?? float.MaxValue; return true;
+                    //case Variable.OrtsSignalAltitudeM: ret = index <= 0 ? currentAltitudeM() : sti(TRAINOBJECTTYPE.SIGNAL)?.AltitudeM ?? float.MaxValue; return true;
                     case Variable.OrtsSignalHeadSpeedLimitMpS: ret = index <= 0 ? Locomotive.Train?.allowedMaxSpeedSignalMpS ?? -1 : sti(TRAINOBJECTTYPE.SIGNAL)?.AllowedSpeedMpS ?? -1; return true;
                     case Variable.OrtsSpeedPostDistanceM: ret = index <= 0 ? -1 : sti(TRAINOBJECTTYPE.SPEEDPOST)?.DistanceToTrainM ?? float.MaxValue; return true;
-                    case Variable.OrtsSpeedPostAltitudeM: ret = index <= 0 ? currentAltitudeM() : sti(TRAINOBJECTTYPE.SPEEDPOST)?.AltitudeM ?? float.MaxValue; return true;
+                    //case Variable.OrtsSpeedPostAltitudeM: ret = index <= 0 ? currentAltitudeM() : sti(TRAINOBJECTTYPE.SPEEDPOST)?.AltitudeM ?? float.MaxValue; return true;
                     case Variable.OrtsSpeedPostSpeedLimitMpS: ret = index <= 0 ? Locomotive.Train?.allowedMaxSpeedLimitMpS ?? -1 : sti(TRAINOBJECTTYPE.SPEEDPOST)?.AllowedSpeedMpS ?? -1; return true;
                     case Variable.OrtsMilePostDistanceM: ret = index <= 0 ? -1 : sti(TRAINOBJECTTYPE.MILEPOST)?.DistanceToTrainM ?? float.MaxValue; return true;
-                    case Variable.OrtsMilePostAltitudeM: ret = index <= 0 ? currentAltitudeM() : sti(TRAINOBJECTTYPE.MILEPOST)?.AltitudeM ?? float.MaxValue; return true;
+                    //case Variable.OrtsMilePostAltitudeM: ret = index <= 0 ? currentAltitudeM() : sti(TRAINOBJECTTYPE.MILEPOST)?.AltitudeM ?? float.MaxValue; return true;
                     case Variable.OrtsFacingDivergingSwitchDistanceM: ret = index <= 0 ? -1 : sti(TRAINOBJECTTYPE.FACING_SWITCH)?.DistanceToTrainM ?? float.MaxValue; return true;
-                    case Variable.OrtsFacingDivergingSwitchAltitudeM: ret = index <= 0 ? currentAltitudeM() : sti(TRAINOBJECTTYPE.MILEPOST)?.AltitudeM ?? float.MaxValue; return true;
+                    //case Variable.OrtsFacingDivergingSwitchAltitudeM: ret = index <= 0 ? currentAltitudeM() : sti(TRAINOBJECTTYPE.MILEPOST)?.AltitudeM ?? float.MaxValue; return true;
                     case Variable.OrtsTrailingDivergingSwitchDistanceM: ret = index <= 0 ? -1 : sti(TRAINOBJECTTYPE.TRAILING_SWITCH)?.DistanceToTrainM ?? float.MaxValue; return true;
-                    case Variable.OrtsTrailingDivergingSwitchAltitudeM: ret = index <= 0 ? currentAltitudeM() : sti(TRAINOBJECTTYPE.MILEPOST)?.AltitudeM ?? float.MaxValue; return true;
+                    //case Variable.OrtsTrailingDivergingSwitchAltitudeM: ret = index <= 0 ? currentAltitudeM() : sti(TRAINOBJECTTYPE.MILEPOST)?.AltitudeM ?? float.MaxValue; return true;
                     case Variable.OrtsStationDistanceM: ret = index <= 0 ? -1 : sti(TRAINOBJECTTYPE.STATION)?.DistanceToTrainM ?? float.MaxValue; return true;
                     case Variable.OrtsStationPlatformLengthM: ret = index <= 0 ? -1 : sti(TRAINOBJECTTYPE.STATION)?.StationPlatformLength ?? float.MaxValue; return true;
                     case Variable.OrtsTunnelEntranceDistanceM: ret = index <= 0 ? -1 : sti(TRAINOBJECTTYPE.TUNNEL)?.DistanceToTrainM ?? float.MaxValue; return true;

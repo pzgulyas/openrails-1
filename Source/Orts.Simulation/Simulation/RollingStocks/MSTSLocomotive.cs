@@ -1171,7 +1171,7 @@ namespace Orts.Simulation.RollingStocks
         /// </summary>
         public override void Initialize()
         {
-            KeyMap.Initialize();
+            KeyMap?.Initialize();
             TrainBrakeController.Initialize();
             EngineBrakeController.Initialize();
             BrakemanBrakeController.Initialize();
@@ -1478,7 +1478,7 @@ namespace Orts.Simulation.RollingStocks
         /// </summary>
         public override void Update(float elapsedClockSeconds)
         {
-            KeyMap.Update(elapsedClockSeconds);
+            KeyMap?.Update(elapsedClockSeconds);
             TrainControlSystem.Update();
             ContentScript.Update(elapsedClockSeconds);
 
