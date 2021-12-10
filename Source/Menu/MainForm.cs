@@ -1204,7 +1204,7 @@ namespace ORTS
             {
                 if (SelectedTimetableSet != null)
                     ShowDetail(catalog.GetStringFmt("Timetable set: {0}", SelectedTimetableSet), new string[0]);
-                    // Description not shown as no description is available for a timetable set.
+                // Description not shown as no description is available for a timetable set.
 
                 if (SelectedTimetable != null)
                     ShowDetail(catalog.GetStringFmt("Timetable: {0}", SelectedTimetable), SelectedTimetable.Briefing.Split('\n'));
@@ -1217,14 +1217,15 @@ namespace ORTS
                     {
                         ShowDetail(catalog.GetStringFmt("Consist: {0}", SelectedTimetableConsist.Name), new string[0]);
                         if (SelectedTimetableConsist.Locomotives.Count == 1)
+                        {
                             var loco = SelectedTimetableConsist.Locomotives.First();
                             ShowDetail(catalog.GetStringFmt("Locomotive: {0}", loco.Name ?? ""), (loco.Description ?? "").Split('\n'));
                         }
-                    if (SelectedTimetablePath != null)
-                        ShowDetail(catalog.GetStringFmt("Path: {0}", SelectedTimetablePath.Name), SelectedTimetablePath.ToInfo());
+                        if (SelectedTimetablePath != null)
+                            ShowDetail(catalog.GetStringFmt("Path: {0}", SelectedTimetablePath.Name), SelectedTimetablePath.ToInfo());
                     }
                 }
-
+            }
             FlowDetails();
             Win32.LockWindowUpdate(IntPtr.Zero);
         }
