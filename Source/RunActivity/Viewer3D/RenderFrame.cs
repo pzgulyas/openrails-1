@@ -425,6 +425,15 @@ namespace Orts.Viewer3D
         readonly ulong[][] RenderItemKeys = new ulong[(int)RenderPrimitiveSequence.Sentinel][];
         readonly int[] RenderItemsMaxIndex = new int[(int)RenderPrimitiveSequence.Sentinel];
 
+        internal RenderTarget2D RenderSurfaceBloomCombine;
+        internal RenderTarget2D BloomSurfaceMip0;
+        internal RenderTarget2D BloomSurfaceMip1;
+        internal RenderTarget2D BloomSurfaceMip2;
+        internal RenderTarget2D BloomSurfaceMip3;
+        internal RenderTarget2D BloomSurfaceMip4;
+        internal RenderTarget2D BloomSurfaceMip5;
+        BloomMaterial BloomRenderSurfaceMaterial;
+
         readonly RenderItemCollection[] RenderShadowSceneryItems;
         readonly RenderItemCollection[] RenderShadowPbrNormalMapItems;
         readonly RenderItemCollection[] RenderShadowPbrSkinnedItems;
@@ -446,6 +455,9 @@ namespace Orts.Viewer3D
         ShadowMapMaterial ShadowMapMaterial;
         SceneryShader SceneryShader;
         ShadowMapShader ShadowMapShader;
+        BloomMaterial BloomMaterial;
+        BloomShader BloomShader;
+
         Vector3 SolarDirection;
         Camera Camera;
         Vector3 CameraLocation;
@@ -506,16 +518,55 @@ namespace Orts.Viewer3D
 
         void ScreenChanged()
         {
-            RenderSurface = new RenderTarget2D(
-                Game.RenderProcess.GraphicsDevice,
-                Game.RenderProcess.GraphicsDevice.PresentationParameters.BackBufferWidth,
-                Game.RenderProcess.GraphicsDevice.PresentationParameters.BackBufferHeight,
-                false,
+            DisposeRenderSurfaces();
+
+            var width = Game.RenderProcess.GraphicsDevice.PresentationParameters.BackBufferWidth;
+            var height = Game.RenderProcess.GraphicsDevice.PresentationParameters.BackBufferHeight;
+
+            RenderSurface = new RenderTarget2D(Game.RenderProcess.GraphicsDevice, width, height, false,
                 Game.RenderProcess.GraphicsDevice.PresentationParameters.BackBufferFormat,
                 Game.RenderProcess.GraphicsDevice.PresentationParameters.DepthStencilFormat,
                 Game.RenderProcess.GraphicsDevice.PresentationParameters.MultiSampleCount,
                 RenderTargetUsage.PreserveContents
             );
+
+            RenderSurfaceBloomCombine = new RenderTarget2D(Game.RenderProcess.GraphicsDevice, width, height, false,
+                Game.RenderProcess.GraphicsDevice.PresentationParameters.BackBufferFormat,
+                Game.RenderProcess.GraphicsDevice.PresentationParameters.DepthStencilFormat,
+                Game.RenderProcess.GraphicsDevice.PresentationParameters.MultiSampleCount,
+                RenderTargetUsage.PreserveContents
+            );
+
+            BloomSurfaceMip0 = new RenderTarget2D(Game.RenderProcess.GraphicsDevice,
+                width,
+                height, false, Game.RenderProcess.GraphicsDevice.PresentationParameters.BackBufferFormat, DepthFormat.None, 0, RenderTargetUsage.DiscardContents);
+            BloomSurfaceMip1 = new RenderTarget2D(Game.RenderProcess.GraphicsDevice,
+                width / 2,
+                height / 2, false, Game.RenderProcess.GraphicsDevice.PresentationParameters.BackBufferFormat, DepthFormat.None, 0, RenderTargetUsage.PreserveContents);
+            BloomSurfaceMip2 = new RenderTarget2D(Game.RenderProcess.GraphicsDevice,
+                width / 4,
+                height / 4, false, Game.RenderProcess.GraphicsDevice.PresentationParameters.BackBufferFormat, DepthFormat.None, 0, RenderTargetUsage.PreserveContents);
+            BloomSurfaceMip3 = new RenderTarget2D(Game.RenderProcess.GraphicsDevice,
+                width / 8,
+                height / 8, false, Game.RenderProcess.GraphicsDevice.PresentationParameters.BackBufferFormat, DepthFormat.None, 0, RenderTargetUsage.PreserveContents);
+            BloomSurfaceMip4 = new RenderTarget2D(Game.RenderProcess.GraphicsDevice,
+                width / 16,
+                height / 16, false, Game.RenderProcess.GraphicsDevice.PresentationParameters.BackBufferFormat, DepthFormat.None, 0, RenderTargetUsage.PreserveContents);
+            BloomSurfaceMip5 = new RenderTarget2D(Game.RenderProcess.GraphicsDevice,
+                width / 32,
+                height / 32, false, Game.RenderProcess.GraphicsDevice.PresentationParameters.BackBufferFormat, DepthFormat.None, 0, RenderTargetUsage.PreserveContents);
+        }
+
+        void DisposeRenderSurfaces()
+        {
+            RenderSurface?.Dispose();
+            RenderSurfaceBloomCombine?.Dispose();
+            BloomSurfaceMip0?.Dispose();
+            BloomSurfaceMip1?.Dispose();
+            BloomSurfaceMip2?.Dispose();
+            BloomSurfaceMip3?.Dispose();
+            BloomSurfaceMip4?.Dispose();
+            BloomSurfaceMip5?.Dispose();
         }
 
         public void Clear()
@@ -554,6 +605,9 @@ namespace Orts.Viewer3D
             if (RenderSurfaceMaterial == null)
                 RenderSurfaceMaterial = new SpriteBatchMaterial(viewer, BlendState.Opaque);
 
+            if (BloomRenderSurfaceMaterial == null)
+                BloomRenderSurfaceMaterial = new BloomMaterial(viewer);
+
             if (viewer.Settings.UseMSTSEnv == false)
                 SolarDirection = viewer.World.Sky.SolarDirection;
             else
@@ -565,6 +619,9 @@ namespace Orts.Viewer3D
                 SceneryShader = viewer.MaterialManager.SceneryShader;
             if (ShadowMapShader == null)
                 ShadowMapShader = viewer.MaterialManager.ShadowMapShader;
+
+            BloomMaterial = BloomMaterial ?? (BloomMaterial)viewer.MaterialManager.Load("Bloom");
+            BloomShader = BloomShader ?? viewer.MaterialManager.BloomShader;
 
             // Ensure that the first light is always the sun/moon, because the ambient and shadow effects will be calculated based on the first light.
             if (SolarDirection.Y > -0.05)
@@ -1027,6 +1084,14 @@ namespace Orts.Viewer3D
                     sequenceMaterial.ResetState(graphicsDevice);
                 }
                 if (logging) Console.WriteLine("    }");
+
+                // At the end of all 3D draws apply the bloom effect.
+                if ((RenderPrimitiveSequence)i == RenderPrimitiveSequence.InteriorBlended && RenderSurfaceMaterial != null)
+                {
+                    BloomMaterial.ApplyBloom(graphicsDevice, RenderSurface, BloomSurfaceMip0, BloomSurfaceMip1, BloomSurfaceMip2, BloomSurfaceMip3, BloomSurfaceMip4, BloomSurfaceMip5, RenderSurfaceBloomCombine);
+                    // The combined image is now on RenderSurfaceBloomCombine, so swap it with the RenderSurface.
+                    (RenderSurface, RenderSurfaceBloomCombine) = (RenderSurfaceBloomCombine, RenderSurface);
+                }
             }
         }
 

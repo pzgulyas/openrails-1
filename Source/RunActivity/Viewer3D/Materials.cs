@@ -285,6 +285,7 @@ namespace Orts.Viewer3D
         public readonly SceneryShader SceneryShader;
         public readonly ShadowMapShader ShadowMapShader;
         public readonly SkyShader SkyShader;
+        public readonly BloomShader BloomShader;
         public readonly DebugShader DebugShader;
         public readonly CabShader CabShader;
 
@@ -329,6 +330,7 @@ namespace Orts.Viewer3D
             }
             ShadowMapShader = new ShadowMapShader(viewer.RenderProcess.GraphicsDevice);
             SkyShader = new SkyShader(viewer.RenderProcess.GraphicsDevice);
+            BloomShader = new BloomShader(viewer.RenderProcess.GraphicsDevice);
             DebugShader = new DebugShader(viewer.RenderProcess.GraphicsDevice);
             CabShader = new CabShader(viewer.RenderProcess.GraphicsDevice, Vector4.One, Vector4.One, Vector3.One, Vector3.One);
 
@@ -359,6 +361,9 @@ namespace Orts.Viewer3D
             {
                 switch (materialName)
                 {
+                    case "Bloom":
+                        Materials[materialKey] = new BloomMaterial(Viewer);
+                        break;
                     case "Debug":
                         Materials[materialKey] = new HUDGraphMaterial(Viewer);
                         break;
@@ -1502,6 +1507,10 @@ namespace Orts.Viewer3D
                 graphicsDevice.SamplerStates[(int)SceneryShader.Samplers.Specular] = SamplerStateSpecular;
                 graphicsDevice.SamplerStates[(int)SceneryShader.Samplers.SpecularColor] = SamplerStateSpecularColor;
             }
+
+            // Tag the emissive pixels for the bloom filter later.
+            if (EmissiveFactor.LengthSquared() > 0 && graphicsDevice.DepthStencilState == DepthStencilState.Default)
+                graphicsDevice.DepthStencilState = EmissiveStencilState;
         }
 
         static SamplerState GetNewSamplerState((TextureFilter filter, TextureAddressMode addressU, TextureAddressMode addressV) samplerAttributes)
@@ -1622,6 +1631,174 @@ namespace Orts.Viewer3D
             base.ResetState(graphicsDevice);
             graphicsDevice.RasterizerState = RasterizerState.CullCounterClockwise;
         }
+
+        public DepthStencilState EmissiveStencilState = new DepthStencilState()
+        {
+            StencilEnable = true,
+            StencilMask = 0x08,
+            StencilWriteMask = 0x08,
+            StencilFunction = CompareFunction.Always,
+            StencilPass = StencilOperation.IncrementSaturation,
+        };
+    }
+
+    public class BloomMaterial : Material
+    {
+        EffectPass ShaderPassExtract;
+        EffectPass ShaderPassExtractLuminance;
+        EffectPass ShaderPassDownsample;
+        EffectPass ShaderPassUpsample;
+        EffectPass ShaderPassUpsampleLuminance;
+        EffectPass ShaderPassMerge;
+        EffectPass ShaderPass;
+        BloomShader Shader;
+        VertexBuffer BloomVertexBuffer;
+        bool UseLuminance = true;
+        float[] Strengths = new[] { 0.5f, 1, 2, 1, 2 };
+        float[] Radiuses = new[] { 1.0f, 2, 2, 4, 4 };
+        
+        float StrengthMultiplier = 1f;
+
+        public enum Pass
+        {
+            Extract,
+            DownSample,
+            UpSample,
+            Merge
+        }
+
+        readonly BlendState Merge = new BlendState()
+        {
+            ColorBlendFunction = BlendFunction.Add,
+            ColorSourceBlend = Blend.BlendFactor,
+            ColorDestinationBlend = Blend.BlendFactor,
+            BlendFactor = new Color(1f, 1f, 1f)
+        };
+
+        public BloomMaterial(Viewer viewer) : base(viewer, null)
+        {
+            BloomVertexBuffer = new VertexBuffer(Viewer.RenderProcess.GraphicsDevice, typeof(VertexPositionTexture), 4, BufferUsage.WriteOnly);
+            BloomVertexBuffer.SetData(new[] {
+                new VertexPositionTexture(new Vector3(-1, +1, 0), new Vector2(0, 0)),
+                new VertexPositionTexture(new Vector3(-1, -1, 0), new Vector2(0, 1)),
+                new VertexPositionTexture(new Vector3(+1, +1, 0), new Vector2(1, 0)),
+                new VertexPositionTexture(new Vector3(+1, -1, 0), new Vector2(1, 1)),
+            });
+            Shader = Viewer.MaterialManager.BloomShader;
+        }
+
+        public void SetState(GraphicsDevice graphicsDevice, Texture2D sourceTexture, Texture2D bloomTexture, RenderTarget2D targetTexture, Pass pass)
+        {
+            SetState(graphicsDevice, sourceTexture, targetTexture, pass);
+
+            graphicsDevice.Clear(ClearOptions.Target | ClearOptions.DepthBuffer | ClearOptions.Stencil, Color.Transparent, 1, 0);
+            Shader.BloomTexture = bloomTexture;
+        }
+
+        public void SetState(GraphicsDevice graphicsDevice, Texture2D sourceTexture, RenderTarget2D targetTexture, Pass pass, float bloomStrength, float bloomRadius)
+        {
+            SetState(graphicsDevice, sourceTexture, targetTexture, pass);
+            Shader.Radius = bloomRadius;
+            Shader.Strength = bloomStrength;
+        }
+
+        public void SetState(GraphicsDevice graphicsDevice, Texture2D sourceTexture, RenderTarget2D targetTexture, Pass pass)
+        {
+            ShaderPassExtract = ShaderPassExtract ?? Shader.Techniques["Extract"].Passes[0];
+            ShaderPassExtractLuminance = ShaderPassExtractLuminance ?? Shader.Techniques["ExtractLuminance"].Passes[0];
+            ShaderPassDownsample = ShaderPassDownsample ?? Shader.Techniques["Downsample"].Passes[0];
+            ShaderPassUpsample = ShaderPassUpsample ?? Shader.Techniques["Upsample"].Passes[0];
+            ShaderPassUpsampleLuminance = ShaderPassUpsampleLuminance ?? Shader.Techniques["UpsampleLuminance"].Passes[0];
+            ShaderPassMerge = ShaderPassMerge ?? Shader.Techniques["Merge"].Passes[0];
+
+            switch (pass)
+            {
+                case Pass.Extract: Shader.CurrentTechnique = Shader.Techniques[UseLuminance ? "ExtractLuminance" : "Extract"]; ShaderPass = UseLuminance ? ShaderPassExtractLuminance : ShaderPassExtract; break;
+                case Pass.UpSample: Shader.CurrentTechnique = Shader.Techniques[UseLuminance ? "UpsampleLuminance" : "Upsample"]; ShaderPass = UseLuminance ? ShaderPassUpsampleLuminance : ShaderPassUpsample; break;
+                case Pass.DownSample: Shader.CurrentTechnique = Shader.Techniques["Downsample"]; ShaderPass = ShaderPassDownsample; break;
+                case Pass.Merge: Shader.CurrentTechnique = Shader.Techniques["Merge"]; ShaderPass = ShaderPassMerge; break;
+            }
+
+            graphicsDevice.RasterizerState = RasterizerState.CullNone;
+            graphicsDevice.BlendState =
+                pass == Pass.Merge ? BlendState.Opaque :
+                pass == Pass.UpSample ? BlendState.AlphaBlend :
+                BlendState.Opaque;
+            graphicsDevice.DepthStencilState = pass == Pass.Extract ? BloomStencilState : DepthStencilState.Default;
+
+            Shader.ScreenTexture = sourceTexture;
+            graphicsDevice.SetRenderTarget(targetTexture);
+        }
+
+        public void Render(GraphicsDevice graphicsDevice)
+        {
+            graphicsDevice.SetVertexBuffer(BloomVertexBuffer);
+            ShaderPass.Apply();
+            graphicsDevice.DrawPrimitives(PrimitiveType.TriangleStrip, 0, 2);
+        }
+
+        public override void ResetState(GraphicsDevice graphicsDevice)
+        {
+            graphicsDevice.RasterizerState = RasterizerState.CullCounterClockwise;
+            graphicsDevice.BlendState = BlendState.NonPremultiplied;
+            graphicsDevice.DepthStencilState = DepthStencilState.Default;
+        }
+
+        public void ApplyBloom(GraphicsDevice graphicsDevice, RenderTarget2D screen, RenderTarget2D mip0, RenderTarget2D mip1, RenderTarget2D mip2, RenderTarget2D mip3, RenderTarget2D mip4, RenderTarget2D mip5, RenderTarget2D result)
+        {
+            // Extract the pixels to be bloomed
+            Shader.InverseResolution = new Vector2(1f / screen.Width, 1f / screen.Height);
+            SetState(graphicsDevice, screen, mip0, Pass.Extract);
+            Render(graphicsDevice);
+
+            SetState(graphicsDevice, mip0, mip1, Pass.DownSample);
+            Render(graphicsDevice);
+
+            Shader.InverseResolution *= 2;
+            SetState(graphicsDevice, mip1, mip2, Pass.DownSample);
+            Render(graphicsDevice);
+
+            Shader.InverseResolution *= 2;
+            SetState(graphicsDevice, mip2, mip3, Pass.DownSample);
+            Render(graphicsDevice);
+
+            Shader.InverseResolution *= 2;
+            SetState(graphicsDevice, mip3, mip4, Pass.DownSample);
+            Render(graphicsDevice);
+
+            Shader.InverseResolution *= 2;
+            SetState(graphicsDevice, mip4, mip5, Pass.DownSample);
+            Render(graphicsDevice);
+
+            SetState(graphicsDevice, mip5, mip4, Pass.UpSample, Strengths[4] * StrengthMultiplier, Radiuses[4]);
+            Render(graphicsDevice);
+            
+            Shader.InverseResolution /= 2;
+            SetState(graphicsDevice, mip4, mip3, Pass.UpSample, Strengths[3] * StrengthMultiplier, Radiuses[3]);
+            Render(graphicsDevice);
+            
+            Shader.InverseResolution /= 2;
+            SetState(graphicsDevice, mip3, mip2, Pass.UpSample, Strengths[2] * StrengthMultiplier, Radiuses[2]);
+            Render(graphicsDevice);
+            
+            Shader.InverseResolution /= 2;
+            SetState(graphicsDevice, mip2, mip1, Pass.UpSample, Strengths[1] * StrengthMultiplier, Radiuses[1]);
+            Render(graphicsDevice);
+            
+            Shader.InverseResolution /= 2;
+            SetState(graphicsDevice, mip1, mip0, Pass.UpSample, Strengths[0] * StrengthMultiplier, Radiuses[0]);
+            Render(graphicsDevice);
+
+            SetState(graphicsDevice, screen, mip0, result, Pass.Merge);
+            Render(graphicsDevice);
+        }
+
+        public DepthStencilState BloomStencilState = new DepthStencilState()
+        {
+            StencilEnable = true,
+            StencilMask = 0x08,
+            StencilFunction = CompareFunction.Greater,
+        };
     }
 
     public class ShadowMapMaterial : Material
