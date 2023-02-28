@@ -297,6 +297,7 @@ namespace Orts.Viewer3D
         public readonly SceneryShader SceneryShader;
         public readonly ShadowMapShader ShadowMapShader;
         public readonly SkyShader SkyShader;
+        public readonly BloomShader BloomShader;
         public readonly DebugShader DebugShader;
 
         public static Texture2D MissingTexture;
@@ -335,6 +336,7 @@ namespace Orts.Viewer3D
             }
             ShadowMapShader = new ShadowMapShader(viewer.RenderProcess.GraphicsDevice);
             SkyShader = new SkyShader(viewer.RenderProcess.GraphicsDevice);
+            BloomShader = new BloomShader(viewer.RenderProcess.GraphicsDevice);
             DebugShader = new DebugShader(viewer.RenderProcess.GraphicsDevice);
 
             // TODO: This should happen on the loader thread.
@@ -368,6 +370,9 @@ namespace Orts.Viewer3D
             {
                 switch (materialName)
                 {
+                    case "Bloom":
+                        Materials[materialKey] = new BloomMaterial(Viewer);
+                        break;
                     case "Debug":
                         Materials[materialKey] = new HUDGraphMaterial(Viewer);
                         break;
@@ -1299,6 +1304,40 @@ namespace Orts.Viewer3D
         {
             base.ResetState(graphicsDevice);
             graphicsDevice.RasterizerState = RasterizerState.CullCounterClockwise;
+        }
+    }
+
+    public class BloomMaterial : Material
+    {
+        IEnumerator<EffectPass> ShaderPassesExtract;
+        IEnumerator<EffectPass> ShaderPassesExtractLuminance;
+        IEnumerator<EffectPass> ShaderPassesDownsample;
+        IEnumerator<EffectPass> ShaderPassesUpsample;
+        IEnumerator<EffectPass> ShaderPassesUpsampleLuminance;
+        VertexBuffer BloomVertexBuffer;
+
+        public BloomMaterial(Viewer viewer) : base(viewer, null)
+        {
+            BloomVertexBuffer = new VertexBuffer(Viewer.RenderProcess.GraphicsDevice, typeof(VertexPositionTexture), 4, BufferUsage.WriteOnly);
+            BloomVertexBuffer.SetData(new[] {
+                new VertexPositionTexture(new Vector3(-1, +1, 0), new Vector2(0, 0)),
+                new VertexPositionTexture(new Vector3(-1, -1, 0), new Vector2(0, 1)),
+                new VertexPositionTexture(new Vector3(+1, +1, 0), new Vector2(1, 0)),
+                new VertexPositionTexture(new Vector3(+1, -1, 0), new Vector2(1, 1)),
+            });
+        }
+
+        public override void SetState(GraphicsDevice graphicsDevice, Material previousMaterial)
+        {
+            var shader = Viewer.MaterialManager.BloomShader;
+            ShaderPassesExtract = ShaderPassesExtract ?? shader.Techniques["Extract"].Passes.GetEnumerator();
+            ShaderPassesExtractLuminance = ShaderPassesExtractLuminance ?? shader.Techniques["ExtractLuminance"].Passes.GetEnumerator();
+            ShaderPassesDownsample = ShaderPassesDownsample ?? shader.Techniques["Downsample"].Passes.GetEnumerator();
+            ShaderPassesUpsample = ShaderPassesUpsample ?? shader.Techniques["Upsample"].Passes.GetEnumerator();
+            ShaderPassesUpsampleLuminance = ShaderPassesUpsampleLuminance ?? shader.Techniques["UpsampleLuminance"].Passes.GetEnumerator();
+
+            graphicsDevice.RasterizerState = RasterizerState.CullNone;
+            graphicsDevice.BlendState = BlendState.Opaque;
         }
     }
 

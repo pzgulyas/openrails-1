@@ -403,6 +403,14 @@ namespace Orts.Viewer3D
         internal RenderTarget2D RenderSurface;
         SpriteBatchMaterial RenderSurfaceMaterial;
 
+        internal RenderTarget2D BloomSurfaceMip0;
+        internal RenderTarget2D BloomSurfaceMip1;
+        internal RenderTarget2D BloomSurfaceMip2;
+        internal RenderTarget2D BloomSurfaceMip3;
+        internal RenderTarget2D BloomSurfaceMip4;
+        internal RenderTarget2D BloomSurfaceMip5;
+        BloomMaterial BloomRenderSurfaceMaterial;
+
         readonly Material DummyBlendedMaterial;
 		readonly Dictionary<Material, RenderItemCollection>[] RenderItems = new Dictionary<Material, RenderItemCollection>[(int)RenderPrimitiveSequence.Sentinel];
         readonly RenderItemCollection[] RenderShadowSceneryItems;
@@ -482,16 +490,47 @@ namespace Orts.Viewer3D
 
         void ScreenChanged()
         {
-            RenderSurface = new RenderTarget2D(
-                Game.RenderProcess.GraphicsDevice,
-                Game.RenderProcess.GraphicsDevice.PresentationParameters.BackBufferWidth,
-                Game.RenderProcess.GraphicsDevice.PresentationParameters.BackBufferHeight,
-                false,
+            DisposeRenderSurfaces();
+
+            var width = Game.RenderProcess.GraphicsDevice.PresentationParameters.BackBufferWidth;
+            var height = Game.RenderProcess.GraphicsDevice.PresentationParameters.BackBufferHeight;
+
+            RenderSurface = new RenderTarget2D(Game.RenderProcess.GraphicsDevice, width, height, false,
                 Game.RenderProcess.GraphicsDevice.PresentationParameters.BackBufferFormat,
                 Game.RenderProcess.GraphicsDevice.PresentationParameters.DepthStencilFormat,
                 Game.RenderProcess.GraphicsDevice.PresentationParameters.MultiSampleCount,
                 RenderTargetUsage.PreserveContents
             );
+
+            BloomSurfaceMip0 = new RenderTarget2D(Game.RenderProcess.GraphicsDevice,
+                width,
+                height, false, Game.RenderProcess.GraphicsDevice.PresentationParameters.BackBufferFormat, DepthFormat.None, 0, RenderTargetUsage.DiscardContents);
+            BloomSurfaceMip1 = new RenderTarget2D(Game.RenderProcess.GraphicsDevice,
+                width / 2,
+                height / 2, false, Game.RenderProcess.GraphicsDevice.PresentationParameters.BackBufferFormat, DepthFormat.None, 0, RenderTargetUsage.PreserveContents);
+            BloomSurfaceMip2 = new RenderTarget2D(Game.RenderProcess.GraphicsDevice,
+                width / 4,
+                height / 4, false, Game.RenderProcess.GraphicsDevice.PresentationParameters.BackBufferFormat, DepthFormat.None, 0, RenderTargetUsage.PreserveContents);
+            BloomSurfaceMip3 = new RenderTarget2D(Game.RenderProcess.GraphicsDevice,
+                width / 8,
+                height / 8, false, Game.RenderProcess.GraphicsDevice.PresentationParameters.BackBufferFormat, DepthFormat.None, 0, RenderTargetUsage.PreserveContents);
+            BloomSurfaceMip4 = new RenderTarget2D(Game.RenderProcess.GraphicsDevice,
+                width / 16,
+                height / 16, false, Game.RenderProcess.GraphicsDevice.PresentationParameters.BackBufferFormat, DepthFormat.None, 0, RenderTargetUsage.PreserveContents);
+            BloomSurfaceMip5 = new RenderTarget2D(Game.RenderProcess.GraphicsDevice,
+                width / 32,
+                height / 32, false, Game.RenderProcess.GraphicsDevice.PresentationParameters.BackBufferFormat, DepthFormat.None, 0, RenderTargetUsage.PreserveContents);
+        }
+
+        void DisposeRenderSurfaces()
+        {
+            RenderSurface?.Dispose();
+            BloomSurfaceMip0?.Dispose();
+            BloomSurfaceMip1?.Dispose();
+            BloomSurfaceMip2?.Dispose();
+            BloomSurfaceMip3?.Dispose();
+            BloomSurfaceMip4?.Dispose();
+            BloomSurfaceMip5?.Dispose();
         }
 
         public void Clear()
@@ -538,6 +577,9 @@ namespace Orts.Viewer3D
         {
             if (RenderSurfaceMaterial == null)
                 RenderSurfaceMaterial = new SpriteBatchMaterial(viewer, BlendState.Opaque);
+
+            if (BloomRenderSurfaceMaterial == null)
+                BloomRenderSurfaceMaterial = new BloomMaterial(viewer);
 
             if (viewer.Settings.UseMSTSEnv == false)
                 SolarDirection = viewer.World.Sky.SolarDirection;
@@ -929,6 +971,15 @@ namespace Orts.Viewer3D
             if (logging) Console.WriteLine("    }");
         }
 
+        void DrawBloom(GraphicsDevice graphicsDevice)
+        {
+            // Extract the pixels to be bloomed
+            graphicsDevice.SetRenderTarget(BloomSurfaceMip0);
+
+
+
+        }
+
         /// <summary>
         /// Executed in the RenderProcess thread - simple draw
         /// </summary>
@@ -962,6 +1013,8 @@ namespace Orts.Viewer3D
 
             if (RenderSurfaceMaterial != null)
             {
+                DrawBloom(graphicsDevice);
+
                 graphicsDevice.SetRenderTarget(null);
                 graphicsDevice.Clear(ClearOptions.Target | ClearOptions.DepthBuffer | ClearOptions.Stencil, Color.Transparent, 1, 0);
                 RenderSurfaceMaterial.SetState(graphicsDevice, null);

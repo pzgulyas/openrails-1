@@ -377,6 +377,29 @@ namespace Orts.Viewer3D
     }
 
     [CallOnThread("Render")]
+    public class BloomShader : Shader
+    {
+        EffectParameter ScreenTexture;
+        EffectParameter InverseResolution;
+        EffectParameter Threshold;
+        EffectParameter Radius;
+        EffectParameter Strength;
+        EffectParameter StreakLength;
+
+        public BloomShader(GraphicsDevice graphicsDevice)
+            : base(graphicsDevice, "Bloom")
+        {
+            ScreenTexture = Parameters["ScreenTexture"];
+            InverseResolution = Parameters["InverseResolution"];
+            Threshold = Parameters["Threshold"];
+            Radius = Parameters["Radius"];
+            Strength = Parameters["Strength"];
+            StreakLength = Parameters["StreakLength"];
+
+        }
+    }
+
+    [CallOnThread("Render")]
     public class ShadowMapShader : Shader
     {
         readonly EffectParameter worldViewProjection;
