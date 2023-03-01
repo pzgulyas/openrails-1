@@ -403,6 +403,7 @@ namespace Orts.Viewer3D
         internal RenderTarget2D RenderSurface;
         SpriteBatchMaterial RenderSurfaceMaterial;
 
+        internal RenderTarget2D BloomSurfaceMerged;
         internal RenderTarget2D BloomSurfaceMip0;
         internal RenderTarget2D BloomSurfaceMip1;
         internal RenderTarget2D BloomSurfaceMip2;
@@ -504,6 +505,9 @@ namespace Orts.Viewer3D
                 RenderTargetUsage.PreserveContents
             );
 
+            BloomSurfaceMerged = new RenderTarget2D(Game.RenderProcess.GraphicsDevice,
+                width,
+                height, false, Game.RenderProcess.GraphicsDevice.PresentationParameters.BackBufferFormat, DepthFormat.None, 0, RenderTargetUsage.PreserveContents);
             BloomSurfaceMip0 = new RenderTarget2D(Game.RenderProcess.GraphicsDevice,
                 width,
                 height, false, Game.RenderProcess.GraphicsDevice.PresentationParameters.BackBufferFormat, DepthFormat.None, 0, RenderTargetUsage.DiscardContents);
@@ -527,6 +531,7 @@ namespace Orts.Viewer3D
         void DisposeRenderSurfaces()
         {
             RenderSurface?.Dispose();
+            BloomSurfaceMerged?.Dispose();
             BloomSurfaceMip0?.Dispose();
             BloomSurfaceMip1?.Dispose();
             BloomSurfaceMip2?.Dispose();
@@ -1009,7 +1014,7 @@ namespace Orts.Viewer3D
 
             if (RenderSurfaceMaterial != null)
             {
-                BloomMaterial.ApplyBloom(graphicsDevice, RenderSurface, BloomSurfaceMip0, BloomSurfaceMip1, BloomSurfaceMip2, BloomSurfaceMip3, BloomSurfaceMip4, BloomSurfaceMip5);
+                BloomMaterial.ApplyBloom(graphicsDevice, RenderSurface, BloomSurfaceMip0, BloomSurfaceMip1, BloomSurfaceMip2, BloomSurfaceMip3, BloomSurfaceMip4, BloomSurfaceMip5, BloomSurfaceMerged);
 
                 graphicsDevice.SetRenderTarget(null);
                 graphicsDevice.Clear(ClearOptions.Target | ClearOptions.DepthBuffer | ClearOptions.Stencil, Color.Transparent, 1, 0);

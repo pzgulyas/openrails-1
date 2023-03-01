@@ -34,6 +34,24 @@ SamplerState LinearSampler
 	AddressV = CLAMP;
 };
 
+// Variables for the merge
+float BloomSaturation = 1;
+float BloomIntensity = 1;
+
+Texture2D BloomTexture
+
+SamplerState BloomSampler
+{
+    Texture = <BloomTexture>;
+
+    MagFilter = LINEAR;
+    MinFilter = LINEAR;
+    Mipfilter = LINEAR;
+
+    AddressU = CLAMP;
+    AddressV = CLAMP;
+};
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //  STRUCTS
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -175,9 +193,19 @@ float4 UpsampleLuminancePS(float4 pos : SV_POSITION,  float2 texCoord : TEXCOORD
 
 }
 
+float4 AdjustSaturation(float4 color, float saturation)
+{
+    // The constants 0.3, 0.59, and 0.11 are chosen because the 
+    // human eye is more sensitive to green light, and less to blue. 
+    float grey = dot(color, float3(0.3, 0.59, 0.11));
+    return lerp(grey, color, saturation);
+}
+
 float4 MergePS(float4 pos : SV_POSITION, float2 texCoord : TEXCOORD0) : SV_TARGET0
 {
-    return ScreenTexture.Sample(LinearSampler, texCoord);
+    float4 bloom = ScreenTexture.Sample(LinearSampler, texCoord);
+    bloom = AdjustSaturation(bloom, BloomSaturation) * BloomIntensity;
+    return bloom;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////

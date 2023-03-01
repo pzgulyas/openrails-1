@@ -1319,8 +1319,8 @@ namespace Orts.Viewer3D
         BloomShader Shader;
         VertexBuffer BloomVertexBuffer;
         bool UseLuminance = true;
-        float[] Strengths = new[] { 0.8f, 1, 1, 1, 2 };
-        float[] Radiuses = new[] { 2.0f, 2, 2, 2, 4 };
+        float[] Strengths = new[] { 0.5f, 1, 2, 1, 2 };
+        float[] Radiuses = new[] { 1.0f, 2, 2, 4, 4 };
 
         public enum Pass
         {
@@ -1350,13 +1350,21 @@ namespace Orts.Viewer3D
             Shader = Viewer.MaterialManager.BloomShader;
         }
 
+        public void SetState(GraphicsDevice graphicsDevice, Texture2D sourceTexture, Texture2D bloomTexture, RenderTarget2D targetTexture, Pass pass)
+        {
+            Shader.BloomTexture = bloomTexture;
+            SetState(graphicsDevice, sourceTexture, targetTexture, pass);
+            // Clear
+            // Draw 
+            // Then swap
+        }
+
         public void SetState(GraphicsDevice graphicsDevice, Texture2D sourceTexture, RenderTarget2D targetTexture, Pass pass, float bloomStrength, float bloomRadius)
         {
             SetState(graphicsDevice, sourceTexture, targetTexture, pass);
             Shader.Radius = bloomRadius;
             Shader.Strength = bloomStrength;
         }
-
 
         public void SetState(GraphicsDevice graphicsDevice, Texture2D sourceTexture, RenderTarget2D targetTexture, Pass pass)
         {
@@ -1398,7 +1406,7 @@ namespace Orts.Viewer3D
             graphicsDevice.BlendState = BlendState.NonPremultiplied;
         }
 
-        public void ApplyBloom(GraphicsDevice graphicsDevice, RenderTarget2D screen, RenderTarget2D mip0, RenderTarget2D mip1, RenderTarget2D mip2, RenderTarget2D mip3, RenderTarget2D mip4, RenderTarget2D mip5)
+        public void ApplyBloom(GraphicsDevice graphicsDevice, RenderTarget2D screen, RenderTarget2D mip0, RenderTarget2D mip1, RenderTarget2D mip2, RenderTarget2D mip3, RenderTarget2D mip4, RenderTarget2D mip5, RenderTarget2D result)
         {
             // Extract the pixels to be bloomed
             Shader.InverseResolution = new Vector2(1f / screen.Width, 1f / screen.Height);

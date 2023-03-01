@@ -379,6 +379,7 @@ namespace Orts.Viewer3D
     [CallOnThread("Render")]
     public class BloomShader : Shader
     {
+        readonly EffectParameter bloomTexture;
         readonly EffectParameter screenTexture;
         readonly EffectParameter inverseResolution;
         readonly EffectParameter threshold;
@@ -389,6 +390,7 @@ namespace Orts.Viewer3D
         public BloomShader(GraphicsDevice graphicsDevice)
             : base(graphicsDevice, "Bloom")
         {
+            bloomTexture = Parameters["BloomTexture"];
             screenTexture = Parameters["ScreenTexture"];
             inverseResolution = Parameters["InverseResolution"];
             threshold = Parameters["Threshold"];
@@ -397,6 +399,7 @@ namespace Orts.Viewer3D
             streakLength = Parameters["StreakLength"];
         }
 
+        public Texture2D BloomTexture { set => bloomTexture.SetValue(value); }
         public Texture2D ScreenTexture { set => screenTexture.SetValue(value); }
         Vector2 InverseResolutionField;
         public Vector2 InverseResolution { get => InverseResolutionField; set => inverseResolution.SetValue(InverseResolutionField = value); }
