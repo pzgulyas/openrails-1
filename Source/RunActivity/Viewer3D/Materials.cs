@@ -1309,12 +1309,32 @@ namespace Orts.Viewer3D
 
     public class BloomMaterial : Material
     {
-        IEnumerator<EffectPass> ShaderPassesExtract;
-        IEnumerator<EffectPass> ShaderPassesExtractLuminance;
-        IEnumerator<EffectPass> ShaderPassesDownsample;
-        IEnumerator<EffectPass> ShaderPassesUpsample;
-        IEnumerator<EffectPass> ShaderPassesUpsampleLuminance;
+        EffectPass ShaderPassExtract;
+        EffectPass ShaderPassExtractLuminance;
+        EffectPass ShaderPassDownsample;
+        EffectPass ShaderPassUpsample;
+        EffectPass ShaderPassUpsampleLuminance;
+        EffectPass ShaderPassMerge;
+        EffectPass ShaderPass;
+        BloomShader Shader;
         VertexBuffer BloomVertexBuffer;
+        bool UseLuminance = true;
+
+        public enum Pass
+        {
+            Extract,
+            DownSample,
+            UpSample,
+            Merge
+        }
+
+        readonly BlendState Merge = new BlendState()
+        {
+            ColorBlendFunction = BlendFunction.Add,
+            ColorSourceBlend = Blend.BlendFactor,
+            ColorDestinationBlend = Blend.BlendFactor,
+            BlendFactor = new Color(1f, 1f, 1f)
+        };
 
         public BloomMaterial(Viewer viewer) : base(viewer, null)
         {
@@ -1325,20 +1345,110 @@ namespace Orts.Viewer3D
                 new VertexPositionTexture(new Vector3(+1, +1, 0), new Vector2(1, 0)),
                 new VertexPositionTexture(new Vector3(+1, -1, 0), new Vector2(1, 1)),
             });
+            Shader = Viewer.MaterialManager.BloomShader;
         }
 
-        public override void SetState(GraphicsDevice graphicsDevice, Material previousMaterial)
+        public void SetState(GraphicsDevice graphicsDevice, Texture2D sourceTexture, RenderTarget2D targetTexture, Pass pass, float bloomStrength, float bloomRadius)
         {
-            var shader = Viewer.MaterialManager.BloomShader;
-            ShaderPassesExtract = ShaderPassesExtract ?? shader.Techniques["Extract"].Passes.GetEnumerator();
-            ShaderPassesExtractLuminance = ShaderPassesExtractLuminance ?? shader.Techniques["ExtractLuminance"].Passes.GetEnumerator();
-            ShaderPassesDownsample = ShaderPassesDownsample ?? shader.Techniques["Downsample"].Passes.GetEnumerator();
-            ShaderPassesUpsample = ShaderPassesUpsample ?? shader.Techniques["Upsample"].Passes.GetEnumerator();
-            ShaderPassesUpsampleLuminance = ShaderPassesUpsampleLuminance ?? shader.Techniques["UpsampleLuminance"].Passes.GetEnumerator();
+            SetState(graphicsDevice, sourceTexture, targetTexture, pass);
+            Shader.Radius = bloomRadius;
+            Shader.Strength = bloomStrength;
+        }
+
+
+        public void SetState(GraphicsDevice graphicsDevice, Texture2D sourceTexture, RenderTarget2D targetTexture, Pass pass)
+        {
+            ShaderPassExtract = ShaderPassExtract ?? Shader.Techniques["Extract"].Passes[0];
+            ShaderPassExtractLuminance = ShaderPassExtractLuminance ?? Shader.Techniques["ExtractLuminance"].Passes[0];
+            ShaderPassDownsample = ShaderPassDownsample ?? Shader.Techniques["Downsample"].Passes[0];
+            ShaderPassUpsample = ShaderPassUpsample ?? Shader.Techniques["Upsample"].Passes[0];
+            ShaderPassUpsampleLuminance = ShaderPassUpsampleLuminance ?? Shader.Techniques["UpsampleLuminance"].Passes[0];
+            ShaderPassMerge = ShaderPassMerge ?? Shader.Techniques["Merge"].Passes[0];
+
+            switch (pass)
+            {
+                case Pass.Extract: Shader.CurrentTechnique = Shader.Techniques[UseLuminance ? "ExtractLuminance" : "Extract"]; ShaderPass = UseLuminance ? ShaderPassExtractLuminance : ShaderPassExtract; break;
+                case Pass.UpSample: Shader.CurrentTechnique = Shader.Techniques[UseLuminance ? "UpsampleLuminance" : "Upsample"]; ShaderPass = UseLuminance ? ShaderPassUpsampleLuminance : ShaderPassUpsample; break;
+                case Pass.DownSample: Shader.CurrentTechnique = Shader.Techniques["Downsample"]; ShaderPass = ShaderPassDownsample; break;
+                case Pass.Merge: Shader.CurrentTechnique = Shader.Techniques["Merge"]; ShaderPass = ShaderPassMerge; break;
+            }
 
             graphicsDevice.RasterizerState = RasterizerState.CullNone;
-            graphicsDevice.BlendState = BlendState.Opaque;
+            graphicsDevice.BlendState =
+                pass == Pass.Merge ? Merge :
+                pass == Pass.UpSample ? BlendState.AlphaBlend :
+                BlendState.Opaque;
+
+            Shader.ScreenTexture = sourceTexture;
+            graphicsDevice.SetRenderTarget(targetTexture);
         }
+
+        public void Render(GraphicsDevice graphicsDevice)
+        {
+            graphicsDevice.SetVertexBuffer(BloomVertexBuffer);
+            ShaderPass.Apply();
+            graphicsDevice.DrawPrimitives(PrimitiveType.TriangleStrip, 0, 2);
+        }
+
+        public override void ResetState(GraphicsDevice graphicsDevice)
+        {
+            graphicsDevice.RasterizerState = RasterizerState.CullCounterClockwise;
+            graphicsDevice.BlendState = BlendState.NonPremultiplied;
+        }
+
+        public void ApplyBloom(GraphicsDevice graphicsDevice, RenderTarget2D screen, RenderTarget2D mip0, RenderTarget2D mip1, RenderTarget2D mip2, RenderTarget2D mip3, RenderTarget2D mip4, RenderTarget2D mip5)
+        {
+            var radiuses = new[] { 1.0f, 2, 2, 4, 4 };
+            var strengths = new[] { 0.5f, 1, 2, 1, 2 };
+
+            // Extract the pixels to be bloomed
+            Shader.InverseResolution = new Vector2(1f / screen.Width, 1f / screen.Height);
+            SetState(graphicsDevice, screen, mip0, Pass.Extract);
+            Render(graphicsDevice);
+
+            SetState(graphicsDevice, mip0, mip1, Pass.DownSample);
+            Render(graphicsDevice);
+
+            Shader.InverseResolution *= 2;
+            SetState(graphicsDevice, mip1, mip2, Pass.DownSample);
+            Render(graphicsDevice);
+
+            Shader.InverseResolution *= 2;
+            SetState(graphicsDevice, mip2, mip3, Pass.DownSample);
+            Render(graphicsDevice);
+
+            Shader.InverseResolution *= 2;
+            SetState(graphicsDevice, mip3, mip4, Pass.DownSample);
+            Render(graphicsDevice);
+
+            Shader.InverseResolution *= 2;
+            SetState(graphicsDevice, mip4, mip5, Pass.DownSample);
+            Render(graphicsDevice);
+
+            SetState(graphicsDevice, mip5, mip4, Pass.UpSample, strengths[4], radiuses[4]);
+            Render(graphicsDevice);
+            
+            Shader.InverseResolution /= 2;
+            SetState(graphicsDevice, mip4, mip3, Pass.UpSample, strengths[3], radiuses[3]);
+            Render(graphicsDevice);
+            
+            Shader.InverseResolution /= 2;
+            SetState(graphicsDevice, mip3, mip2, Pass.UpSample, strengths[2], radiuses[2]);
+            Render(graphicsDevice);
+            
+            Shader.InverseResolution /= 2;
+            SetState(graphicsDevice, mip2, mip1, Pass.UpSample, strengths[1], radiuses[1]);
+            Render(graphicsDevice);
+            
+            Shader.InverseResolution /= 2;
+            SetState(graphicsDevice, mip1, mip0, Pass.UpSample, strengths[0], radiuses[0]);
+            Render(graphicsDevice);
+
+            SetState(graphicsDevice, mip0, screen, Pass.Merge);
+            Render(graphicsDevice);
+        }
+
+
     }
 
     public class ShadowMapMaterial : Material

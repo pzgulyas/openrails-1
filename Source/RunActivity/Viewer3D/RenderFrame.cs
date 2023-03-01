@@ -433,6 +433,8 @@ namespace Orts.Viewer3D
         public bool IsScreenChanged { get; internal set; }
         ShadowMapMaterial ShadowMapMaterial;
         SceneryShader SceneryShader;
+        BloomMaterial BloomMaterial;
+        BloomShader BloomShader;
         Vector3 SolarDirection;
         Camera Camera;
         Vector3 CameraLocation;
@@ -590,6 +592,9 @@ namespace Orts.Viewer3D
                 ShadowMapMaterial = (ShadowMapMaterial)viewer.MaterialManager.Load("ShadowMap");
             if (SceneryShader == null)
                 SceneryShader = viewer.MaterialManager.SceneryShader;
+
+            BloomMaterial = BloomMaterial ?? (BloomMaterial)viewer.MaterialManager.Load("Bloom");
+            BloomShader = BloomShader ?? viewer.MaterialManager.BloomShader;
 
             // Ensure that the first light is always the sun/moon, because the ambient and shadow effects will be calculated based on the first light.
             if (SolarDirection.Y > -0.05)
@@ -971,15 +976,6 @@ namespace Orts.Viewer3D
             if (logging) Console.WriteLine("    }");
         }
 
-        void DrawBloom(GraphicsDevice graphicsDevice)
-        {
-            // Extract the pixels to be bloomed
-            graphicsDevice.SetRenderTarget(BloomSurfaceMip0);
-
-
-
-        }
-
         /// <summary>
         /// Executed in the RenderProcess thread - simple draw
         /// </summary>
@@ -1013,7 +1009,7 @@ namespace Orts.Viewer3D
 
             if (RenderSurfaceMaterial != null)
             {
-                DrawBloom(graphicsDevice);
+                BloomMaterial.ApplyBloom(graphicsDevice, RenderSurface, BloomSurfaceMip0, BloomSurfaceMip1, BloomSurfaceMip2, BloomSurfaceMip3, BloomSurfaceMip4, BloomSurfaceMip5);
 
                 graphicsDevice.SetRenderTarget(null);
                 graphicsDevice.Clear(ClearOptions.Target | ClearOptions.DepthBuffer | ClearOptions.Stencil, Color.Transparent, 1, 0);

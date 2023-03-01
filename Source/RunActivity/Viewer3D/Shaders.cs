@@ -379,24 +379,29 @@ namespace Orts.Viewer3D
     [CallOnThread("Render")]
     public class BloomShader : Shader
     {
-        EffectParameter ScreenTexture;
-        EffectParameter InverseResolution;
-        EffectParameter Threshold;
-        EffectParameter Radius;
-        EffectParameter Strength;
-        EffectParameter StreakLength;
+        readonly EffectParameter screenTexture;
+        readonly EffectParameter inverseResolution;
+        readonly EffectParameter threshold;
+        readonly EffectParameter radius;
+        readonly EffectParameter strength;
+        readonly EffectParameter streakLength;
 
         public BloomShader(GraphicsDevice graphicsDevice)
             : base(graphicsDevice, "Bloom")
         {
-            ScreenTexture = Parameters["ScreenTexture"];
-            InverseResolution = Parameters["InverseResolution"];
-            Threshold = Parameters["Threshold"];
-            Radius = Parameters["Radius"];
-            Strength = Parameters["Strength"];
-            StreakLength = Parameters["StreakLength"];
-
+            screenTexture = Parameters["ScreenTexture"];
+            inverseResolution = Parameters["InverseResolution"];
+            threshold = Parameters["Threshold"];
+            radius = Parameters["Radius"];
+            strength = Parameters["Strength"];
+            streakLength = Parameters["StreakLength"];
         }
+
+        public Texture2D ScreenTexture { set => screenTexture.SetValue(value); }
+        Vector2 InverseResolutionField;
+        public Vector2 InverseResolution { get => InverseResolutionField; set => inverseResolution.SetValue(InverseResolutionField = value); }
+        public float Radius { set=> radius.SetValue(value); }
+        public float Strength { set => strength.SetValue(value); }
     }
 
     [CallOnThread("Render")]

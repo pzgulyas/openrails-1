@@ -1,6 +1,6 @@
 ﻿
 
-// Bllom filter by Kosmonaut3d
+// Bloom filter by Kosmonaut3d
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //  VARIABLES
@@ -175,6 +175,11 @@ float4 UpsampleLuminancePS(float4 pos : SV_POSITION,  float2 texCoord : TEXCOORD
 
 }
 
+float4 MergePS(float4 pos : SV_POSITION, float2 texCoord : TEXCOORD0) : SV_TARGET0
+{
+    return ScreenTexture.Sample(LinearSampler, texCoord);
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //  TECHNIQUES
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -215,12 +220,20 @@ technique Upsample
     }
 }
 
-
 technique UpsampleLuminance
 {
     pass Pass1
     {
 		VertexShader = compile vs_4_0 VertexShaderFunction();
         PixelShader = compile ps_4_0 UpsampleLuminancePS();
+    }
+}
+
+technique Merge
+{
+    pass Pass1
+    {
+        VertexShader = compile vs_4_0 VertexShaderFunction();
+        PixelShader = compile ps_4_0 MergePS();
     }
 }
