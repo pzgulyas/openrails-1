@@ -1319,6 +1319,8 @@ namespace Orts.Viewer3D
         BloomShader Shader;
         VertexBuffer BloomVertexBuffer;
         bool UseLuminance = true;
+        float[] Strengths = new[] { 0.8f, 1, 1, 1, 2 };
+        float[] Radiuses = new[] { 2.0f, 2, 2, 2, 4 };
 
         public enum Pass
         {
@@ -1398,9 +1400,6 @@ namespace Orts.Viewer3D
 
         public void ApplyBloom(GraphicsDevice graphicsDevice, RenderTarget2D screen, RenderTarget2D mip0, RenderTarget2D mip1, RenderTarget2D mip2, RenderTarget2D mip3, RenderTarget2D mip4, RenderTarget2D mip5)
         {
-            var radiuses = new[] { 1.0f, 2, 2, 4, 4 };
-            var strengths = new[] { 0.5f, 1, 2, 1, 2 };
-
             // Extract the pixels to be bloomed
             Shader.InverseResolution = new Vector2(1f / screen.Width, 1f / screen.Height);
             SetState(graphicsDevice, screen, mip0, Pass.Extract);
@@ -1425,23 +1424,23 @@ namespace Orts.Viewer3D
             SetState(graphicsDevice, mip4, mip5, Pass.DownSample);
             Render(graphicsDevice);
 
-            SetState(graphicsDevice, mip5, mip4, Pass.UpSample, strengths[4], radiuses[4]);
+            SetState(graphicsDevice, mip5, mip4, Pass.UpSample, Strengths[4], Radiuses[4]);
             Render(graphicsDevice);
             
             Shader.InverseResolution /= 2;
-            SetState(graphicsDevice, mip4, mip3, Pass.UpSample, strengths[3], radiuses[3]);
+            SetState(graphicsDevice, mip4, mip3, Pass.UpSample, Strengths[3], Radiuses[3]);
             Render(graphicsDevice);
             
             Shader.InverseResolution /= 2;
-            SetState(graphicsDevice, mip3, mip2, Pass.UpSample, strengths[2], radiuses[2]);
+            SetState(graphicsDevice, mip3, mip2, Pass.UpSample, Strengths[2], Radiuses[2]);
             Render(graphicsDevice);
             
             Shader.InverseResolution /= 2;
-            SetState(graphicsDevice, mip2, mip1, Pass.UpSample, strengths[1], radiuses[1]);
+            SetState(graphicsDevice, mip2, mip1, Pass.UpSample, Strengths[1], Radiuses[1]);
             Render(graphicsDevice);
             
             Shader.InverseResolution /= 2;
-            SetState(graphicsDevice, mip1, mip0, Pass.UpSample, strengths[0], radiuses[0]);
+            SetState(graphicsDevice, mip1, mip0, Pass.UpSample, Strengths[0], Radiuses[0]);
             Render(graphicsDevice);
 
             SetState(graphicsDevice, mip0, screen, Pass.Merge);
