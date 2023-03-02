@@ -1242,6 +1242,10 @@ namespace Orts.Viewer3D
                 shader.ClearcoatNormalTexture = ClearcoatNormalTexture;
                 shader.ClearcoatNormalScale = ClearcoatNormalScale;
             }
+
+            // Tag the emissive pixels for the bloom filter later.
+            if (EmissiveFactor.LengthSquared() > 0 && graphicsDevice.DepthStencilState == DepthStencilState.Default)
+                graphicsDevice.DepthStencilState = EmissiveStencilState;
         }
 
         // Currently isn't possible to set a glTF to anisotropic filtering, so this is a hack against the spec:
@@ -1305,6 +1309,15 @@ namespace Orts.Viewer3D
             base.ResetState(graphicsDevice);
             graphicsDevice.RasterizerState = RasterizerState.CullCounterClockwise;
         }
+
+        public DepthStencilState EmissiveStencilState = new DepthStencilState()
+        {
+            StencilEnable = true,
+            StencilMask = 0x08,
+            StencilWriteMask = 0x08,
+            StencilFunction = CompareFunction.Always,
+            StencilPass = StencilOperation.IncrementSaturation,
+        };
     }
 
     public class BloomMaterial : Material
@@ -1321,6 +1334,8 @@ namespace Orts.Viewer3D
         bool UseLuminance = true;
         float[] Strengths = new[] { 0.5f, 1, 2, 1, 2 };
         float[] Radiuses = new[] { 1.0f, 2, 2, 4, 4 };
+        
+        float StrengthMultiplier = 1f;
 
         public enum Pass
         {
@@ -1387,6 +1402,7 @@ namespace Orts.Viewer3D
                 pass == Pass.Merge ? BlendState.Opaque :
                 pass == Pass.UpSample ? BlendState.AlphaBlend :
                 BlendState.Opaque;
+            graphicsDevice.DepthStencilState = pass == Pass.Extract ? BloomStencilState : DepthStencilState.Default;
 
             Shader.ScreenTexture = sourceTexture;
             graphicsDevice.SetRenderTarget(targetTexture);
@@ -1403,6 +1419,7 @@ namespace Orts.Viewer3D
         {
             graphicsDevice.RasterizerState = RasterizerState.CullCounterClockwise;
             graphicsDevice.BlendState = BlendState.NonPremultiplied;
+            graphicsDevice.DepthStencilState = DepthStencilState.Default;
         }
 
         public void ApplyBloom(GraphicsDevice graphicsDevice, RenderTarget2D screen, RenderTarget2D mip0, RenderTarget2D mip1, RenderTarget2D mip2, RenderTarget2D mip3, RenderTarget2D mip4, RenderTarget2D mip5, RenderTarget2D result)
@@ -1431,28 +1448,35 @@ namespace Orts.Viewer3D
             SetState(graphicsDevice, mip4, mip5, Pass.DownSample);
             Render(graphicsDevice);
 
-            SetState(graphicsDevice, mip5, mip4, Pass.UpSample, Strengths[4], Radiuses[4]);
+            SetState(graphicsDevice, mip5, mip4, Pass.UpSample, Strengths[4] * StrengthMultiplier, Radiuses[4]);
             Render(graphicsDevice);
             
             Shader.InverseResolution /= 2;
-            SetState(graphicsDevice, mip4, mip3, Pass.UpSample, Strengths[3], Radiuses[3]);
+            SetState(graphicsDevice, mip4, mip3, Pass.UpSample, Strengths[3] * StrengthMultiplier, Radiuses[3]);
             Render(graphicsDevice);
             
             Shader.InverseResolution /= 2;
-            SetState(graphicsDevice, mip3, mip2, Pass.UpSample, Strengths[2], Radiuses[2]);
+            SetState(graphicsDevice, mip3, mip2, Pass.UpSample, Strengths[2] * StrengthMultiplier, Radiuses[2]);
             Render(graphicsDevice);
             
             Shader.InverseResolution /= 2;
-            SetState(graphicsDevice, mip2, mip1, Pass.UpSample, Strengths[1], Radiuses[1]);
+            SetState(graphicsDevice, mip2, mip1, Pass.UpSample, Strengths[1] * StrengthMultiplier, Radiuses[1]);
             Render(graphicsDevice);
             
             Shader.InverseResolution /= 2;
-            SetState(graphicsDevice, mip1, mip0, Pass.UpSample, Strengths[0], Radiuses[0]);
+            SetState(graphicsDevice, mip1, mip0, Pass.UpSample, Strengths[0] * StrengthMultiplier, Radiuses[0]);
             Render(graphicsDevice);
 
             SetState(graphicsDevice, screen, mip0, result, Pass.Merge);
             Render(graphicsDevice);
         }
+
+        public DepthStencilState BloomStencilState = new DepthStencilState()
+        {
+            StencilEnable = true,
+            StencilMask = 0x08,
+            StencilFunction = CompareFunction.Greater,
+        };
     }
 
     public class ShadowMapMaterial : Material

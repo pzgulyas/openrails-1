@@ -1019,10 +1019,6 @@ namespace Orts.Viewer3D
 
             if (RenderSurfaceMaterial != null)
             {
-                BloomMaterial.ApplyBloom(graphicsDevice, RenderSurface, BloomSurfaceMip0, BloomSurfaceMip1, BloomSurfaceMip2, BloomSurfaceMip3, BloomSurfaceMip4, BloomSurfaceMip5, RenderSurfaceBloomCombine);
-                // The combined image is now on RenderSurfaceBloomCombine, so swap it with the RenderSurface.
-                (RenderSurface, RenderSurfaceBloomCombine) = (RenderSurfaceBloomCombine, RenderSurface);
-
                 graphicsDevice.SetRenderTarget(null);
                 graphicsDevice.Clear(ClearOptions.Target | ClearOptions.DepthBuffer | ClearOptions.Stencil, Color.Transparent, 1, 0);
                 RenderSurfaceMaterial.SetState(graphicsDevice, null);
@@ -1100,6 +1096,14 @@ namespace Orts.Viewer3D
                     }
                 }
                 if (logging) Console.WriteLine("    }");
+
+                // At the end of all 3D draws apply the bloom effect.
+                if ((RenderPrimitiveSequence)i == RenderPrimitiveSequence.InteriorBlended && RenderSurfaceMaterial != null)
+                {
+                    BloomMaterial.ApplyBloom(graphicsDevice, RenderSurface, BloomSurfaceMip0, BloomSurfaceMip1, BloomSurfaceMip2, BloomSurfaceMip3, BloomSurfaceMip4, BloomSurfaceMip5, RenderSurfaceBloomCombine);
+                    // The combined image is now on RenderSurfaceBloomCombine, so swap it with the RenderSurface.
+                    (RenderSurface, RenderSurfaceBloomCombine) = (RenderSurfaceBloomCombine, RenderSurface);
+                }
             }
 
             if (Game.Settings.DynamicShadows && (RenderProcess.ShadowMapCount > 0) && SceneryShader != null)
