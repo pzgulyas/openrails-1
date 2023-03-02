@@ -28,6 +28,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using System.Windows.Forms.VisualStyles;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Orts.Viewer3D.Processes;
@@ -403,7 +404,7 @@ namespace Orts.Viewer3D
         internal RenderTarget2D RenderSurface;
         SpriteBatchMaterial RenderSurfaceMaterial;
 
-        internal RenderTarget2D BloomSurfaceMerged;
+        internal RenderTarget2D RenderSurfaceBloomCombine;
         internal RenderTarget2D BloomSurfaceMip0;
         internal RenderTarget2D BloomSurfaceMip1;
         internal RenderTarget2D BloomSurfaceMip2;
@@ -505,9 +506,13 @@ namespace Orts.Viewer3D
                 RenderTargetUsage.PreserveContents
             );
 
-            BloomSurfaceMerged = new RenderTarget2D(Game.RenderProcess.GraphicsDevice,
-                width,
-                height, false, Game.RenderProcess.GraphicsDevice.PresentationParameters.BackBufferFormat, DepthFormat.None, 0, RenderTargetUsage.PreserveContents);
+            RenderSurfaceBloomCombine = new RenderTarget2D(Game.RenderProcess.GraphicsDevice, width, height, false,
+                Game.RenderProcess.GraphicsDevice.PresentationParameters.BackBufferFormat,
+                Game.RenderProcess.GraphicsDevice.PresentationParameters.DepthStencilFormat,
+                Game.RenderProcess.GraphicsDevice.PresentationParameters.MultiSampleCount,
+                RenderTargetUsage.PreserveContents
+            );
+
             BloomSurfaceMip0 = new RenderTarget2D(Game.RenderProcess.GraphicsDevice,
                 width,
                 height, false, Game.RenderProcess.GraphicsDevice.PresentationParameters.BackBufferFormat, DepthFormat.None, 0, RenderTargetUsage.DiscardContents);
@@ -531,7 +536,7 @@ namespace Orts.Viewer3D
         void DisposeRenderSurfaces()
         {
             RenderSurface?.Dispose();
-            BloomSurfaceMerged?.Dispose();
+            RenderSurfaceBloomCombine?.Dispose();
             BloomSurfaceMip0?.Dispose();
             BloomSurfaceMip1?.Dispose();
             BloomSurfaceMip2?.Dispose();
@@ -1014,7 +1019,9 @@ namespace Orts.Viewer3D
 
             if (RenderSurfaceMaterial != null)
             {
-                BloomMaterial.ApplyBloom(graphicsDevice, RenderSurface, BloomSurfaceMip0, BloomSurfaceMip1, BloomSurfaceMip2, BloomSurfaceMip3, BloomSurfaceMip4, BloomSurfaceMip5, BloomSurfaceMerged);
+                BloomMaterial.ApplyBloom(graphicsDevice, RenderSurface, BloomSurfaceMip0, BloomSurfaceMip1, BloomSurfaceMip2, BloomSurfaceMip3, BloomSurfaceMip4, BloomSurfaceMip5, RenderSurfaceBloomCombine);
+                // The combined image is now on RenderSurfaceBloomCombine, so swap it with the RenderSurface.
+                (RenderSurface, RenderSurfaceBloomCombine) = (RenderSurfaceBloomCombine, RenderSurface);
 
                 graphicsDevice.SetRenderTarget(null);
                 graphicsDevice.Clear(ClearOptions.Target | ClearOptions.DepthBuffer | ClearOptions.Stencil, Color.Transparent, 1, 0);

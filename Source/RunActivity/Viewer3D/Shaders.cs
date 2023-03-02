@@ -403,7 +403,7 @@ namespace Orts.Viewer3D
         public Texture2D ScreenTexture { set => screenTexture.SetValue(value); }
         Vector2 InverseResolutionField;
         public Vector2 InverseResolution { get => InverseResolutionField; set => inverseResolution.SetValue(InverseResolutionField = value); }
-        public float Radius { set=> radius.SetValue(value); }
+        public float Radius { set => radius.SetValue(value); }
         public float Strength { set => strength.SetValue(value); }
     }
 

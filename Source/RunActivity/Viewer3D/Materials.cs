@@ -1352,11 +1352,10 @@ namespace Orts.Viewer3D
 
         public void SetState(GraphicsDevice graphicsDevice, Texture2D sourceTexture, Texture2D bloomTexture, RenderTarget2D targetTexture, Pass pass)
         {
-            Shader.BloomTexture = bloomTexture;
             SetState(graphicsDevice, sourceTexture, targetTexture, pass);
-            // Clear
-            // Draw 
-            // Then swap
+
+            graphicsDevice.Clear(ClearOptions.Target | ClearOptions.DepthBuffer | ClearOptions.Stencil, Color.Transparent, 1, 0);
+            Shader.BloomTexture = bloomTexture;
         }
 
         public void SetState(GraphicsDevice graphicsDevice, Texture2D sourceTexture, RenderTarget2D targetTexture, Pass pass, float bloomStrength, float bloomRadius)
@@ -1385,7 +1384,7 @@ namespace Orts.Viewer3D
 
             graphicsDevice.RasterizerState = RasterizerState.CullNone;
             graphicsDevice.BlendState =
-                pass == Pass.Merge ? Merge :
+                pass == Pass.Merge ? BlendState.Opaque :
                 pass == Pass.UpSample ? BlendState.AlphaBlend :
                 BlendState.Opaque;
 
@@ -1451,11 +1450,9 @@ namespace Orts.Viewer3D
             SetState(graphicsDevice, mip1, mip0, Pass.UpSample, Strengths[0], Radiuses[0]);
             Render(graphicsDevice);
 
-            SetState(graphicsDevice, mip0, screen, Pass.Merge);
+            SetState(graphicsDevice, screen, mip0, result, Pass.Merge);
             Render(graphicsDevice);
         }
-
-
     }
 
     public class ShadowMapMaterial : Material

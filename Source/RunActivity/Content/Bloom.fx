@@ -10,7 +10,7 @@
 float2 InverseResolution;
 
 //The threshold of pixels that are brighter than that.
-float Threshold = 0.8f;
+float Threshold = 0.9f;
 
 //MODIFIED DURING RUNTIME, CHANGING HERE MAKES NO DIFFERENCE;
 float Radius;
@@ -35,10 +35,12 @@ SamplerState LinearSampler
 };
 
 // Variables for the merge
-float BloomSaturation = 1;
-float BloomIntensity = 1;
+const float BloomSaturation = 1;
+const float BloomIntensity = 1;
+const float BaseSaturation = 1;
+const float BaseIntensity = 1;
 
-Texture2D BloomTexture
+Texture2D BloomTexture;
 
 SamplerState BloomSampler
 {
@@ -96,13 +98,13 @@ float4 Box4(float4 p0, float4 p1, float4 p2, float4 p3)
 //Extracts the pixels we want to blur
 float4 ExtractPS(float4 pos : SV_POSITION,  float2 texCoord : TEXCOORD0) : SV_TARGET0
 {
-	float4 color = ScreenTexture.Sample(LinearSampler, texCoord);
+    float4 color = ScreenTexture.Sample(LinearSampler, texCoord);
 
-	float avg = (color.r + color.g + color.b) / 3;
+    float avg = (color.r + color.g + color.b) / 3;
 
-	if (avg>Threshold)
+    if (avg > Threshold)
 	{
-		return color * (avg - Threshold) / (1 - Threshold);// * (avg - Threshold);
+		return color * (avg - Threshold) / (1 - Threshold);
 	}
 
 	return float4(0, 0, 0, 0);
@@ -113,11 +115,15 @@ float4 ExtractLuminancePS(float4 pos : SV_POSITION,  float2 texCoord : TEXCOORD0
 {
     float4 color = ScreenTexture.Sample(LinearSampler, texCoord);
 
-    float luminance = color.r * 0.21f + color.g * 0.72f + color.b * 0.07f;
+    const float exposure = 1.;
+    float brightness = clamp(dot(color.rgb * exposure, float3(0.2126, 0.7152, 0.0722)), 0, 1);
+    return step(Threshold, brightness) * color;
 
-    if(luminance>Threshold)
+    float luminance = color.r * 0.2126f + color.g * 0.7152f + color.b * 0.0722f;
+
+    if(luminance > Threshold)
     {
-		return color * (luminance - Threshold) / (1 - Threshold);// *(luminance - Threshold);
+		return color * (luminance - Threshold) / (1 - Threshold);
         //return saturate((color - Threshold) / (1 - Threshold));
     }
 
@@ -130,7 +136,7 @@ float4 DownsamplePS(float4 pos : SV_POSITION,  float2 texCoord : TEXCOORD0) : SV
     float2 offset = float2(StreakLength * InverseResolution.x, 1 * InverseResolution.y);
         
     float4 c0 = ScreenTexture.Sample(LinearSampler, texCoord + float2(-2, -2) * offset);
-    float4 c1 = ScreenTexture.Sample(LinearSampler, texCoord + float2(0,-2)*offset);
+    float4 c1 = ScreenTexture.Sample(LinearSampler, texCoord + float2(0, -2) * offset);
     float4 c2 = ScreenTexture.Sample(LinearSampler, texCoord + float2(2, -2) * offset);
     float4 c3 = ScreenTexture.Sample(LinearSampler, texCoord + float2(-1, -1) * offset);
     float4 c4 = ScreenTexture.Sample(LinearSampler, texCoord + float2(1, -1) * offset);
@@ -203,9 +209,13 @@ float4 AdjustSaturation(float4 color, float saturation)
 
 float4 MergePS(float4 pos : SV_POSITION, float2 texCoord : TEXCOORD0) : SV_TARGET0
 {
-    float4 bloom = ScreenTexture.Sample(LinearSampler, texCoord);
-    bloom = AdjustSaturation(bloom, BloomSaturation) * BloomIntensity;
-    return bloom;
+    float4 base = ScreenTexture.Sample(LinearSampler, texCoord);
+    float4 bloom = BloomTexture.Sample(LinearSampler, texCoord);
+
+    //base = AdjustSaturation(base, BaseSaturation) * BaseIntensity;
+    //bloom = AdjustSaturation(bloom, BloomSaturation) * BloomIntensity;
+
+    return base + bloom;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
