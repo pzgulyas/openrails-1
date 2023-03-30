@@ -1368,13 +1368,13 @@ public List<CabView> CabViewList = new List<CabView>();
             var split = stf.ReadFloat(STFReader.UNITS.None, 0.5f);
             var defaultValue = stf.ReadFloat(STFReader.UNITS.None, 0.5f);
 
-            string s;
-            while ((s = stf.ReadItem()) != ")")
+            ReadOnlySpan<char> s;
+            while ((s = stf.ReadItem().Span) != ")".AsSpan())
             {
-                throttle |= s == "throttle";
-                train |= s == "train";
-                dynamic |= s == "dynamic";
-                independent |= s == "independent";
+                throttle |= MemoryExtensions.Equals(s, "throttle".AsSpan(), StringComparison.OrdinalIgnoreCase);
+                train |= MemoryExtensions.Equals(s, "train".AsSpan(), StringComparison.OrdinalIgnoreCase);
+                dynamic |= MemoryExtensions.Equals(s, "dynamic".AsSpan(), StringComparison.OrdinalIgnoreCase);
+                independent |= MemoryExtensions.Equals(s, "independent".AsSpan(), StringComparison.OrdinalIgnoreCase);
             }
 
             CombinedControlSplitPosition = (split - minValue) / (maxValue - minValue);

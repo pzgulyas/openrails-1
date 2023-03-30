@@ -29,6 +29,7 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Runtime.InteropServices;
 
 #region Original STFreader
 #if !NEW_READER
@@ -178,11 +179,13 @@ namespace Orts.Parsers.Msts
             var path = Path.GetDirectoryName(filename);
             if (Directory.Exists(path))
             {
-                streamSTF = new StreamReader(filename, true); // was System.Text.Encoding.Unicode ); but I found some ASCII files, ie GLOBAL\SHAPES\milemarker.s
+                using (var streamSTF = new StreamReader(filename, true)) // was System.Text.Encoding.Unicode ); but I found some ASCII files, ie GLOBAL\SHAPES\milemarker.s
+                    spanSTF = MemoryExtensions.AsMemory<char>(streamSTF.ReadToEnd().ToCharArray());
                 FileName = filename;
-                SimisSignature = streamSTF.ReadLine();
+                SimisSignature = spanSTF.Slice(spanPosition, spanPosition = spanSTF.Span.IndexOf(Environment.NewLine.AsSpan()));
+                spanPosition++;
                 LineNumber = 2;
-                if (useTree) tree = new List<string>();
+                if (useTree) tree = new List<ReadOnlyMemory<char>>();
             }
             else
             {
@@ -200,9 +203,10 @@ namespace Orts.Parsers.Msts
         {
             // TODO RESTORE Debug.Assert(inputStream.CanSeek);
             FileName = fileName;
-            streamSTF = new StreamReader(inputStream, encoding);
+            using (var streamSTF = new StreamReader(inputStream, encoding))
+                spanSTF = MemoryExtensions.AsMemory<char>(streamSTF.ReadToEnd().ToCharArray());
             LineNumber = 1;
-            if (useTree) tree = new List<string>();
+            if (useTree) tree = new List<ReadOnlyMemory<char>>();
         }
 
         /// <summary>Implements the IDisposable interface so this class can be implemented with the 'using(STFReader r = new STFReader(...)) {...}' C# statement.
@@ -230,17 +234,14 @@ namespace Orts.Parsers.Msts
                     STFException.TraceWarning(this, "Expected end of file");
                 else if (block_depth != 0)
                     STFException.TraceWarning(this, string.Format("Expected depth 0; got depth {0} at end of file (missing ')'?)", block_depth));
-                streamSTF.Close(); streamSTF = null;
                 if (includeReader != null)
                     includeReader.Dispose();
-                itemBuilder.Length = 0;
-                itemBuilder.Capacity = 0;
             }
         }
 
         /// <summary>Property that returns true when the EOF has been reached
         /// </summary>
-        public bool Eof { get { return PeekChar() == -1; } }
+        public bool Eof { get { return spanPosition >= spanSTF.Length; } }
         /// <summary>Filename property for the file being parsed - for reporting purposes
         /// </summary>
         public string FileName { get; private set; }
@@ -249,7 +250,7 @@ namespace Orts.Parsers.Msts
         public int LineNumber { get; private set; }
         /// <summary>SIMIS header read from the first line of the file being parsed
         /// </summary>
-        public string SimisSignature { get; private set; }
+        public ReadOnlyMemory<char> SimisSignature { get; private set; }
         /// <summary>Property returning the last {item} read using ReadItem() prefixed with string describing the nested block hierachy.
         /// <para>The string returned is formatted 'rootnode(nestednode(childnode(previous_item'.</para>
         /// </summary>
@@ -261,13 +262,13 @@ namespace Orts.Parsers.Msts
             get
             {
                 Debug.Assert(tree != null);
-                if ((tree_cache != null) && (!stepbackoneitemFlag))
-                    return tree_cache + previousItem;
+                if ((tree_cache.Length != 0) && (!stepbackoneitemFlag))
+                    return tree_cache.ToString() + previousItem;
                 else
                 {
                     StringBuilder sb = new StringBuilder(256);
-                    foreach (string t in (stepbackoneitemFlag) ? stepback.Tree : tree) sb.Append(t);
-                    tree_cache = sb.ToString();
+                    foreach (var t in (stepbackoneitemFlag) ? stepback.Tree : tree) sb.Append(t);
+                    tree_cache = sb.ToString().AsMemory();
                     sb.Append(previousItem);
                     return sb.ToString();
                 }
@@ -280,7 +281,7 @@ namespace Orts.Parsers.Msts
         /// <alert class="important">If a comment/skip/#*/_* ignore block is the last {item} in a block, rather than being totally consumed a dummy <see cref="EndBlockCommentSentinel"/> is returned, so if EndOFBlock() returns false, you always get an {item} (which can then just be ignored).</alert>
         /// </remarks>
         /// <returns>The next {item} from the STF file, any surrounding quotations will be not be returned.</returns>
-        public string ReadItem()
+        public ReadOnlyMemory<char> ReadItem()
         {
             return ReadItem(false);
         }
@@ -292,13 +293,13 @@ namespace Orts.Parsers.Msts
         /// </remarks>
         /// <param name="string_mode">When true normal comment processing is disabled.</param>
         /// <returns>The next {item} from the STF file, any surrounding quotations will be not be returned.</returns>
-        private string ReadItem(bool string_mode)
+        private ReadOnlyMemory<char> ReadItem(bool string_mode)
         {
             #region If StepBackOneItem() has been called then return the previous output from ReadItem() rather than reading a new token
             if (stepbackoneitemFlag)
             {
-                Debug.Assert(stepback.Item != null, "You must called at least one ReadItem() between StepBackOneItem() calls", "The current step back functionality only allows for a single step");
-                string item = stepback.Item;
+                Debug.Assert(stepback.Item.Length != 0, "You must called at least one ReadItem() between StepBackOneItem() calls", "The current step back functionality only allows for a single step");
+                var item = stepback.Item;
                 previousItem = stepback.PrevItem;
                 block_depth = stepback.BlockDepth;
                 if (stepback.Tree != null) { tree = stepback.Tree; tree_cache = null; }
@@ -332,14 +333,14 @@ namespace Orts.Parsers.Msts
                 STFException.TraceWarning(this, "Unexpected end of file instead of " + target);
             else
             {
-                string s1 = ReadItem();
+                var s1 = ReadItem();
                 // A single unexpected token leads to a warning; two leads to a fatal error.
-                if (!s1.Equals(target, StringComparison.OrdinalIgnoreCase))
+                if (!MemoryExtensions.Equals(s1.Span, target.AsSpan(), StringComparison.OrdinalIgnoreCase))
                 {
-                    STFException.TraceWarning(this, "\"" + target + "\" not found - instead found \"" + s1 + "\"");
-                    string s2 = ReadItem();
-                    if (!s2.Equals(target, StringComparison.OrdinalIgnoreCase))
-                        throw new STFException(this, "\"" + target + "\" not found - instead found \"" + s1 + "\"");
+                    STFException.TraceWarning(this, "\"" + target + "\" not found - instead found \"" + s1.ToString() + "\"");
+                    var s2 = ReadItem();
+                    if (!MemoryExtensions.Equals(s2.Span, target.AsSpan(), StringComparison.OrdinalIgnoreCase))
+                        throw new STFException(this, "\"" + target + "\" not found - instead found \"" + s1.ToString() + "\"");
                 }
             }
         }
@@ -436,7 +437,7 @@ namespace Orts.Parsers.Msts
             if (includeReader != null)
             {
                 var eob = includeReader.EndOfBlock();
-                if (eob) UpdateTreeAndStepBack(")");
+                if (eob) UpdateTreeAndStepBack(")".AsMemory());
                 if (includeReader.Eof)
                 {
                     includeReader.Dispose();
@@ -448,19 +449,19 @@ namespace Orts.Parsers.Msts
                 }
             }
             #region If StepBackOneItem() has been called and that token was a ")" then consume it, and return true;
-            if (stepbackoneitemFlag && (stepback.Item == ")"))
+            if (stepbackoneitemFlag && (stepback.Item.Span == ")".AsSpan()))
             {
                 // Consume the step-back end-of-block
                 stepbackoneitemFlag = false;
-                UpdateTreeAndStepBack(")");
+                UpdateTreeAndStepBack(")".AsMemory());
                 return true;
             }
             #endregion
             int c = PeekPastWhitespace();
             if (c == ')')
             {
-                c = streamSTF.Read(); // consume the end block
-                UpdateTreeAndStepBack(")");
+                c = ReadChar(); // consume the end block
+                UpdateTreeAndStepBack(")".AsMemory());
             }
             return c == ')' || c == -1;
         }
@@ -469,22 +470,22 @@ namespace Orts.Parsers.Msts
         /// </summary>
         public void SkipBlock()
         {
-            string token = ReadItem(true, false);  // read the leading bracket ( 
-            if (token == ")")   // just in case we are not where we think we are
+            var token = ReadItem(true, false);  // read the leading bracket ( 
+            if (token.Span == ")".AsSpan())   // just in case we are not where we think we are
             {
                 STFException.TraceWarning(this, "Found a close parenthesis, rather than the expected block of data");
                 StepBackOneItem();
                 return;
             }
-            else if (token != "(")
-                throw new STFException(this, "SkipBlock() expected an open block but found a token instead: " + token);
+            else if (token.Span != "(".AsSpan())
+                throw new STFException(this, "SkipBlock() expected an open block but found a token instead: " + token.ToString());
             SkipRestOfBlock();
         }
         /// <summary>Skip to the end of this block, ignoring any nested blocks
         /// </summary>
         public void SkipRestOfBlock()
         {
-            if (stepbackoneitemFlag && (stepback.Item == ")"))
+            if (stepbackoneitemFlag && (stepback.Item.Span == ")".AsSpan()))
             {
                 // Consume the step-back end-of-block
                 stepbackoneitemFlag = false;
@@ -500,10 +501,10 @@ namespace Orts.Parsers.Msts
             int depth = 1;
             while (!Eof && depth > 0)
             {
-                string token = ReadItem(true, false);
-                if (token == "(")
+                var token = ReadItem(true, false);
+                if (token.Span == "(".AsSpan())
                     ++depth;
-                if (token == ")")
+                if (token.Span == ")".AsSpan())
                     --depth;
             }
         }
@@ -516,7 +517,7 @@ namespace Orts.Parsers.Msts
         /// <returns>The next {string_item} from the STF file, any surrounding quotations will be not be returned.</returns>
         public string ReadString()
         {
-            return ReadItem(true);
+            return ReadItem(true).ToString();
         }
 
         /// <summary>Read an hexidecimal encoded number {constant_item}
@@ -525,9 +526,9 @@ namespace Orts.Parsers.Msts
         /// <returns>The next {constant_item} from the STF file.</returns>
         public uint ReadHex(uint? defaultValue)
         {
-            string item = ReadItem();
+            var item = ReadItem();
 
-            if ((defaultValue.HasValue) && (item == ")"))
+            if ((defaultValue.HasValue) && (item.Span == ")".AsSpan()))
             {
                 STFException.TraceWarning(this, "When expecting a hex string, we found a ) marker. Using the default " + defaultValue.ToString());
                 StepBackOneItem();
@@ -537,9 +538,9 @@ namespace Orts.Parsers.Msts
             if (item.Length == 0)
                 return 0x0;
             uint val;
-            if (uint.TryParse(item, parseHex, parseNFI, out val)) return val;
-            STFException.TraceWarning(this, "Cannot parse the constant hex string " + item);
-            if (item == ")") StepBackOneItem();
+            if (uint.TryParse(item.ToString(), parseHex, parseNFI, out val)) return val;
+            STFException.TraceWarning(this, "Cannot parse the constant hex string " + item.ToString());
+            if (item.Span == ")".AsSpan()) StepBackOneItem();
             return defaultValue.GetValueOrDefault(0);
         }
 
@@ -549,9 +550,9 @@ namespace Orts.Parsers.Msts
         /// <returns>The next {constant_item} from the STF file.</returns>
         public int ReadInt(int? defaultValue)
         {
-            string item = ReadItem();
+            var item = ReadItem();
 
-            if ((defaultValue.HasValue) && (item == ")"))
+            if ((defaultValue.HasValue) && (item.Span == ")".AsSpan()))
             {
                 STFException.TraceWarning(this, "When expecting a number, we found a ) marker. Using the default " + defaultValue.ToString());
                 StepBackOneItem();
@@ -559,10 +560,10 @@ namespace Orts.Parsers.Msts
             }
             int val;
             if (item.Length == 0) return 0;
-            if (item[item.Length - 1] == ',') item = item.TrimEnd(',');
-            if (int.TryParse(item, parseNum, parseNFI, out val)) return val;
-            STFException.TraceWarning(this, "Cannot parse the constant number " + item);
-            if (item == ")") StepBackOneItem();
+            if (item.Span[item.Length - 1] == ',') item = item.Slice(0, item.Length - 1);
+            if (int.TryParse(item.ToString(), parseNum, parseNFI, out val)) return val;
+            STFException.TraceWarning(this, "Cannot parse the constant number " + item.ToString());
+            if (item.Span == ")".AsSpan()) StepBackOneItem();
             return defaultValue.GetValueOrDefault(0);
         }
         /// <summary>Read an unsigned integer {constant_item}
@@ -571,9 +572,9 @@ namespace Orts.Parsers.Msts
         /// <returns>The next {constant_item} from the STF file.</returns>
         public uint ReadUInt(uint? defaultValue)
         {
-            string item = ReadItem();
+            var item = ReadItem();
 
-            if ((defaultValue.HasValue) && (item == ")"))
+            if ((defaultValue.HasValue) && (item.Span == ")".AsSpan()))
             {
                 STFException.TraceWarning(this, "When expecting a number, we found a ) marker. Using the default " + defaultValue.ToString());
                 StepBackOneItem();
@@ -582,11 +583,11 @@ namespace Orts.Parsers.Msts
 
             uint val;
             if (item.Length == 0) return 0;
-            if (item[item.Length - 1] == ',') item = item.TrimEnd(',');
-            if (uint.TryParse(item, parseNum, parseNFI, out val)) return val;
+            if (item.Span[item.Length - 1] == ',') item = item.Slice(0, item.Length - 1);
+            if (uint.TryParse(item.ToString(), parseNum, parseNFI, out val)) return val;
 
-            STFException.TraceWarning(this, "Cannot parse the constant number " + item);
-            if (item == ")") StepBackOneItem();
+            STFException.TraceWarning(this, "Cannot parse the constant number " + item.ToString());
+            if (item.Span == ")".AsSpan()) StepBackOneItem();
             return defaultValue.GetValueOrDefault(0);
         }
         /// <summary>Read an single precision floating point number {constant_item}
@@ -596,9 +597,9 @@ namespace Orts.Parsers.Msts
         /// <returns>The next {constant_item} from the STF file, with the suffix normalized to OR units.</returns>
         public float ReadFloat(UNITS validUnits, float? defaultValue)
         {
-            string item = ReadItem();
+            var item = ReadItem();
 
-            if ((defaultValue.HasValue) && (item == ")"))
+            if ((defaultValue.HasValue) && (item.Span == ")".AsSpan()))
             {
                 STFException.TraceWarning(this, "When expecting a number, we found a ) marker. Using the default " + defaultValue.ToString());
                 StepBackOneItem();
@@ -612,10 +613,10 @@ namespace Orts.Parsers.Msts
             float val;
             double scale = ParseUnitSuffix(ref item, validUnits);
             if (item.Length == 0) return 0.0f;
-            if (item[item.Length - 1] == ',') item = item.TrimEnd(',');
-            if (float.TryParse(item, parseNum, parseNFI, out val)) return (scale == 1) ? val : (float)(scale * val);
-            STFException.TraceWarning(this, "Cannot parse the constant number " + item);
-            if (item == ")") StepBackOneItem();
+            if (item.Span[item.Length - 1] == ',') item = item.Slice(0, item.Length - 1);
+            if (float.TryParse(item.ToString(), parseNum, parseNFI, out val)) return (scale == 1) ? val : (float)(scale * val);
+            STFException.TraceWarning(this, "Cannot parse the constant number " + item.ToString());
+            if (item.Span == ")".AsSpan()) StepBackOneItem();
             return defaultValue.GetValueOrDefault(0);
         }
 
@@ -625,9 +626,9 @@ namespace Orts.Parsers.Msts
         /// <returns>The next {constant_item} from the STF file.</returns>
         public double ReadDouble(double? defaultValue)
         {
-            string item = ReadItem();
+            var item = ReadItem();
 
-            if ((defaultValue.HasValue) && (item == ")"))
+            if ((defaultValue.HasValue) && (item.Span == ")".AsSpan()))
             {
                 STFException.TraceWarning(this, "When expecting a number, we found a ) marker. Using the default " + defaultValue.ToString());
                 StepBackOneItem();
@@ -636,10 +637,10 @@ namespace Orts.Parsers.Msts
 
             double val;
             if (item.Length == 0) return 0.0;
-            if (item[item.Length - 1] == ',') item = item.TrimEnd(',');
-            if (double.TryParse(item, parseNum, parseNFI, out val)) return val;
-            STFException.TraceWarning(this, "Cannot parse the constant number " + item);
-            if (item == ")") StepBackOneItem();
+            if (item.Span[item.Length - 1] == ',') item = item.Slice(0, item.Length - 1);
+            if (double.TryParse(item.ToString(), parseNum, parseNFI, out val)) return val;
+            STFException.TraceWarning(this, "Cannot parse the constant number " + item.ToString());
+            if (item.Span == ")".AsSpan()) StepBackOneItem();
             return defaultValue.GetValueOrDefault(0);
         }
 
@@ -828,7 +829,7 @@ namespace Orts.Parsers.Msts
         /// <param name="constant">string with suffix (ie "23 mph"), after the function call the suffix is removed.</param>
         /// <param name="validUnits">Any combination of the UNITS enumeration, to limit the available suffixes to reasonable values.</param>
         /// <returns>The scaler that should be used to multiply the constant to convert into standard OR units.</returns>
-        internal double ParseUnitSuffix(ref string constant, UNITS validUnits)
+        internal double ParseUnitSuffix(ref ReadOnlyMemory<char> constant, UNITS validUnits)
         {
             if (validUnits == UNITS.None)
                 return 1;
@@ -837,18 +838,18 @@ namespace Orts.Parsers.Msts
             int beg, end, i;
             for (beg = end = i = 0; i < constant.Length; end = ++i)
             {
-                char c = constant[i];
+                char c = constant.Span[i];
                 if ((i == 0) && (c == '+')) { ++beg; continue; }
                 if ((i == 0) && (c == '-')) continue;
                 if ((c == '.') || (c == ',')) continue;
                 if ((c == 'e') || (c == 'E') && (i < constant.Length - 1))
                 {
-                    c = constant[i + 1];
+                    c = constant.Span[i + 1];
                     if ((c == '+') || (c == '-')) { ++i; continue; }
                 }
                 if ((c < '0') || (c > '9')) break;
             }
-            string suffix = "";
+            ReadOnlySpan<char> suffix = ReadOnlySpan<char>.Empty;
             if (i == constant.Length)
             {
                 if ((validUnits & UNITS.Compulsory) > 0)
@@ -856,7 +857,7 @@ namespace Orts.Parsers.Msts
             }
             else
             {
-                while ((i < constant.Length) && (constant[i] == ' ')) ++i; // skip the spaces
+                while ((i < constant.Length) && (constant.Span[i] == ' ')) ++i; // skip the spaces
 
                 // Enclose the unit suffix
                 int suffixStart = i;
@@ -869,279 +870,278 @@ namespace Orts.Parsers.Msts
                 //  ")" not found - "Service" found instead. 
                 // Should re-write the comment with a space as
                 //  MaxReleaseRate( 20 #Passenger Service )
-                int commentStart = constant.IndexOf('#', suffixStart);
+                int commentStart = MemoryExtensions.IndexOf(constant.Span, "#".AsSpan());
                 if (commentStart != -1)
                     suffixLength = commentStart - suffixStart;
                 // Extract the unit suffix
-                suffix = constant.Substring(suffixStart, suffixLength).ToLowerInvariant();
+                suffix = constant.Slice(suffixStart, suffixLength).Span;
                 suffix = suffix.Trim();
 
                 // Extract the prefixed numeric string
-                constant = constant.Substring(beg, end - beg);
+                constant = constant.Slice(beg, end - beg);
             }
             // Select and return the scalar value
             if ((validUnits & UNITS.Mass) > 0)
                 switch (suffix)
                 {
-                    case "": return 1.0;
-                    case "kg": return 1;
-                    case "lb": return 0.45359237;
-                    case "t": return 1e3;   // metric tonne
-                    case "t-uk": return 1016.05;
-                    case "t-us": return 907.18474;
+                    case ReadOnlySpan<char> s when MemoryExtensions.Equals(s, ReadOnlySpan<char>.Empty, StringComparison.OrdinalIgnoreCase): return 1.0;
+                    case ReadOnlySpan<char> s when MemoryExtensions.Equals(s, "kg".AsSpan(), StringComparison.OrdinalIgnoreCase): return 1;
+                    case ReadOnlySpan<char> s when MemoryExtensions.Equals(s, "lb".AsSpan(), StringComparison.OrdinalIgnoreCase): return 0.45359237;
+                    case ReadOnlySpan<char> s when MemoryExtensions.Equals(s, "t".AsSpan(), StringComparison.OrdinalIgnoreCase): return 1e3;   // metric tonne
+                    case ReadOnlySpan<char> s when MemoryExtensions.Equals(s, "t-uk".AsSpan(), StringComparison.OrdinalIgnoreCase): return 1016.05;
+                    case ReadOnlySpan<char> s when MemoryExtensions.Equals(s, "t-us".AsSpan(), StringComparison.OrdinalIgnoreCase): return 907.18474;
                 }
             if ((validUnits & UNITS.Distance) > 0)
                 switch (suffix)
                 {
-                    case "": return 1.0;
-                    case "m": return 1;
-                    case "cm": return 0.01;
-                    case "mm": return 0.001;
-                    case "km": return 1e3;
-                    case "ft": return 0.3048;
-                    case "in": return 0.0254;
-                    case "in/2": return 0.0127; // Used to measure wheel radius in half-inches, as sometimes the practice in the tyre industry
+                    case ReadOnlySpan<char> s when MemoryExtensions.Equals(s, ReadOnlySpan<char>.Empty, StringComparison.OrdinalIgnoreCase): return 1.0;
+                    case ReadOnlySpan<char> s when MemoryExtensions.Equals(s, "m".AsSpan(), StringComparison.OrdinalIgnoreCase): return 1;
+                    case ReadOnlySpan<char> s when MemoryExtensions.Equals(s, "cm".AsSpan(), StringComparison.OrdinalIgnoreCase): return 0.01;
+                    case ReadOnlySpan<char> s when MemoryExtensions.Equals(s, "mm".AsSpan(), StringComparison.OrdinalIgnoreCase): return 0.001;
+                    case ReadOnlySpan<char> s when MemoryExtensions.Equals(s, "km".AsSpan(), StringComparison.OrdinalIgnoreCase): return 1e3;
+                    case ReadOnlySpan<char> s when MemoryExtensions.Equals(s, "ft".AsSpan(), StringComparison.OrdinalIgnoreCase): return 0.3048;
+                    case ReadOnlySpan<char> s when MemoryExtensions.Equals(s, "in".AsSpan(), StringComparison.OrdinalIgnoreCase): return 0.0254;
+                    case ReadOnlySpan<char> s when MemoryExtensions.Equals(s, "in/2".AsSpan(), StringComparison.OrdinalIgnoreCase): return 0.0127; // Used to measure wheel radius in half-inches, as sometimes the practice in the tyre industry
                                                 // - see trainset\KIHA31\KIHA31a.eng and others
                 }
             if ((validUnits & UNITS.AreaDefaultFT2) > 0)
                 switch (suffix)
                 {
-                    case "": return 0.09290304f;
-                    case "*(m^2)": return 1.0f;
-                    case "m^2": return 1.0f;
-                    case "*(ft^2)": return 0.09290304f;
-                    case "ft^2": return 0.09290304f;
+                    case ReadOnlySpan<char> s when MemoryExtensions.Equals(s, ReadOnlySpan<char>.Empty, StringComparison.OrdinalIgnoreCase): return 0.09290304f;
+                    case ReadOnlySpan<char> s when MemoryExtensions.Equals(s, "*(m^2)".AsSpan(), StringComparison.OrdinalIgnoreCase): return 1.0f;
+                    case ReadOnlySpan<char> s when MemoryExtensions.Equals(s, "m^2".AsSpan(), StringComparison.OrdinalIgnoreCase): return 1.0f;
+                    case ReadOnlySpan<char> s when MemoryExtensions.Equals(s, "*(ft^2)".AsSpan(), StringComparison.OrdinalIgnoreCase): return 0.09290304f;
+                    case ReadOnlySpan<char> s when MemoryExtensions.Equals(s, "ft^2".AsSpan(), StringComparison.OrdinalIgnoreCase): return 0.09290304f;
                 }
             if ((validUnits & UNITS.Volume) > 0)
                 switch (suffix)
                 {
-                    case "": return 1.0;
-                    case "*(ft^3)": return 28.3168;
-                    case "ft^3": return 28.3168;
-                    case "*(in^3)": return 0.0163871;
-                    case "in^3": return 0.0163871;
-                    case "*(m^3)": return 1000;
-                    case "m^3": return 1000;
-                    case "l": return 1;
-                    case "g-uk": return 4.54609f;
-                    case "g-us": return 3.78541f;
-                    case "gal": return 3.78541f;  // US gallons
-                    case "gals": return 3.78541f; // US gallons
+                    case ReadOnlySpan<char> s when MemoryExtensions.Equals(s, ReadOnlySpan<char>.Empty, StringComparison.OrdinalIgnoreCase): return 1.0;
+                    case ReadOnlySpan<char> s when MemoryExtensions.Equals(s, "*(ft^3)".AsSpan(), StringComparison.OrdinalIgnoreCase): return 28.3168;
+                    case ReadOnlySpan<char> s when MemoryExtensions.Equals(s, "ft^3".AsSpan(), StringComparison.OrdinalIgnoreCase): return 28.3168;
+                    case ReadOnlySpan<char> s when MemoryExtensions.Equals(s, "*(in^3)".AsSpan(), StringComparison.OrdinalIgnoreCase): return 0.0163871;
+                    case ReadOnlySpan<char> s when MemoryExtensions.Equals(s, "in^3".AsSpan(), StringComparison.OrdinalIgnoreCase): return 0.0163871;
+                    case ReadOnlySpan<char> s when MemoryExtensions.Equals(s, "*(m^3)".AsSpan(), StringComparison.OrdinalIgnoreCase): return 1000;
+                    case ReadOnlySpan<char> s when MemoryExtensions.Equals(s, "m^3".AsSpan(), StringComparison.OrdinalIgnoreCase): return 1000;
+                    case ReadOnlySpan<char> s when MemoryExtensions.Equals(s, "l".AsSpan(), StringComparison.OrdinalIgnoreCase): return 1;
+                    case ReadOnlySpan<char> s when MemoryExtensions.Equals(s, "g-uk".AsSpan(), StringComparison.OrdinalIgnoreCase): return 4.54609f;
+                    case ReadOnlySpan<char> s when MemoryExtensions.Equals(s, "g-us".AsSpan(), StringComparison.OrdinalIgnoreCase): return 3.78541f;
+                    case ReadOnlySpan<char> s when MemoryExtensions.Equals(s, "gal".AsSpan(), StringComparison.OrdinalIgnoreCase): return 3.78541f;  // US gallons
+                    case ReadOnlySpan<char> s when MemoryExtensions.Equals(s, "gals".AsSpan(), StringComparison.OrdinalIgnoreCase): return 3.78541f; // US gallons
                 }
             if ((validUnits & UNITS.VolumeDefaultFT3) > 0)
                 switch (suffix)
                 {
-                    case "": return 1.0;
-                    case "*(ft^3)": return 1;  // <CJComment> Factors to be revised when non-metric internal units removed. </CJComment>
-                    case "ft^3": return 1;  // <CJComment> Factors to be revised when non-metric internal units removed. </CJComment>
-                    case "*(in^3)": return 0.000578703704;
-                    case "in^3": return 0.000578703704;
-                    case "*(m^3)": return 35.3146667;
-                    case "m^3": return 35.3146667;
-                    case "l": return 0.0353146667;
-                    case "g-uk": return 0.16054372f;
-                    case "g-us": return 0.133680556f;
-                    case "gal": return 0.133680556f;  // US gallons
-                    case "gals": return 0.133680556f; // US gallons
+                    case ReadOnlySpan<char> s when MemoryExtensions.Equals(s, ReadOnlySpan<char>.Empty, StringComparison.OrdinalIgnoreCase): return 1.0;
+                    case ReadOnlySpan<char> s when MemoryExtensions.Equals(s, "*(ft^3)".AsSpan(), StringComparison.OrdinalIgnoreCase): return 1;  // <CJComment> Factors to be revised when non-metric internal units removed. </CJComment>
+                    case ReadOnlySpan<char> s when MemoryExtensions.Equals(s, "ft^3".AsSpan(), StringComparison.OrdinalIgnoreCase): return 1;  // <CJComment> Factors to be revised when non-metric internal units removed. </CJComment>
+                    case ReadOnlySpan<char> s when MemoryExtensions.Equals(s, "*(in^3)".AsSpan(), StringComparison.OrdinalIgnoreCase): return 0.000578703704;
+                    case ReadOnlySpan<char> s when MemoryExtensions.Equals(s, "in^3".AsSpan(), StringComparison.OrdinalIgnoreCase): return 0.000578703704;
+                    case ReadOnlySpan<char> s when MemoryExtensions.Equals(s, "*(m^3)".AsSpan(), StringComparison.OrdinalIgnoreCase): return 35.3146667;
+                    case ReadOnlySpan<char> s when MemoryExtensions.Equals(s, "m^3".AsSpan(), StringComparison.OrdinalIgnoreCase): return 35.3146667;
+                    case ReadOnlySpan<char> s when MemoryExtensions.Equals(s, "l".AsSpan(), StringComparison.OrdinalIgnoreCase): return 0.0353146667;
+                    case ReadOnlySpan<char> s when MemoryExtensions.Equals(s, "g-uk".AsSpan(), StringComparison.OrdinalIgnoreCase): return 0.16054372f;
+                    case ReadOnlySpan<char> s when MemoryExtensions.Equals(s, "g-us".AsSpan(), StringComparison.OrdinalIgnoreCase): return 0.133680556f;
+                    case ReadOnlySpan<char> s when MemoryExtensions.Equals(s, "gal".AsSpan(), StringComparison.OrdinalIgnoreCase): return 0.133680556f;  // US gallons
+                    case ReadOnlySpan<char> s when MemoryExtensions.Equals(s, "gals".AsSpan(), StringComparison.OrdinalIgnoreCase): return 0.133680556f; // US gallons
                 }
             if ((validUnits & UNITS.Time) > 0)
                 switch (suffix)
                 {
-                    case "": return 1.0;
-                    case "s": return 1;
-                    case "m": return 60;    // If validUnits == UNITS.Any then "m" for meters will be returned instead of "m" for minutes.
+                    case ReadOnlySpan<char> s when MemoryExtensions.Equals(s, ReadOnlySpan<char>.Empty, StringComparison.OrdinalIgnoreCase): return 1.0;
+                    case ReadOnlySpan<char> s when MemoryExtensions.Equals(s, "s".AsSpan(), StringComparison.OrdinalIgnoreCase): return 1;
+                    case ReadOnlySpan<char> s when MemoryExtensions.Equals(s, "m".AsSpan(), StringComparison.OrdinalIgnoreCase): return 60;    // If validUnits == UNITS.Any then "m" for meters will be returned instead of "m" for minutes.
                                             // Use of UNITS.Any is not good practice.
-                    case "h": return 3600;
+                    case ReadOnlySpan<char> s when MemoryExtensions.Equals(s, "h".AsSpan(), StringComparison.OrdinalIgnoreCase): return 3600;
                 }
             if ((validUnits & UNITS.TimeDefaultM) > 0)
                 switch (suffix)
                 {
-                    case "": return 60.0;
-                    case "s": return 1;
-                    case "m": return 60;
-                    case "h": return 3600;
+                    case ReadOnlySpan<char> s when MemoryExtensions.Equals(s, ReadOnlySpan<char>.Empty, StringComparison.OrdinalIgnoreCase): return 60.0;
+                    case ReadOnlySpan<char> s when MemoryExtensions.Equals(s, "s".AsSpan(), StringComparison.OrdinalIgnoreCase): return 1;
+                    case ReadOnlySpan<char> s when MemoryExtensions.Equals(s, "m".AsSpan(), StringComparison.OrdinalIgnoreCase): return 60;
+                    case ReadOnlySpan<char> s when MemoryExtensions.Equals(s, "h".AsSpan(), StringComparison.OrdinalIgnoreCase): return 3600;
                 }
             if ((validUnits & UNITS.TimeDefaultH) > 0)
                 switch (suffix)
                 {
-                    case "": return 3600.0;
-                    case "s": return 1;
-                    case "m": return 60;
-                    case "h": return 3600;
+                    case ReadOnlySpan<char> s when MemoryExtensions.Equals(s, ReadOnlySpan<char>.Empty, StringComparison.OrdinalIgnoreCase): return 3600.0;
+                    case ReadOnlySpan<char> s when MemoryExtensions.Equals(s, "s".AsSpan(), StringComparison.OrdinalIgnoreCase): return 1;
+                    case ReadOnlySpan<char> s when MemoryExtensions.Equals(s, "m".AsSpan(), StringComparison.OrdinalIgnoreCase): return 60;
+                    case ReadOnlySpan<char> s when MemoryExtensions.Equals(s, "h".AsSpan(), StringComparison.OrdinalIgnoreCase): return 3600;
                 }
             if ((validUnits & UNITS.Current) > 0)
                 switch (suffix)
                 {
-                    case "": return 1.0;
-                    case "amps": return 1;
-                    case "a": return 1;
+                    case ReadOnlySpan<char> s when MemoryExtensions.Equals(s, ReadOnlySpan<char>.Empty, StringComparison.OrdinalIgnoreCase): return 1.0;
+                    case ReadOnlySpan<char> s when MemoryExtensions.Equals(s, "amps".AsSpan(), StringComparison.OrdinalIgnoreCase): return 1;
+                    case ReadOnlySpan<char> s when MemoryExtensions.Equals(s, "a".AsSpan(), StringComparison.OrdinalIgnoreCase): return 1;
                 }
             if ((validUnits & UNITS.Voltage) > 0)
                 switch (suffix)
                 {
-                    case "": return 1.0;
-                    case "v": return 1;
-                    case "kv": return 1000;
+                    case ReadOnlySpan<char> s when MemoryExtensions.Equals(s, ReadOnlySpan<char>.Empty, StringComparison.OrdinalIgnoreCase): return 1.0;
+                    case ReadOnlySpan<char> s when MemoryExtensions.Equals(s, "v".AsSpan(), StringComparison.OrdinalIgnoreCase): return 1;
+                    case ReadOnlySpan<char> s when MemoryExtensions.Equals(s, "kv".AsSpan(), StringComparison.OrdinalIgnoreCase): return 1000;
                 }
             if ((validUnits & UNITS.MassRateDefaultLBpH) > 0)
                 switch (suffix)
                 {
-                    case "": return 1.0;
-                    case "lb/h": return 1;  // <CJComment> To be revised when non-metric internal units removed. </CJComment>
-                    case "kg/h": return 2.20462;
-                    case "g/h": return 0.00220462;
+                    case ReadOnlySpan<char> s when MemoryExtensions.Equals(s, ReadOnlySpan<char>.Empty, StringComparison.OrdinalIgnoreCase): return 1.0;
+                    case ReadOnlySpan<char> s when MemoryExtensions.Equals(s, "lb/h".AsSpan(), StringComparison.OrdinalIgnoreCase): return 1;  // <CJComment> To be revised when non-metric internal units removed. </CJComment>
+                    case ReadOnlySpan<char> s when MemoryExtensions.Equals(s, "kg/h".AsSpan(), StringComparison.OrdinalIgnoreCase): return 2.20462;
+                    case ReadOnlySpan<char> s when MemoryExtensions.Equals(s, "g/h".AsSpan(), StringComparison.OrdinalIgnoreCase): return 0.00220462;
                 }
             if ((validUnits & UNITS.Speed) > 0)
                 switch (suffix)
                 {
-                    case "": return 1.0;
-                    case "m/s": return 1.0;
-                    case "mph": return 0.44704;
-                    case "kph": return 0.27777778;
-                    case "km/h": return 0.27777778;
-                    case "kmph": return 0.27777778;
-                    case "kmh": return 0.27777778; // Misspelled unit accepted by MSTS, documented in Richter-Realmuto's 
+                    case ReadOnlySpan<char> s when MemoryExtensions.Equals(s, ReadOnlySpan<char>.Empty, StringComparison.OrdinalIgnoreCase): return 1.0;
+                    case ReadOnlySpan<char> s when MemoryExtensions.Equals(s, "m/s".AsSpan(), StringComparison.OrdinalIgnoreCase): return 1.0;
+                    case ReadOnlySpan<char> s when MemoryExtensions.Equals(s, "mph".AsSpan(), StringComparison.OrdinalIgnoreCase): return 0.44704;
+                    case ReadOnlySpan<char> s when MemoryExtensions.Equals(s, "kph".AsSpan(), StringComparison.OrdinalIgnoreCase): return 0.27777778;
+                    case ReadOnlySpan<char> s when MemoryExtensions.Equals(s, "km/h".AsSpan(), StringComparison.OrdinalIgnoreCase): return 0.27777778;
+                    case ReadOnlySpan<char> s when MemoryExtensions.Equals(s, "kmph".AsSpan(), StringComparison.OrdinalIgnoreCase): return 0.27777778;
+                    case ReadOnlySpan<char> s when MemoryExtensions.Equals(s, "kmh".AsSpan(), StringComparison.OrdinalIgnoreCase): return 0.27777778; // Misspelled unit accepted by MSTS, documented in Richter-Realmuto's 
                                                    // "Manual for .eng- and .wag-files of the MS Train Simulator 1.0". and used in Bernina
                 }
             if ((validUnits & UNITS.SpeedDefaultMPH) > 0)
                 switch (suffix)
                 {
-                    case "": return 0.44704;
-                    case "m/s": return 1.0;
-                    case "mph": return 0.44704;
-                    case "kph": return 0.27777778;
-                    case "km/h": return 0.27777778;
-                    case "kmph": return 0.27777778;
-                    case "kmh": return 0.27777778; // Misspelled unit accepted by MSTS, documented in Richter-Realmuto's 
+                    case ReadOnlySpan<char> s when MemoryExtensions.Equals(s, ReadOnlySpan<char>.Empty, StringComparison.OrdinalIgnoreCase): return 0.44704;
+                    case ReadOnlySpan<char> s when MemoryExtensions.Equals(s, "m/s".AsSpan(), StringComparison.OrdinalIgnoreCase): return 1.0;
+                    case ReadOnlySpan<char> s when MemoryExtensions.Equals(s, "mph".AsSpan(), StringComparison.OrdinalIgnoreCase): return 0.44704;
+                    case ReadOnlySpan<char> s when MemoryExtensions.Equals(s, "kph".AsSpan(), StringComparison.OrdinalIgnoreCase): return 0.27777778;
+                    case ReadOnlySpan<char> s when MemoryExtensions.Equals(s, "km/h".AsSpan(), StringComparison.OrdinalIgnoreCase): return 0.27777778;
+                    case ReadOnlySpan<char> s when MemoryExtensions.Equals(s, "kmph".AsSpan(), StringComparison.OrdinalIgnoreCase): return 0.27777778;
+                    case ReadOnlySpan<char> s when MemoryExtensions.Equals(s, "kmh".AsSpan(), StringComparison.OrdinalIgnoreCase): return 0.27777778; // Misspelled unit accepted by MSTS, documented in Richter-Realmuto's 
                                                    // "Manual for .eng- and .wag-files of the MS Train Simulator 1.0". and used in Bernina
                 }
             if ((validUnits & UNITS.Frequency) > 0)
                 switch (suffix)
                 {
-                    case "": return 1.0;
-                    case "hz": return 1;
-                    case "rps": return 1;
-                    case "rpm": return 1.0 / 60;
+                    case ReadOnlySpan<char> s when MemoryExtensions.Equals(s, ReadOnlySpan<char>.Empty, StringComparison.OrdinalIgnoreCase): return 1.0;
+                    case ReadOnlySpan<char> s when MemoryExtensions.Equals(s, "hz".AsSpan(), StringComparison.OrdinalIgnoreCase): return 1;
+                    case ReadOnlySpan<char> s when MemoryExtensions.Equals(s, "rps".AsSpan(), StringComparison.OrdinalIgnoreCase): return 1;
+                    case ReadOnlySpan<char> s when MemoryExtensions.Equals(s, "rpm".AsSpan(), StringComparison.OrdinalIgnoreCase): return 1.0 / 60;
                 }
             if ((validUnits & UNITS.Force) > 0)
                 switch (suffix)
                 {
-                    case "": return 1.0;
-                    case "n": return 1;
-                    case "kn": return 1e3;
-                    case "lbf": return 4.44822162;
-                    case "lb": return 4.44822162;
+                    case ReadOnlySpan<char> s when MemoryExtensions.Equals(s, ReadOnlySpan<char>.Empty, StringComparison.OrdinalIgnoreCase): return 1.0;
+                    case ReadOnlySpan<char> s when MemoryExtensions.Equals(s, "n".AsSpan(), StringComparison.OrdinalIgnoreCase): return 1;
+                    case ReadOnlySpan<char> s when MemoryExtensions.Equals(s, "kn".AsSpan(), StringComparison.OrdinalIgnoreCase): return 1e3;
+                    case ReadOnlySpan<char> s when MemoryExtensions.Equals(s, "lbf".AsSpan(), StringComparison.OrdinalIgnoreCase): return 4.44822162;
+                    case ReadOnlySpan<char> s when MemoryExtensions.Equals(s, "lb".AsSpan(), StringComparison.OrdinalIgnoreCase): return 4.44822162;
                 }
             if ((validUnits & UNITS.Power) > 0)
                 switch (suffix)
                 {
-                    case "": return 1.0;
-                    case "w": return 1;
-                    case "kw": return 1e3;
-                    case "hp": return 745.699872;
+                    case ReadOnlySpan<char> s when MemoryExtensions.Equals(s, ReadOnlySpan<char>.Empty, StringComparison.OrdinalIgnoreCase): return 1.0;
+                    case ReadOnlySpan<char> s when MemoryExtensions.Equals(s, "w".AsSpan(), StringComparison.OrdinalIgnoreCase): return 1;
+                    case ReadOnlySpan<char> s when MemoryExtensions.Equals(s, "kw".AsSpan(), StringComparison.OrdinalIgnoreCase): return 1e3;
+                    case ReadOnlySpan<char> s when MemoryExtensions.Equals(s, "hp".AsSpan(), StringComparison.OrdinalIgnoreCase): return 745.699872;
                 }
             if ((validUnits & UNITS.Stiffness) > 0)
                 switch (suffix)
                 {
-                    case "": return 1.0;
-                    case "n/m": return 1;
+                    case ReadOnlySpan<char> s when MemoryExtensions.Equals(s, ReadOnlySpan<char>.Empty, StringComparison.OrdinalIgnoreCase): return 1.0;
+                    case ReadOnlySpan<char> s when MemoryExtensions.Equals(s, "n/m".AsSpan(), StringComparison.OrdinalIgnoreCase): return 1;
                 }
             if ((validUnits & UNITS.Resistance) > 0)
                 switch (suffix)
                 {
-                    case "": return 1.0;
-                    case "n/m/s": return 1;
-                    case "ns/m": return 1;
-                    case "lbf/mph": return 10.0264321;  // 1 lbf = 4.4822162, 1 mph = 0.44704 mps => 4.4822162 / 0.44704 = 10.0264321
+                    case ReadOnlySpan<char> s when MemoryExtensions.Equals(s, ReadOnlySpan<char>.Empty, StringComparison.OrdinalIgnoreCase): return 1.0;
+                    case ReadOnlySpan<char> s when MemoryExtensions.Equals(s, "n/m/s".AsSpan(), StringComparison.OrdinalIgnoreCase): return 1;
+                    case ReadOnlySpan<char> s when MemoryExtensions.Equals(s, "ns/m".AsSpan(), StringComparison.OrdinalIgnoreCase): return 1;
+                    case ReadOnlySpan<char> s when MemoryExtensions.Equals(s, "lbf/mph".AsSpan(), StringComparison.OrdinalIgnoreCase): return 10.0264321;  // 1 lbf = 4.4822162, 1 mph = 0.44704 mps => 4.4822162 / 0.44704 = 10.0264321
                 }
             if ((validUnits & UNITS.PressureDefaultPSI) > 0)
                 switch (suffix)
                 {
-                    case "": return 1.0;
-                    case "psi": return 1;  // <CJComment> Factors to be revised when non-metric internal units removed. </CJComment>
-                    case "bar": return 14.5037738;
-                    case "inhg": return 0.4911542;
-                    case "cmhg": return 0.1933672;
-                    case "kpa": return 0.145037738;
+                    case ReadOnlySpan<char> s when MemoryExtensions.Equals(s, ReadOnlySpan<char>.Empty, StringComparison.OrdinalIgnoreCase): return 1.0;
+                    case ReadOnlySpan<char> s when MemoryExtensions.Equals(s, "psi".AsSpan(), StringComparison.OrdinalIgnoreCase): return 1;  // <CJComment> Factors to be revised when non-metric internal units removed. </CJComment>
+                    case ReadOnlySpan<char> s when MemoryExtensions.Equals(s, "bar".AsSpan(), StringComparison.OrdinalIgnoreCase): return 14.5037738;
+                    case ReadOnlySpan<char> s when MemoryExtensions.Equals(s, "inhg".AsSpan(), StringComparison.OrdinalIgnoreCase): return 0.4911542;
+                    case ReadOnlySpan<char> s when MemoryExtensions.Equals(s, "cmhg".AsSpan(), StringComparison.OrdinalIgnoreCase): return 0.1933672;
+                    case ReadOnlySpan<char> s when MemoryExtensions.Equals(s, "kpa".AsSpan(), StringComparison.OrdinalIgnoreCase): return 0.145037738;
                 }
             if ((validUnits & UNITS.PressureDefaultInHg) > 0)
                 switch (suffix)
                 {
-                    case "": return 0.4911542;
-                    case "psi": return 1;  // <CJComment> Factors to be revised when non-metric internal units removed. </CJComment>
-                    case "bar": return 14.5037738;
-                    case "inhg": return 0.4911542;
-                    case "kpa": return 0.145037738;
+                    case ReadOnlySpan<char> s when MemoryExtensions.Equals(s, ReadOnlySpan<char>.Empty, StringComparison.OrdinalIgnoreCase): return 0.4911542;
+                    case ReadOnlySpan<char> s when MemoryExtensions.Equals(s, "psi".AsSpan(), StringComparison.OrdinalIgnoreCase): return 1;  // <CJComment> Factors to be revised when non-metric internal units removed. </CJComment>
+                    case ReadOnlySpan<char> s when MemoryExtensions.Equals(s, "bar".AsSpan(), StringComparison.OrdinalIgnoreCase): return 14.5037738;
+                    case ReadOnlySpan<char> s when MemoryExtensions.Equals(s, "inhg".AsSpan(), StringComparison.OrdinalIgnoreCase): return 0.4911542;
+                    case ReadOnlySpan<char> s when MemoryExtensions.Equals(s, "kpa".AsSpan(), StringComparison.OrdinalIgnoreCase): return 0.145037738;
                 }
             if ((validUnits & UNITS.PressureRateDefaultPSIpS) > 0)
                 switch (suffix)
                 {
-                    case "": return 1.0;
-                    case "psi/s": return 1;  // <CJComment> Factors to be revised when non-metric internal units removed. </CJComment>
-                    case "inhg/s": return 0.4911542;
-                    case "cmhg/s": return 0.1933672;
-                    case "bar/s": return 14.5037738;
-                    case "kpa/s": return 0.145;
+                    case ReadOnlySpan<char> s when MemoryExtensions.Equals(s, ReadOnlySpan<char>.Empty, StringComparison.OrdinalIgnoreCase): return 1.0;
+                    case ReadOnlySpan<char> s when MemoryExtensions.Equals(s, "psi/s".AsSpan(), StringComparison.OrdinalIgnoreCase): return 1;  // <CJComment> Factors to be revised when non-metric internal units removed. </CJComment>
+                    case ReadOnlySpan<char> s when MemoryExtensions.Equals(s, "inhg/s".AsSpan(), StringComparison.OrdinalIgnoreCase): return 0.4911542;
+                    case ReadOnlySpan<char> s when MemoryExtensions.Equals(s, "cmhg/s".AsSpan(), StringComparison.OrdinalIgnoreCase): return 0.1933672;
+                    case ReadOnlySpan<char> s when MemoryExtensions.Equals(s, "bar/s".AsSpan(), StringComparison.OrdinalIgnoreCase): return 14.5037738;
+                    case ReadOnlySpan<char> s when MemoryExtensions.Equals(s, "kpa/s".AsSpan(), StringComparison.OrdinalIgnoreCase): return 0.145;
                 }
             if ((validUnits & UNITS.PressureRateDefaultInHgpS) > 0)
                 switch (suffix)
                 {
-                    case "": return 0.4911542; // <PNComment> Is this correct? - It appears to hold inHg values, yet it does no conversion on psi values, and a conversion on inHg values 
-                    case "psi/s": return 1;  // <CJComment> Factors to be revised when non-metric internal units removed. </CJComment>
-                    case "inhg/s": return 0.4911542;
-                    case "cmhg/s": return 0.1933672;
-                    case "bar/s": return 14.5037738;
-                    case "kpa/s": return 0.145;
+                    case ReadOnlySpan<char> s when MemoryExtensions.Equals(s, ReadOnlySpan<char>.Empty, StringComparison.OrdinalIgnoreCase): return 0.4911542; // <PNComment> Is this correct? - It appears to hold inHg values, yet it does no conversion on psi values, and a conversion on inHg values 
+                    case ReadOnlySpan<char> s when MemoryExtensions.Equals(s, "psi/s".AsSpan(), StringComparison.OrdinalIgnoreCase): return 1;  // <CJComment> Factors to be revised when non-metric internal units removed. </CJComment>
+                    case ReadOnlySpan<char> s when MemoryExtensions.Equals(s, "inhg/s".AsSpan(), StringComparison.OrdinalIgnoreCase): return 0.4911542;
+                    case ReadOnlySpan<char> s when MemoryExtensions.Equals(s, "cmhg/s".AsSpan(), StringComparison.OrdinalIgnoreCase): return 0.1933672;
+                    case ReadOnlySpan<char> s when MemoryExtensions.Equals(s, "bar/s".AsSpan(), StringComparison.OrdinalIgnoreCase): return 14.5037738;
+                    case ReadOnlySpan<char> s when MemoryExtensions.Equals(s, "kpa/s".AsSpan(), StringComparison.OrdinalIgnoreCase): return 0.145;
                 }
             if ((validUnits & UNITS.EnergyDensity) > 0)
                 switch (suffix)
                 {
-                    case "": return 1.0;
-                    case "kj/kg": return 1;
-                    case "j/g": return 1;
-                    case "btu/lb": return 2.326f;
+                    case ReadOnlySpan<char> s when MemoryExtensions.Equals(s, ReadOnlySpan<char>.Empty, StringComparison.OrdinalIgnoreCase): return 1.0;
+                    case ReadOnlySpan<char> s when MemoryExtensions.Equals(s, "kj/kg".AsSpan(), StringComparison.OrdinalIgnoreCase): return 1;
+                    case ReadOnlySpan<char> s when MemoryExtensions.Equals(s, "j/g".AsSpan(), StringComparison.OrdinalIgnoreCase): return 1;
+                    case ReadOnlySpan<char> s when MemoryExtensions.Equals(s, "btu/lb".AsSpan(), StringComparison.OrdinalIgnoreCase): return 2.326f;
                 }
             if ((validUnits & UNITS.TemperatureDifference) > 0)
                 switch (suffix)
                 {
-                    case "": return 1.0;
-                    case "degc": return 1;
-                    case "degf": return 100.0 / 180;
+                    case ReadOnlySpan<char> s when MemoryExtensions.Equals(s, ReadOnlySpan<char>.Empty, StringComparison.OrdinalIgnoreCase): return 1.0;
+                    case ReadOnlySpan<char> s when MemoryExtensions.Equals(s, "degc".AsSpan(), StringComparison.OrdinalIgnoreCase): return 1;
+                    case ReadOnlySpan<char> s when MemoryExtensions.Equals(s, "degf".AsSpan(), StringComparison.OrdinalIgnoreCase): return 100.0 / 180;
                 }
             if ((validUnits & UNITS.RotationalInertia) > 0)
                 switch (suffix)
                 {
-                    case "": return 1.0;
+                    case ReadOnlySpan<char> s when MemoryExtensions.Equals(s, ReadOnlySpan<char>.Empty, StringComparison.OrdinalIgnoreCase): return 1.0;
                 }
             if ((validUnits & UNITS.ResistanceDavisC) > 0)
                 switch (suffix)
                 {
-                    case "": return 1.0;
-                    case "Nm/s^2": return 1;
-                    case "lbf/mph^2": return 22.42849;  // 1 lbf = 4.4822162, 1 mph = 0.44704 mps +> 4.4822162 / (0.44704 * 0.44704) = 22.42849
+                    case ReadOnlySpan<char> s when MemoryExtensions.Equals(s, ReadOnlySpan<char>.Empty, StringComparison.OrdinalIgnoreCase): return 1.0;
+                    case ReadOnlySpan<char> s when MemoryExtensions.Equals(s, "Nm/s^2".AsSpan(), StringComparison.OrdinalIgnoreCase): return 1;
+                    case ReadOnlySpan<char> s when MemoryExtensions.Equals(s, "lbf/mph^2".AsSpan(), StringComparison.OrdinalIgnoreCase): return 22.42849;  // 1 lbf = 4.4822162, 1 mph = 0.44704 mps +> 4.4822162 / (0.44704 * 0.44704) = 22.42849
                 }
             if ((validUnits & UNITS.Temperature) > 0)
             {
                 switch (suffix)
                 {
-
-                    case "": return 1.0;
-                    case "degc": return 1;
-                    case "degf":  // For degF we have a complex calculation process that require conversion from a string, calculation of equivalent degC, and then conversion back to a string
-                        float TempConstant = Convert.ToSingle(constant);
+                    case ReadOnlySpan<char> s when MemoryExtensions.Equals(s, ReadOnlySpan<char>.Empty, StringComparison.OrdinalIgnoreCase): return 1.0;
+                    case ReadOnlySpan<char> s when MemoryExtensions.Equals(s, "degc".AsSpan(), StringComparison.OrdinalIgnoreCase): return 1;
+                    case ReadOnlySpan<char> s when MemoryExtensions.Equals(s, "degf".AsSpan(), StringComparison.OrdinalIgnoreCase):  // For degF we have a complex calculation process that require conversion from a string, calculation of equivalent degC, and then conversion back to a string
+                        float TempConstant = Convert.ToSingle(constant.ToString());
                         float Temperature = (TempConstant - 32f) * (100f / 180f);
-                        constant = Convert.ToString(Temperature);
+                        constant = Convert.ToString(Temperature).AsMemory();
                         return 1;
                 }
             }
             if ((validUnits & UNITS.Angle) > 0)
                 switch (suffix)
                 {
-                    case "": return 1.0;
-                    case "rad": return 1;
-                    case "deg": return 0.0174533;  // 1 deg = 0.0174533 radians
+                    case ReadOnlySpan<char> s when MemoryExtensions.Equals(s, ReadOnlySpan<char>.Empty, StringComparison.OrdinalIgnoreCase): return 1.0;
+                    case ReadOnlySpan<char> s when MemoryExtensions.Equals(s, "rad".AsSpan(), StringComparison.OrdinalIgnoreCase): return 1;
+                    case ReadOnlySpan<char> s when MemoryExtensions.Equals(s, "deg".AsSpan(), StringComparison.OrdinalIgnoreCase): return 0.0174533;  // 1 deg = 0.0174533 radians
                 }
-            STFException.TraceWarning(this, "Found a suffix '" + suffix + "' which could not be parsed as a " + validUnits.ToString() + " unit");
+            STFException.TraceWarning(this, "Found a suffix '" + suffix.ToString() + "' which could not be parsed as a " + validUnits.ToString() + " unit");
             return 1;
         }
 
@@ -1156,13 +1156,13 @@ namespace Orts.Parsers.Msts
                 STFException.TraceWarning(this, "Unexpected end of file");
                 return defaultValue;
             }
-            string s = ReadItem();
-            if (s == ")" && (defaultValue != null))
+            var s = ReadItem();
+            if (s.Span == ")".AsSpan() && (defaultValue != null))
             {
                 StepBackOneItem();
                 return defaultValue;
             }
-            if (s == "(")
+            if (s.Span == "(".AsSpan())
             {
                 string result = ReadString();
                 if (result == ")")
@@ -1178,7 +1178,7 @@ namespace Orts.Parsers.Msts
                 }
                 return result;
             }
-            STFException.TraceWarning(this, "Block Not Found - instead found " + s);
+            STFException.TraceWarning(this, "Block Not Found - instead found " + s.ToString());
             return defaultValue;
         }
 
@@ -1207,19 +1207,19 @@ namespace Orts.Parsers.Msts
                 STFException.TraceWarning(this, "Unexpected end of file");
                 return defaultValue.GetValueOrDefault(0);
             }
-            string s = ReadItem();
-            if (s == ")" && defaultValue.HasValue)
+            var s = ReadItem();
+            if (s.Span == ")".AsSpan() && defaultValue.HasValue)
             {
                 StepBackOneItem();
                 return defaultValue.Value;
             }
-            if (s == "(")
+            if (s.Span == "(".AsSpan())
             {
                 uint result = ReadHex(defaultValue);
                 SkipRestOfBlock(); // <CJComment> This call seems poor practice as it discards any tokens _including mistakes_ up to the matching ")". </CJComment>  
                 return result;
             }
-            STFException.TraceWarning(this, "Block Not Found - instead found " + s);
+            STFException.TraceWarning(this, "Block Not Found - instead found " + s.ToString());
             return defaultValue.GetValueOrDefault(0);
         }
 
@@ -1234,19 +1234,19 @@ namespace Orts.Parsers.Msts
                 STFException.TraceWarning(this, "Unexpected end of file");
                 return defaultValue.GetValueOrDefault(0);
             }
-            string s = ReadItem();
-            if (s == ")" && defaultValue.HasValue)
+            var s = ReadItem();
+            if (s.Span == ")".AsSpan() && defaultValue.HasValue)
             {
                 StepBackOneItem();
                 return defaultValue.Value;
             }
-            if (s == "(")
+            if (s.Span == "(".AsSpan())
             {
                 int result = ReadInt(defaultValue);
                 SkipRestOfBlock(); // <CJComment> This call seems poor practice as it discards any tokens _including mistakes_ up to the matching ")". </CJComment>  
                 return result;
             }
-            STFException.TraceWarning(this, "Block Not Found - instead found " + s);
+            STFException.TraceWarning(this, "Block Not Found - instead found " + s.ToString());
             return defaultValue.GetValueOrDefault(0);
         }
 
@@ -1261,19 +1261,19 @@ namespace Orts.Parsers.Msts
                 STFException.TraceWarning(this, "Unexpected end of file");
                 return defaultValue.GetValueOrDefault(0);
             }
-            string s = ReadItem();
-            if (s == ")" && defaultValue.HasValue)
+            var s = ReadItem();
+            if (s.Span == ")".AsSpan() && defaultValue.HasValue)
             {
                 StepBackOneItem();
                 return defaultValue.Value;
             }
-            if (s == "(")
+            if (s.Span == "(".AsSpan())
             {
                 uint result = ReadUInt(defaultValue);
                 SkipRestOfBlock(); // <CJComment> This call seems poor practice as it discards any tokens _including mistakes_ up to the matching ")". </CJComment>  
                 return result;
             }
-            STFException.TraceWarning(this, "Block Not Found - instead found " + s);
+            STFException.TraceWarning(this, "Block Not Found - instead found " + s.ToString());
             return defaultValue.GetValueOrDefault(0);
         }
 
@@ -1289,20 +1289,20 @@ namespace Orts.Parsers.Msts
                 STFException.TraceWarning(this, "Unexpected end of file");
                 return defaultValue.GetValueOrDefault(0);
             }
-            string s = ReadItem();
-            if (s == ")" && defaultValue.HasValue)
+            var s = ReadItem();
+            if (s.Span == ")".AsSpan() && defaultValue.HasValue)
             {
                 StepBackOneItem();
                 return defaultValue.Value;
             }
-            if (s == "(")
+            if (s.Span == "(".AsSpan())
             {
                 float result = ReadFloat(validUnits, defaultValue);
                 SkipRestOfBlock(); // e.g. to ignore everything after the "30" in
                 // SignalAspect ( APPROACH_1 "Approach" SpeedMPH ( 30 SignalFlags ( ASAP ) ) )
                 return result;
             }
-            STFException.TraceWarning(this, "Block Not Found - instead found " + s);
+            STFException.TraceWarning(this, "Block Not Found - instead found " + s.ToString());
             return defaultValue.GetValueOrDefault(0);
         }
 
@@ -1317,19 +1317,19 @@ namespace Orts.Parsers.Msts
                 STFException.TraceWarning(this, "Unexpected end of file");
                 return defaultValue.GetValueOrDefault(0);
             }
-            string s = ReadItem();
-            if (s == ")" && defaultValue.HasValue)
+            var s = ReadItem();
+            if (s.Span == ")".AsSpan() && defaultValue.HasValue)
             {
                 StepBackOneItem();
                 return defaultValue.Value;
             }
-            if (s == "(")
+            if (s.Span == "(".AsSpan())
             {
                 double result = ReadDouble(defaultValue);
                 SkipRestOfBlock(); // <CJComment> This call seems poor practice as it discards any tokens _including mistakes_ up to the matching ")". </CJComment>  
                 return result;
             }
-            STFException.TraceWarning(this, "Block Not Found - instead found " + s);
+            STFException.TraceWarning(this, "Block Not Found - instead found " + s.ToString());
             return defaultValue.GetValueOrDefault(0);
         }
 
@@ -1345,22 +1345,22 @@ namespace Orts.Parsers.Msts
                 STFException.TraceWarning(this, "Unexpected end of file");
                 return defaultValue;
             }
-            string s = ReadItem();
-            if (s == ")")
+            var s = ReadItem();
+            if (s.Span == ")".AsSpan())
             {
                 StepBackOneItem();
                 return defaultValue;
             }
-            if (s == "(")
+            if (s.Span == "(".AsSpan())
             {
-                switch (s = ReadItem().ToLower())
+                switch (s = ReadItem())
                 {
-                    case "true": SkipRestOfBlock(); return true;
-                    case "false": SkipRestOfBlock(); return false;
-                    case ")": return defaultValue;
+                    case ReadOnlyMemory<char> sz when MemoryExtensions.Equals(sz.Span, "true".AsSpan(), StringComparison.OrdinalIgnoreCase): SkipRestOfBlock(); return true;
+                    case ReadOnlyMemory<char> sz when MemoryExtensions.Equals(sz.Span, "false".AsSpan(), StringComparison.OrdinalIgnoreCase): SkipRestOfBlock(); return false;
+                    case ReadOnlyMemory<char> sz when MemoryExtensions.Equals(sz.Span, ")".AsSpan(), StringComparison.OrdinalIgnoreCase): return defaultValue;
                     default:
                         int v;
-                        if (int.TryParse(s, NumberStyles.Any, parseNFI, out v))
+                        if (int.TryParse(s.ToString(), NumberStyles.Any, parseNFI, out v))
                         {
                             defaultValue = (v != 0);
                         }
@@ -1368,7 +1368,7 @@ namespace Orts.Parsers.Msts
                         return defaultValue;
                 }
             }
-            STFException.TraceWarning(this, "Block Not Found - instead found " + s);
+            STFException.TraceWarning(this, "Block Not Found - instead found " + s.ToString());
             return defaultValue;
         }
 
@@ -1397,13 +1397,13 @@ namespace Orts.Parsers.Msts
                 STFException.TraceWarning(this, "Unexpected end of file");
                 return defaultValue;
             }
-            string s = ReadItem();
-            if (s == ")")
+            var s = ReadItem();
+            if (s.Span == ")".AsSpan())
             {
                 StepBackOneItem();
                 return defaultValue;
             }
-            if (s == "(")
+            if (s.Span == "(".AsSpan())
             {
                 defaultValue.X = ReadFloat(validUnits, defaultValue.X);
                 defaultValue.Y = ReadFloat(validUnits, defaultValue.Y);
@@ -1411,7 +1411,7 @@ namespace Orts.Parsers.Msts
                 SkipRestOfBlock(); // <CJComment> This call seems poor practice as it discards any tokens _including mistakes_ up to the matching ")". </CJComment>  
                 return defaultValue;
             }
-            STFException.TraceWarning(this, "Block Not Found - instead found " + s);
+            STFException.TraceWarning(this, "Block Not Found - instead found " + s.ToString());
             return defaultValue;
         }
 
@@ -1427,20 +1427,20 @@ namespace Orts.Parsers.Msts
                 STFException.TraceWarning(this, "Unexpected end of file");
                 return defaultValue;
             }
-            string s = ReadItem();
-            if (s == ")")
+            var s = ReadItem();
+            if (s.Span == ")".AsSpan())
             {
                 StepBackOneItem();
                 return defaultValue;
             }
-            if (s == "(")
+            if (s.Span == "(".AsSpan())
             {
                 defaultValue.X = ReadFloat(validUnits, defaultValue.X);
                 defaultValue.Y = ReadFloat(validUnits, defaultValue.Y);
                 SkipRestOfBlock(); // <CJComment> This call seems poor practice as it discards any tokens _including mistakes_ up to the matching ")". </CJComment>  
                 return defaultValue;
             }
-            STFException.TraceWarning(this, "Block Not Found - instead found " + s);
+            STFException.TraceWarning(this, "Block Not Found - instead found " + s.ToString());
             return defaultValue;
         }
 
@@ -1456,13 +1456,13 @@ namespace Orts.Parsers.Msts
                 STFException.TraceWarning(this, "Unexpected end of file");
                 return defaultValue;
             }
-            string s = ReadItem();
-            if (s == ")")
+            var s = ReadItem();
+            if (s.Span == ")".AsSpan())
             {
                 StepBackOneItem();
                 return defaultValue;
             }
-            if (s == "(")
+            if (s.Span == "(".AsSpan())
             {
                 defaultValue.X = ReadFloat(validUnits, defaultValue.X);
                 defaultValue.Y = ReadFloat(validUnits, defaultValue.Y);
@@ -1471,7 +1471,7 @@ namespace Orts.Parsers.Msts
                 SkipRestOfBlock(); // <CJComment> This call seems poor practice as it discards any tokens _including mistakes_ up to the matching ")". </CJComment>  
                 return defaultValue;
             }
-            STFException.TraceWarning(this, "Block Not Found - instead found " + s);
+            STFException.TraceWarning(this, "Block Not Found - instead found " + s.ToString());
             return defaultValue;
         }
 
@@ -1483,10 +1483,10 @@ namespace Orts.Parsers.Msts
 #line hidden
             while (!Eof)
             {
-                string token = ReadItem().ToLower();
-                if (token == "(") { SkipRestOfBlock(); continue; }
+                var token = ReadItem();
+                if (token.Span == "(".AsSpan()) { SkipRestOfBlock(); continue; }
                 foreach (TokenProcessor tp in processors)
-                    if (tp.token == token)
+                    if (MemoryExtensions.Equals(tp.token.AsSpan(), token.Span, StringComparison.OrdinalIgnoreCase))
 #line default
                         tp.processor(); // Press F11 'Step Into' to debug the Processor delegate
             } // Press F10 'Step Over' to jump to the next token
@@ -1506,10 +1506,10 @@ namespace Orts.Parsers.Msts
                 else { } // Press F10 'Step Over' to jump to the next token
 #endif
 #line hidden
-                string token = ReadItem().ToLower();
-                if (token == "(") { SkipRestOfBlock(); continue; }
+                var token = ReadItem();
+                if (token.Span == "(".AsSpan()) { SkipRestOfBlock(); continue; }
                 foreach (TokenProcessor tp in processors)
-                    if (tp.token == token)
+                    if (MemoryExtensions.Equals(tp.token.AsSpan(), token.Span, StringComparison.OrdinalIgnoreCase))
 #line default
                         tp.processor(); // Press F11 'Step Into' to debug the Processor delegate
             } // Press F10 'Step Over' to jump to the next token
@@ -1517,15 +1517,15 @@ namespace Orts.Parsers.Msts
         /// <summary>Parse an STF file until the end of block ')' marker, using the array of lower case tokens, with a processor delegate/lambda
         /// </summary>
         /// <param name="processors">Array of lower case token, and the delegate/lambda to call when matched.</param>
-        public void ParseBlock(IEnumerable<TokenProcessor> processors)
+        public void ParseBlock(TokenProcessor[] processors)
         { // Press F10 'Step Over' to jump to the next token
 #line hidden
             while (!EndOfBlock())
             {
-                string token = ReadItem().ToLower();
-                if (token == "(") { SkipRestOfBlock(); continue; }
+                var token = ReadItem();
+                if (token.Span == "(".AsSpan()) { SkipRestOfBlock(); continue; }
                 foreach (TokenProcessor tp in processors)
-                    if (tp.token == token)
+                    if (MemoryExtensions.Equals(tp.token.AsSpan(), token.Span, StringComparison.OrdinalIgnoreCase))
 #line default
                         tp.processor(); // Press F11 'Step Into' to debug the Processor delegate
             } // Press F10 'Step Over' to jump to the next token
@@ -1545,10 +1545,10 @@ namespace Orts.Parsers.Msts
                 else { } // Press F10 'Step Over' to jump to the next token
 #endif
 #line hidden
-                string token = ReadItem().ToLower();
-                if (token == "(") { SkipRestOfBlock(); continue; }
+                var token = ReadItem();
+                if (token.Span == "(".AsSpan()) { SkipRestOfBlock(); continue; }
                 foreach (TokenProcessor tp in processors)
-                    if (tp.token == token)
+                    if (MemoryExtensions.Equals(tp.token.AsSpan(), token.Span, StringComparison.OrdinalIgnoreCase))
 #line default
                         tp.processor(); // Press F11 'Step Into' to debug the Processor delegate
             } // Press F10 'Step Over' to jump to the next token
@@ -1575,24 +1575,25 @@ namespace Orts.Parsers.Msts
         }
         #endregion
 
-        /// <summary>The I/O stream for the STF file we are processing
+        /// <summary>All text read from the I/O stream for the STF file we are processing
         /// </summary>
-        private StreamReader streamSTF;
+        private ReadOnlyMemory<char> spanSTF;
+        private int spanPosition;
         /// <summary>includeReader is used recursively in ReadItem() to handle the 'include' token, file include mechanism
         /// </summary>
         private STFReader includeReader;
         /// <summary>Remembers the last returned ReadItem().  If the next {item] is a '(', this is the block name used in the tree.
         /// </summary>
-        private string previousItem = "";
+        private ReadOnlyMemory<char> previousItem = ReadOnlyMemory<char>.Empty;
         /// <summary>How deep in nested blocks the current parser is
         /// </summary>
         private int block_depth;
         /// <summary>A list describing the hierachy of nested block tokens
         /// </summary>
-        private List<string> tree;
+        private List<ReadOnlyMemory<char>> tree;
         /// <summary>The tree cache is used to minimize the calls to StringBuilder when Tree is called repetively for the same hierachy.
         /// </summary>
-        private string tree_cache;
+        private ReadOnlyMemory<char> tree_cache;
 
         private static NumberStyles parseHex = NumberStyles.AllowLeadingWhite | NumberStyles.AllowHexSpecifier | NumberStyles.AllowTrailingWhite;
         private static NumberStyles parseNum = NumberStyles.AllowLeadingWhite | NumberStyles.AllowLeadingSign | NumberStyles.AllowThousands | NumberStyles.AllowDecimalPoint | NumberStyles.AllowExponent | NumberStyles.AllowTrailingWhite;
@@ -1609,14 +1610,14 @@ namespace Orts.Parsers.Msts
             //includeReader - is not needed for this stepback implementation
             /// <summary>The stepback* variables store the previous state, so StepBackOneItem() can jump back on {item}. stepbackItem « ReadItem() return
             /// </summary>
-            public string Item;
+            public ReadOnlyMemory<char> Item;
             /// <summary>The stepback* variables store the previous state, so StepBackOneItem() can jump back on {item}. stepbackCurrItem « previousItem
             /// </summary>
-            public string PrevItem;
+            public ReadOnlyMemory<char> PrevItem;
             /// <summary>The stepback* variables store the previous state, so StepBackOneItem() can jump back on {item}. stepbackTree « tree
             /// <para>This item, is optimized, so when value is null it means stepbackTree was the same as Tree, so we don't create unneccessary memory duplicates of lists.</para>
             /// </summary>
-            public List<string> Tree;
+            public List<ReadOnlyMemory<char>> Tree;
             /// <summary>The stepback* variables store the previous state, so StepBackOneItem() can jump back on {item}. BlockDepth « block_depth
             /// </summary>
             public int BlockDepth;
@@ -1630,23 +1631,27 @@ namespace Orts.Parsers.Msts
         private static bool IsEof(int c) { return c == -1; }
         private int PeekChar()
         {
-            return streamSTF.Peek();
+            if (spanPosition >= spanSTF.Length)
+                return -1;
+            return spanSTF.Span[spanPosition];
         }
         public int PeekPastWhitespace()
         {
-            int c = streamSTF.Peek();
+            int c = PeekChar();
             while (IsEof(c) || IsWhiteSpace(c)) // skip over eof and white space
             {
                 c = ReadChar();
                 if (IsEof(c))
                     break;   // break on reading eof 
-                c = streamSTF.Peek();
+                c = PeekChar();
             }
             return c;
         }
         private int ReadChar()
         {
-            int c = streamSTF.Read();
+            if (spanPosition >= spanSTF.Length)
+                return -1;
+            var c = spanSTF.Span[spanPosition++];
             if (c == '\n') ++LineNumber;
             return c;
         }
@@ -1658,22 +1663,17 @@ namespace Orts.Parsers.Msts
 
         public bool EOF() { return PeekChar() == -1; }
 
-
-        /// <summary>This is really a local variable in the function ReadItem(...) but it is a class member to stop unnecessary memory re-allocations.
-        /// </summary>
-        private StringBuilder itemBuilder = new StringBuilder(256);
-
         /// <summary>Internal Implementation - This is the main function that reads an item from the STF stream.
         /// </summary>
         /// <param name="skip_mode">True - we are in a skip function, and so we don't want to do any special token processing.</param>
         /// <param name="string_mode">True - we are expecting a string, so don't skip comments.</param>
         /// <returns>The next item from the STF file</returns>
-        private string ReadItem(bool skip_mode, bool string_mode)
+        private ReadOnlyMemory<char> ReadItem(bool skip_mode, bool string_mode)
         {
             #region If includeReader exists, then recurse down to get the next token from the included STF file
             if (includeReader != null)
             {
-                string item = includeReader.ReadItem(skip_mode, string_mode);
+                var item = includeReader.ReadItem(skip_mode, string_mode);
                 UpdateTreeAndStepBack(item);
                 if ((!includeReader.Eof) || (item.Length > 0)) return item;
                 includeReader.Dispose();
@@ -1681,25 +1681,30 @@ namespace Orts.Parsers.Msts
             }
             #endregion
 
+            var start = spanPosition;
+            var end = spanPosition;
+            var hasEscapeSequence = false;
             int c;
             #region Skip past any leading whitespace characters
             for (;;)
             {
                 c = ReadChar();
-                if (IsEof(c)) return UpdateTreeAndStepBack("");
-                if (!IsWhiteSpace(c)) break;
+                if (IsEof(c)) return UpdateTreeAndStepBack(ReadOnlyMemory<char>.Empty);
+                if (IsWhiteSpace(c))
+                    start = end = spanPosition;
+                else
+                    break;
             }
             #endregion
 
-            itemBuilder.Length = 0;
             #region Handle Open and Close Block markers - parentheses
             if (c == '(')
             {
-                return UpdateTreeAndStepBack("(");
+                return UpdateTreeAndStepBack("(".AsMemory());
             }
             else if (c == ')')
             {
-                return UpdateTreeAndStepBack(")");
+                return UpdateTreeAndStepBack(")".AsMemory());
             }
             #endregion
             #region Handle #&_ markers
@@ -1714,47 +1719,47 @@ namespace Orts.Parsers.Msts
                     if (IsEof(c))
                     {
                         STFException.TraceWarning(this, "Found a # marker immediately followed by an unexpected EOF.");
-                        return UpdateTreeAndStepBack("");
+                        return UpdateTreeAndStepBack(ReadOnlyMemory<char>.Empty);
                     }
                     if (IsWhiteSpace(c)) break;
                 }
                 #endregion
                 #region Skip the comment item or block
-                string comment = ReadItem(skip_mode, string_mode);
-                if (comment == ")") return comment;
-                if (comment == "(") SkipRestOfBlock();
+                var comment = ReadItem(skip_mode, string_mode);
+                if (comment.Span == ")".AsSpan()) return comment;
+                if (comment.Span == "(".AsSpan()) SkipRestOfBlock();
                 #endregion
 
                 //If the next thing is end-of-block, we cannot just read it, because StepBackOneItem is not handling
                 //this correctly when using 'tree'
                 int c2 = PeekPastWhitespace();
                 if (c2 == ')')
-                    return EndBlockCommentSentinel;
-                string item = ReadItem(skip_mode, string_mode);
+                    return EndBlockCommentSentinel.AsMemory();
+                var item = ReadItem(skip_mode, string_mode);
                 return item; // Now move on to the next token after the commented area
             }
             #endregion
             #region Build Quoted Items - including append operations
             else if (c == '"')
             {
+                start = end = spanPosition;
                 for (;;)
                 {
                     c = ReadChar();
                     if (IsEof(c))
                     {
                         STFException.TraceWarning(this, "Found an unexpected EOF, while reading an item started with a double-quote character.");
-                        return UpdateTreeAndStepBack(itemBuilder.ToString());
+                        return UpdateTreeAndStepBack(spanSTF.Slice(start, end - start));
                     }
                     if (c == '\\') // escape sequence
                     {
                         c = ReadChar();
-                        if (c == 'n') itemBuilder.Append('\n');
-                        else if (c == 't') itemBuilder.Append('\t');
-                        else itemBuilder.Append((char)c);  // ie \, " etc
+                        hasEscapeSequence = true;
+                        end = spanPosition;
                     }
                     else if (c != '"')
                     {
-                        itemBuilder.Append((char)c);
+                        end = spanPosition;
                     }
                     else //  end of quotation
                     {
@@ -1767,17 +1772,19 @@ namespace Orts.Parsers.Msts
                         if (IsEof(c))
                         {
                             STFException.TraceWarning(this, "Found an unexpected EOF, while reading an item started with a double-quote character and followed by the + operator.");
-                            return UpdateTreeAndStepBack(itemBuilder.ToString());
+                            return UpdateTreeAndStepBack(spanSTF.Slice(start, end - start));
                         }
                         #endregion
 
                         if (c != '"')
                         {
-                            if (skip_mode) return "";
+                            if (skip_mode) return ReadOnlyMemory<char>.Empty;
                             STFException.TraceWarning(this, "Reading an item started with a double-quote character and followed by the + operator but then the next item must also be double-quoted.");
-                            return UpdateTreeAndStepBack(itemBuilder.ToString());
+                            return UpdateTreeAndStepBack(spanSTF.Slice(start, end - start));
                         }
                         c = ReadChar(); // Read the open quote
+                        hasEscapeSequence = true;
+                        end = spanPosition;
                     }
                 }
             }
@@ -1785,7 +1792,7 @@ namespace Orts.Parsers.Msts
             #region Build Normal Items - delimitered by whitespace, ( and )
             else if (c != -1)
             {
-                itemBuilder.Append((char)c);
+                end = spanPosition;
                 for (;;)
                 {
                     c = PeekChar();
@@ -1801,34 +1808,74 @@ namespace Orts.Parsers.Msts
                     if (c == '\\') // escape sequence
                     {
                         c = ReadChar();
-                        if (c == 'n') itemBuilder.Append('\n');
-                        else if (c == 't') itemBuilder.Append('\t');
-                        else itemBuilder.Append((char)c);  // ie \, " etc
+                        hasEscapeSequence = true;
+                        end = spanPosition;
                     }
                     else
                     {
-                        itemBuilder.Append((char)c);
+                        end = spanPosition;
                     }
                 }
             }
             #endregion
 
-            if (skip_mode) return "";
-            string result = itemBuilder.ToString();
+            if (skip_mode) return ReadOnlyMemory<char>.Empty;
+            ReadOnlyMemory<char> result = spanSTF.Slice(start, end - start);
+
+            if (hasEscapeSequence)
+            {
+                // Must allocate a new string (Memory), escape sequences and string extenders cannot be handled allocation-free.
+                var destinationPosition = 0;
+                Span<char> destinationItem = stackalloc char[result.Length];
+                var sourcePosition = start;
+                var sourceItem = spanSTF.Span;
+                do
+                {
+                    c = sourceItem[sourcePosition++];
+                    if (c == '\\' && sourcePosition < end) // escape sequence
+                    {
+                        c = sourceItem[sourcePosition++];
+                        if (c == 'n') destinationItem[destinationPosition++] = '\n';
+                        else if (c == 't') destinationItem[destinationPosition++] = '\t';
+                        else destinationItem[destinationPosition++] = (char)c;  // ie \, " etc
+                    }
+                    else if (c != '"')
+                    {
+                        destinationItem[destinationPosition++] = (char)c;
+                    }
+                    else
+                    {
+                        // This must be a string extender preceding closing quot. mark, like in: "a" + "b" + "c"
+                        sourcePosition++; // skip the quotation mark
+                        while (IsWhiteSpace(c = sourceItem[sourcePosition++])) { } // skip the whitespaces
+                        if (c != '+') break; // skip the string extender
+                        while (IsWhiteSpace(c = sourceItem[sourcePosition++])) { } // skip the whitespaces
+                        if (c != '"') break; // skip the new opening quotation mark
+                    }
+                }
+                while (sourcePosition < end);
+
+                result = destinationItem.Slice(0, destinationPosition).ToString().AsMemory();
+            }
+
             if (!string_mode)  // in string mode we don't exclude comments
             {
-                switch (result.ToLower())
+                switch (result)
                 {
                     #region Process special token - include
-                    case "include":
-                        var filename = ReadItem(skip_mode, string_mode);
-                        if (filename == "(")
+                    case ReadOnlyMemory<char> r when MemoryExtensions.Equals(r.Span, "include".AsSpan(), StringComparison.OrdinalIgnoreCase):
+                        var readItem = ReadItem(skip_mode, string_mode);
+                        string filename;
+                        if (readItem.Span == "(".AsSpan())
                         {
-                            filename = ReadItem(skip_mode, string_mode);
+                            filename = ReadItem(skip_mode, string_mode).ToString();
                             SkipRestOfBlock();
                         }
-                        var purefilename = Path.GetFileName(filename).ToLower();
-                        if (purefilename == "[[samename]]")
+                        else
+                        {
+                            filename = readItem.ToString();
+                        }
+                        if (string.Equals(Path.GetFileName(filename), "[[samename]]", StringComparison.OrdinalIgnoreCase))
                             filename = Path.GetDirectoryName(filename) + @"\" + Path.GetFileName(FileName);
                         var includeFileName = Path.GetDirectoryName(FileName) + @"\" + filename;
                         if (!File.Exists(includeFileName))
@@ -1837,19 +1884,19 @@ namespace Orts.Parsers.Msts
                         return ReadItem(skip_mode, string_mode); // Which will recurse down when includeReader is tested
                     #endregion
                     #region Process special token - skip and comment
-                    case "skip":
-                    case "comment":
+                    case ReadOnlyMemory<char> r1 when MemoryExtensions.Equals(r1.Span, "skip".AsSpan(), StringComparison.OrdinalIgnoreCase):
+                    case ReadOnlyMemory<char> r2 when MemoryExtensions.Equals(r2.Span, "comment".AsSpan(), StringComparison.OrdinalIgnoreCase):
                         {
                             #region Skip the comment item or block
-                            string comment = ReadItem(skip_mode, string_mode);
-                            if (comment == "(") SkipRestOfBlock();
+                            var comment = ReadItem(skip_mode, string_mode);
+                            if (comment.Span == "(".AsSpan()) SkipRestOfBlock();
                             #endregion
                             //If the next thing is end-of-block, we cannot just read it, because StepBackOneItem is not handling
                             //this correctly when using 'tree'
                             int c2 = PeekPastWhitespace();
                             if (c2 == ')')
-                                return EndBlockCommentSentinel;
-                            string item = ReadItem(skip_mode, string_mode);
+                                return EndBlockCommentSentinel.AsMemory();
+                            var item = ReadItem(skip_mode, string_mode);
                             return item; // Now move on to the next token after the commented area
                         }
                         #endregion
@@ -1865,27 +1912,26 @@ namespace Orts.Parsers.Msts
         /// <para>Now when the stepbackoneitemFlag flag is set, we use the stepback* copies, to move back exactly one item.</para>
         /// </summary>
         /// <param name="token"></param>
-        private string UpdateTreeAndStepBack(string token)
+        private ReadOnlyMemory<char> UpdateTreeAndStepBack(ReadOnlyMemory<char> token)
         {
             stepback.Item = token;
-            token = token.Trim();
-            if (token == "(")
+            if (token.Span.Trim() == "(".AsSpan())
             {
                 if (tree != null)
                 {
-                    stepback.Tree = new List<string>(tree);
-                    tree.Add(previousItem + "(");
+                    stepback.Tree = new List<ReadOnlyMemory<char>>(tree);
+                    tree.Add((previousItem.ToString() + "(").AsMemory());
                     tree_cache = null; // The tree has changed, so we need to empty the cache which will be rebuilt if the property 'Tree' is used
                 }
                 stepback.BlockDepth = block_depth++;
                 stepback.PrevItem = previousItem;
-                previousItem = "";
+                previousItem = ReadOnlyMemory<char>.Empty;
             }
-            else if (token == ")")
+            else if (token.Span.Trim() == ")".AsSpan())
             {
                 if (tree != null)
                 {
-                    stepback.Tree = new List<string>(tree);
+                    stepback.Tree = new List<ReadOnlyMemory<char>>(tree);
                     if (tree.Count > 0)
                     {
                         tree.RemoveAt(tree.Count - 1);

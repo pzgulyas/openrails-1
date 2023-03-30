@@ -267,24 +267,24 @@ namespace Orts.Viewer3D
             STFReader reader = new STFReader(file, false);
             while (!reader.Eof)
             {
-                string token = reader.ReadItem();
-                if (token == "Position")
+                var token = reader.ReadItem();
+                if (token.Span == "Position".AsSpan())
                 {
-                    string name = reader.ReadItem();
+                    var name = reader.ReadItem();
                     int min= -1;
                     int max= -1;
-                    while (token != "}")
+                    while (token.Span != "}".AsSpan())
                     {
                         token = reader.ReadItem();
-                        if (token == "Min")
+                        if (token.Span == "Min".AsSpan())
                             min = reader.ReadInt(-1);
-                        else if (token == "Max")
+                        else if (token.Span == "Max".AsSpan())
                             max = reader.ReadInt(-1);
                     }
                     if (min >= 0 && max >= 0)
                     {
                         float v = .5f * (min + max);
-                        switch (name)
+                        switch (name.ToString())
                         {
                             case "Full Reversed": FullReversed = v; break;
                             case "Neutral": Neutral = v; break;
@@ -308,7 +308,7 @@ namespace Orts.Viewer3D
                             case "Rotary Switch 2-Position 1(OFF)": Rotary2Position1 = v; break;
                             case "Rotary Switch 2-Position 2(DIM)": Rotary2Position2 = v; break;
                             case "Rotary Switch 2-Position 3(FULL)": Rotary2Position3 = v; break;
-                            default: STFException.TraceInformation(reader, "Skipped unknown calibration value " + name); break;
+                            default: STFException.TraceInformation(reader, "Skipped unknown calibration value " + name.ToString()); break;
                         }
                     }
                 }

@@ -66,7 +66,6 @@ namespace Orts.Simulation.RollingStocks.SubSystems.PowerTransmissions
 
         public void Parse(string lowercasetoken, STFReader stf)
         {
-            string temp = "";
             switch (lowercasetoken)
             {
                 case "engine(gearboxnumberofgears": GearBoxNumberOfGears = stf.ReadIntBlock(1); initLevel++; break;
@@ -129,12 +128,12 @@ namespace Orts.Simulation.RollingStocks.SubSystems.PowerTransmissions
                     }
                     break;
                 case "engine(gearboxmaxspeedforgears":
-                    temp = stf.ReadItem();
-                    if (temp == ")")
+                    var temp = stf.ReadItem();
+                    if (temp.Span == ")".AsSpan())
                     {
                         stf.StepBackOneItem();
                     }
-                    if (temp == "(")
+                    if (temp.Span == "(".AsSpan())
                     {
                         GearBoxMaxSpeedForGearsMpS.Clear();
                         for (int i = 0; i < GearBoxNumberOfGears; i++)
@@ -148,11 +147,11 @@ namespace Orts.Simulation.RollingStocks.SubSystems.PowerTransmissions
                 // gearboxmaxtractiveforceforgears purely retained for legacy reasons
                 case "engine(gearboxmaxtractiveforceforgears":
                     temp = stf.ReadItem();
-                    if (temp == ")")
+                    if (temp.Span == ")".AsSpan())
                     {
                         stf.StepBackOneItem();
                     }
-                    if (temp == "(")
+                    if (temp.Span == "(".AsSpan())
                     {
                         GearBoxMaxTractiveForceForGearsN.Clear();
                         for (int i = 0; i < GearBoxNumberOfGears; i++)
@@ -164,11 +163,11 @@ namespace Orts.Simulation.RollingStocks.SubSystems.PowerTransmissions
                 case "engine(ortsgearboxtractiveforceatspeed":
                     MaxTEFound = true;
                     temp = stf.ReadItem();
-                    if (temp == ")")
+                    if (temp.Span == ")".AsSpan())
                     {
                         stf.StepBackOneItem();
                     }
-                    if (temp == "(")
+                    if (temp.Span == "(".AsSpan())
                     {
                         GearBoxTractiveForceAtSpeedN.Clear();
                         for (int i = 0; i < GearBoxNumberOfGears; i++)

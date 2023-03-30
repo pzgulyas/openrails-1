@@ -502,7 +502,7 @@ namespace Orts.Formats.Msts
             stf.MustMatch("(");
             try
             {
-                string sUnits = stf.ReadItem();
+                string sUnits = stf.ReadItem().ToString();
                 // sUnits = sUnits.Replace('/', '?');
                 sUnits = sUnits.Replace('/', '_');
                 Units = (CABViewControlUnits)Enum.Parse(typeof(CABViewControlUnits), sUnits);
@@ -510,7 +510,7 @@ namespace Orts.Formats.Msts
             catch (ArgumentException)
             {
                 stf.StepBackOneItem();
-                STFException.TraceInformation(stf, "Skipped unknown ControlStyle " + stf.ReadItem());
+                STFException.TraceInformation(stf, "Skipped unknown ControlStyle " + stf.ReadItem().ToString());
                 Units = CABViewControlUnits.NONE;
             }
             stf.SkipRestOfBlock();

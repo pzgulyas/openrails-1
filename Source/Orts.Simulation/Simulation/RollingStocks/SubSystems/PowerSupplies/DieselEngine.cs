@@ -959,7 +959,7 @@ namespace Orts.Simulation.RollingStocks.SubSystems.PowerSupplies
             bool end = false;
             while (!end)
             {
-                string lowercasetoken = stf.ReadItem().ToLower();
+                string lowercasetoken = stf.ReadItem().ToString().ToLower();
                 switch (lowercasetoken)
                 {
                     case "idlerpm": IdleRPM = stf.ReadFloatBlock(STFReader.UNITS.None, 0); initLevel |= SettingsFlags.IdleRPM; break;

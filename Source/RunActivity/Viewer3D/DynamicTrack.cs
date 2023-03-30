@@ -297,7 +297,7 @@ namespace Orts.Viewer3D
                         using (STFReader stf = new STFReader(filespec, false))
                         {
                             // "EXPERIMENTAL" header is temporary
-                            if (stf.SimisSignature != "SIMISA@@@@@@@@@@JINX0p0t______")
+                            if (stf.SimisSignature.Span != "SIMISA@@@@@@@@@@JINX0p0t______".AsSpan())
                             {
                                 STFException.TraceWarning(stf, "Invalid header - file will not be processed. Using DEFAULT profile.");
                                 TrackProfile = new TrProfile(viewer); // Default profile if no file

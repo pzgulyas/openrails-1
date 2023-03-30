@@ -282,7 +282,7 @@ namespace Orts.Formats.Msts
 		{
             using (STFReader stf = new STFReader(pathNameExt, false))
             {
-                if (stf.SimisSignature != "SIMISA@@@@@@@@@@JINX0T0t______")
+                if (!MemoryExtensions.Equals(stf.SimisSignature.Span, "SIMISA@@@@@@@@@@JINX0T0t______".AsSpan(), StringComparison.Ordinal))
                 {
                     Trace.TraceWarning("Skipped invalid TSECTION.DAT in route folder");
                     return;

@@ -76,7 +76,7 @@ namespace Tests.Orts.Parsers.Msts
                 Assert.True(reader.EndOfBlock(), "STFReader.EndOfBlock()");
                 Assert.Equal("EmptyFile.stf", reader.FileName);
                 Assert.Equal(1, reader.LineNumber);
-                Assert.Null(reader.SimisSignature);
+                Assert.Equal("", reader.SimisSignature.ToString());
                 // Note, the Debug.Assert() in reader.Tree is already captured by AssertWarnings.Expected.
                 // For the rest, we do not care which exception is being thrown.
                 var exception = Record.Exception(() => reader.Tree);
@@ -96,7 +96,7 @@ namespace Tests.Orts.Parsers.Msts
                 Assert.Equal(0U, reader.ReadHexBlock(null));
                 Assert.Equal(0, reader.ReadInt(null));
                 Assert.Equal(0, reader.ReadIntBlock(null));
-                Assert.Equal("", reader.ReadItem());
+                Assert.Equal("", reader.ReadItem().ToString());
                 Assert.Equal("", reader.ReadString());
                 Assert.Null(reader.ReadStringBlock(null));
                 Assert.Equal(0U, reader.ReadUInt(null));
@@ -131,7 +131,7 @@ namespace Tests.Orts.Parsers.Msts
                 Assert.False(reader.EndOfBlock(), "STFReader.EndOfBlock()");
                 Assert.Equal("EmptyBlock.stf", reader.FileName);
                 Assert.Equal(1, reader.LineNumber);
-                Assert.Null(reader.SimisSignature);
+                Assert.Equal("", reader.SimisSignature.ToString());
                 Assert.Throws<STFException>(() => reader.MustMatch("Something Else"));
                 // We can't rewind the STFReader and it has advanced forward now. :(
             }
@@ -162,7 +162,7 @@ namespace Tests.Orts.Parsers.Msts
                     new STFReader.TokenProcessor("TheBlock", () => { not_called++; })
                 });
                 Assert.True(called == 1, "TokenProcessor for theblock must be called exactly once: called = " + called);
-                Assert.True(not_called == 0, "TokenProcessor for TheBlock must not be called: not_called = " + not_called);
+                //Assert.True(not_called == 0, "TokenProcessor for TheBlock must not be called: not_called = " + not_called); // no lowercasing is done anymore, so this is no longer true.
                 Assert.True(reader.Eof, "STFReader.Eof");
                 Assert.True(reader.EOF(), "STFReader.EOF()");
                 Assert.True(reader.EndOfBlock(), "STFReader.EndOfBlock()");
@@ -206,9 +206,9 @@ namespace Tests.Orts.Parsers.Msts
         {
             using (var reader = new STFReader(new MemoryStream(Encoding.Unicode.GetBytes("Item1 \"Item2\" \"Item\" + \"3\" String1 \"String2\" \"String\" + \"3\"")), "", Encoding.Unicode, false))
             {
-                Assert.Equal("Item1", reader.ReadItem());
-                Assert.Equal("Item2", reader.ReadItem());
-                Assert.Equal("Item3", reader.ReadItem());
+                Assert.Equal("Item1", reader.ReadItem().ToString());
+                Assert.Equal("Item2", reader.ReadItem().ToString());
+                Assert.Equal("Item3", reader.ReadItem().ToString());
                 Assert.Equal("String1", reader.ReadString());
                 Assert.Equal("String2", reader.ReadString());
                 Assert.Equal("String3", reader.ReadString());
@@ -697,7 +697,7 @@ namespace Tests.Orts.Parsers.Msts
                 reader.SkipRestOfBlock();
                 Assert.Equal("wagon(lights()", reader.Tree.ToLower());
 
-                if (reader.ReadItem() == STFReader.EndBlockCommentSentinel)
+                if (reader.ReadItem().ToString() == STFReader.EndBlockCommentSentinel)
                     reader.ReadItem();
                 reader.ReadItem();
                 Assert.Equal("wagon(sound", reader.Tree.ToLower());
@@ -818,7 +818,7 @@ namespace Tests.Orts.Parsers.Msts.StfReader
             AssertWarnings.NotExpected();
             string firstToken = "firsttoken";
             var reader = Create.Reader(firstToken);
-            Assert.Null(reader.SimisSignature);
+            Assert.Equal("", reader.SimisSignature.ToString());
         }
 
 #if NEW_READER
@@ -889,7 +889,7 @@ namespace Tests.Orts.Parsers.Msts.StfReader
             AssertWarnings.NotExpected();
             string item = "sometoken";
             var reader = Create.Reader(item);
-            Assert.Equal(item, reader.ReadItem());
+            Assert.Equal(item, reader.ReadItem().ToString());
         }
 
         [Fact]
@@ -900,7 +900,7 @@ namespace Tests.Orts.Parsers.Msts.StfReader
             foreach (string item in singleItems)
             {
                 var reader = Create.Reader(item);
-                Assert.Equal(item, reader.ReadItem());
+                Assert.Equal(item, reader.ReadItem().ToString());
             }
         }
 
@@ -921,7 +921,7 @@ namespace Tests.Orts.Parsers.Msts.StfReader
                 var reader = Create.Reader(tokenTester.inputString);
                 foreach (string expectedToken in tokenTester.expectedTokens)
                 {
-                    Assert.Equal(expectedToken, reader.ReadItem());
+                    Assert.Equal(expectedToken, reader.ReadItem().ToString());
                 }
             }
         }
@@ -942,7 +942,7 @@ namespace Tests.Orts.Parsers.Msts.StfReader
                 var reader = Create.Reader(tokenTester.inputString);
                 foreach (string expectedToken in tokenTester.expectedTokens)
                 {
-                    Assert.Equal(expectedToken, reader.ReadItem());
+                    Assert.Equal(expectedToken, reader.ReadItem().ToString());
                 }
             }
         }
@@ -967,7 +967,7 @@ namespace Tests.Orts.Parsers.Msts.StfReader
                 var reader = Create.Reader(tokenTester.inputString);
                 foreach (string expectedToken in tokenTester.expectedTokens)
                 {
-                    Assert.Equal(expectedToken, reader.ReadItem());
+                    Assert.Equal(expectedToken, reader.ReadItem().ToString());
                 }
             }
         }
@@ -985,7 +985,7 @@ namespace Tests.Orts.Parsers.Msts.StfReader
                 var reader = Create.Reader(tokenTester.inputString);
                 foreach (string expectedToken in tokenTester.expectedTokens)
                 {
-                    Assert.Equal(expectedToken, reader.ReadItem());
+                    Assert.Equal(expectedToken, reader.ReadItem().ToString());
                 }
             }
         }
@@ -1000,7 +1000,7 @@ namespace Tests.Orts.Parsers.Msts.StfReader
             AssertWarnings.Matching("unexpected.*EOF.*started.*double-quote", () =>
             {
                 var reader = Create.Reader(inputString);
-                returnedItem = reader.ReadItem();
+                returnedItem = reader.ReadItem().ToString();
             });
             Assert.Equal(tokenToBeRead, returnedItem);
         }
@@ -1013,8 +1013,8 @@ namespace Tests.Orts.Parsers.Msts.StfReader
             string followingToken = "following";
             string inputString = String.Format(" {0}\" {1}", tokenToBeRead, followingToken);
             var reader = Create.Reader(inputString);
-            Assert.Equal(tokenToBeRead, reader.ReadItem());
-            Assert.Equal(followingToken, reader.ReadItem());
+            Assert.Equal(tokenToBeRead, reader.ReadItem().ToString());
+            Assert.Equal(followingToken, reader.ReadItem().ToString());
         }
 
         [Fact]
@@ -1033,8 +1033,8 @@ namespace Tests.Orts.Parsers.Msts.StfReader
             AssertWarnings.NotExpected();
             var reader = Create.Reader("lasttoken");
             reader.ReadItem();
-            Assert.Equal(String.Empty, reader.ReadItem());
-            Assert.Equal(String.Empty, reader.ReadItem());
+            Assert.Equal(String.Empty, reader.ReadItem().ToString());
+            Assert.Equal(String.Empty, reader.ReadItem().ToString());
         }
 
         /// <summary>
@@ -1119,7 +1119,7 @@ namespace Tests.Orts.Parsers.Msts.StfReader
             AssertWarnings.NotExpected();
             string inputString = "\"a\" + \"b\"";
             var reader = Create.Reader(inputString);
-            Assert.Equal("ab", reader.ReadItem());
+            Assert.Equal("ab", reader.ReadItem().ToString());
         }
 
         [Fact]
@@ -1128,7 +1128,7 @@ namespace Tests.Orts.Parsers.Msts.StfReader
             AssertWarnings.NotExpected();
             string inputString = "a + b";
             var reader = Create.Reader(inputString);
-            Assert.Equal("a", reader.ReadItem());
+            Assert.Equal("a", reader.ReadItem().ToString());
         }
 
         [Fact]
@@ -1137,7 +1137,7 @@ namespace Tests.Orts.Parsers.Msts.StfReader
             AssertWarnings.NotExpected();
             string inputString = "\"a\" + \"b\" + \"c\"";
             var reader = Create.Reader(inputString);
-            Assert.Equal("abc", reader.ReadItem());
+            Assert.Equal("abc", reader.ReadItem().ToString());
         }
 
         [Fact]
@@ -1150,7 +1150,7 @@ namespace Tests.Orts.Parsers.Msts.StfReader
             AssertWarnings.Matching("started.*double.*quote.*next.*must", () =>
             {
                 var reader = Create.Reader(inputString);
-                result = reader.ReadItem();
+                result = reader.ReadItem().ToString();
             });
             Assert.Equal("a", result);
         }
@@ -1220,7 +1220,7 @@ namespace Tests.Orts.Parsers.Msts.StfReader
             string someTokenAfterBlock = "a";
             var reader = Create.Reader(")" + someTokenAfterBlock);
             reader.SkipRestOfBlock();
-            Assert.Equal(someTokenAfterBlock, reader.ReadItem());
+            Assert.Equal(someTokenAfterBlock, reader.ReadItem().ToString());
         }
 
         [Fact]
@@ -1230,7 +1230,7 @@ namespace Tests.Orts.Parsers.Msts.StfReader
             string someTokenAfterBlock = "a";
             var reader = Create.Reader("b)" + someTokenAfterBlock);
             reader.SkipRestOfBlock();
-            Assert.Equal(someTokenAfterBlock, reader.ReadItem());
+            Assert.Equal(someTokenAfterBlock, reader.ReadItem().ToString());
         }
 
         [Fact]
@@ -1240,7 +1240,7 @@ namespace Tests.Orts.Parsers.Msts.StfReader
             string someTokenAfterBlock = "a";
             var reader = Create.Reader("b(c))" + someTokenAfterBlock);
             reader.SkipRestOfBlock();
-            Assert.Equal(someTokenAfterBlock, reader.ReadItem());
+            Assert.Equal(someTokenAfterBlock, reader.ReadItem().ToString());
         }
 
         [Fact]
@@ -1258,7 +1258,7 @@ namespace Tests.Orts.Parsers.Msts.StfReader
             string someTokenAfterBlock = "a";
             var reader = Create.Reader("(c)" + someTokenAfterBlock);
             reader.SkipBlock();
-            Assert.Equal(someTokenAfterBlock, reader.ReadItem());
+            Assert.Equal(someTokenAfterBlock, reader.ReadItem().ToString());
         }
 
         [Fact]
@@ -1267,7 +1267,7 @@ namespace Tests.Orts.Parsers.Msts.StfReader
             string someTokenAfterBlock = "a";
             var reader = Create.Reader("(c(b)d)" + someTokenAfterBlock);
             reader.SkipBlock();
-            Assert.Equal(someTokenAfterBlock, reader.ReadItem());
+            Assert.Equal(someTokenAfterBlock, reader.ReadItem().ToString());
         }
 
         [Fact]
@@ -1276,7 +1276,7 @@ namespace Tests.Orts.Parsers.Msts.StfReader
             AssertWarnings.NotExpected();
             var reader = Create.Reader(")");
             AssertWarnings.Matching("Found a close.*expected block of data", () => reader.SkipBlock());
-            Assert.Equal(")", reader.ReadItem());
+            Assert.Equal(")", reader.ReadItem().ToString());
         }
 
         [Fact]
@@ -1330,7 +1330,7 @@ namespace Tests.Orts.Parsers.Msts.StfReader
             var reader = Create.Reader(")" + followuptoken + " " + followuptoken); // should be at EOF
 
             Assert.True(reader.EndOfBlock());
-            Assert.Equal(followuptoken, reader.ReadItem());
+            Assert.Equal(followuptoken, reader.ReadItem().ToString());
             Assert.False(reader.EndOfBlock());
         }
     }
@@ -1348,7 +1348,7 @@ namespace Tests.Orts.Parsers.Msts.StfReader
 
             var reader = Create.Reader(matchingToken + " " + someTokenAfterMatch);
             reader.MustMatch(matchingToken);
-            Assert.Equal(someTokenAfterMatch, reader.ReadItem());
+            Assert.Equal(someTokenAfterMatch, reader.ReadItem().ToString());
         }
 
         [Fact]
@@ -1360,7 +1360,7 @@ namespace Tests.Orts.Parsers.Msts.StfReader
 
             var reader = Create.Reader(matchingToken + someTokenAfterMatch);
             reader.MustMatch(matchingToken);
-            Assert.Equal(someTokenAfterMatch, reader.ReadItem());
+            Assert.Equal(someTokenAfterMatch, reader.ReadItem().ToString());
         }
 
         [Fact]
@@ -1372,7 +1372,7 @@ namespace Tests.Orts.Parsers.Msts.StfReader
 
             var reader = Create.Reader(matchingToken + someTokenAfterMatch);
             reader.MustMatch(matchingToken);
-            Assert.Equal(someTokenAfterMatch, reader.ReadItem());
+            Assert.Equal(someTokenAfterMatch, reader.ReadItem().ToString());
         }
 
         [Fact]
@@ -1385,7 +1385,7 @@ namespace Tests.Orts.Parsers.Msts.StfReader
 
             var reader = Create.Reader(matchingTokenOtherCase + " " + someTokenAfterMatch);
             reader.MustMatch(matchingToken);
-            Assert.Equal(someTokenAfterMatch, reader.ReadItem());
+            Assert.Equal(someTokenAfterMatch, reader.ReadItem().ToString());
         }
 
         [Fact]
@@ -1430,7 +1430,7 @@ namespace Tests.Orts.Parsers.Msts.StfReader
             AssertWarnings.NotExpected();
             string someFollowingToken = "b";
             var reader = Create.Reader("comment(a)" + someFollowingToken);
-            Assert.Equal(someFollowingToken, reader.ReadItem());
+            Assert.Equal(someFollowingToken, reader.ReadItem().ToString());
         }
 
         [Fact]
@@ -1439,7 +1439,7 @@ namespace Tests.Orts.Parsers.Msts.StfReader
             AssertWarnings.NotExpected();
             string someFollowingToken = "b";
             var reader = Create.Reader("Comment(a)" + someFollowingToken);
-            Assert.Equal(someFollowingToken, reader.ReadItem());
+            Assert.Equal(someFollowingToken, reader.ReadItem().ToString());
         }
         
         [Fact]
@@ -1448,7 +1448,7 @@ namespace Tests.Orts.Parsers.Msts.StfReader
             AssertWarnings.NotExpected();
             string someFollowingToken = "b";
             STFReader reader = Create.Reader("comment a " + someFollowingToken);
-            Assert.Equal(someFollowingToken, reader.ReadItem());
+            Assert.Equal(someFollowingToken, reader.ReadItem().ToString());
         }
 
         [Fact]
@@ -1457,7 +1457,7 @@ namespace Tests.Orts.Parsers.Msts.StfReader
             AssertWarnings.NotExpected();
             string someFollowingToken = "b";
             var reader = Create.Reader("skip(a)" + someFollowingToken);
-            Assert.Equal(someFollowingToken, reader.ReadItem());
+            Assert.Equal(someFollowingToken, reader.ReadItem().ToString());
         }
 
         [Fact]
@@ -1466,7 +1466,7 @@ namespace Tests.Orts.Parsers.Msts.StfReader
             AssertWarnings.NotExpected();
             string someFollowingToken = "b";
             var reader = Create.Reader("Skip(a)" + someFollowingToken);
-            Assert.Equal(someFollowingToken, reader.ReadItem());
+            Assert.Equal(someFollowingToken, reader.ReadItem().ToString());
         }
 
         [Fact]
@@ -1475,7 +1475,7 @@ namespace Tests.Orts.Parsers.Msts.StfReader
             AssertWarnings.NotExpected();
             string someFollowingToken = "b";
             STFReader reader = Create.Reader("skip a " + someFollowingToken);
-            Assert.Equal(someFollowingToken, reader.ReadItem());
+            Assert.Equal(someFollowingToken, reader.ReadItem().ToString());
         }
 
         [Fact]
@@ -1484,7 +1484,7 @@ namespace Tests.Orts.Parsers.Msts.StfReader
             AssertWarnings.NotExpected();
             string someFollowingToken = "b";
             var reader = Create.Reader("#token(a)" + someFollowingToken);
-            Assert.Equal(someFollowingToken, reader.ReadItem());
+            Assert.Equal(someFollowingToken, reader.ReadItem().ToString());
         }
 
         [Fact]
@@ -1493,7 +1493,7 @@ namespace Tests.Orts.Parsers.Msts.StfReader
             AssertWarnings.NotExpected();
             string someFollowingToken = "b";
             var reader = Create.Reader("#token a " + someFollowingToken);
-            Assert.Equal(someFollowingToken, reader.ReadItem());
+            Assert.Equal(someFollowingToken, reader.ReadItem().ToString());
         }
 
         [Fact]
@@ -1513,7 +1513,7 @@ namespace Tests.Orts.Parsers.Msts.StfReader
             AssertWarnings.NotExpected();
             string someFollowingToken = "b";
             var reader = Create.Reader("_token(a)" + someFollowingToken);
-            Assert.Equal(someFollowingToken, reader.ReadItem());
+            Assert.Equal(someFollowingToken, reader.ReadItem().ToString());
         }
 
         [Fact]
@@ -1522,7 +1522,7 @@ namespace Tests.Orts.Parsers.Msts.StfReader
             AssertWarnings.NotExpected();
             string someFollowingToken = "b";
             var reader = Create.Reader("_token a " + someFollowingToken);
-            Assert.Equal(someFollowingToken, reader.ReadItem());
+            Assert.Equal(someFollowingToken, reader.ReadItem().ToString());
         }
 
         [Fact]
@@ -1531,7 +1531,7 @@ namespace Tests.Orts.Parsers.Msts.StfReader
             AssertWarnings.NotExpected();
             string someFollowingToken = "b";
             var reader = Create.Reader("comment(a comment( c) skip _underscore #hash)" + someFollowingToken);
-            Assert.Equal(someFollowingToken, reader.ReadItem());
+            Assert.Equal(someFollowingToken, reader.ReadItem().ToString());
         }
 
         [Fact]
@@ -1540,7 +1540,7 @@ namespace Tests.Orts.Parsers.Msts.StfReader
             AssertWarnings.NotExpected();
             string someFollowingToken = "b";
             var reader = Create.Reader("comment(a include c )" + someFollowingToken);
-            Assert.Equal(someFollowingToken, reader.ReadItem());
+            Assert.Equal(someFollowingToken, reader.ReadItem().ToString());
         }
     }
     #endregion
@@ -1665,12 +1665,12 @@ namespace Tests.Orts.Parsers.Msts.StfReader
             var reader = Create.Reader(inputString);
             AssertWarnings.Matching("Cannot parse|expecting.*found.*[)]", () => { result = codeDoingReading(reader, default(nullableT)); });
             Assert.Equal(niceDefault, result);
-            Assert.Equal(")", reader.ReadItem());
+            Assert.Equal(")", reader.ReadItem().ToString());
 
             reader = Create.Reader(inputString);
             AssertWarnings.Matching("expecting.*found.*[)]", () => { result = codeDoingReading(reader, someDefault); });
             Assert.Equal(resultDefault, result);
-            Assert.Equal(")", reader.ReadItem());
+            Assert.Equal(")", reader.ReadItem().ToString());
         }
 
         public static void ReturnValue<T>
@@ -1816,7 +1816,7 @@ namespace Tests.Orts.Parsers.Msts.StfReader
             var reader = Create.Reader(inputString);
             result = codeDoingReading(reader, someDefault);
             Assert.Equal(resultDefault, result);
-            Assert.Equal(")", reader.ReadItem());
+            Assert.Equal(")", reader.ReadItem().ToString());
         }
 
         public static void OnEmptyBlockEndReturnGivenDefault<T, nullableT>
@@ -1829,7 +1829,7 @@ namespace Tests.Orts.Parsers.Msts.StfReader
             var reader = Create.Reader(inputString);
             result = codeDoingReading(reader, someDefault);
             Assert.Equal(resultDefault, result);
-            Assert.Equal("a", reader.ReadItem());
+            Assert.Equal("a", reader.ReadItem().ToString());
         }
 
         public static void ReturnValueInBlock<T>
@@ -2693,7 +2693,7 @@ namespace Tests.Orts.Parsers.Msts.StfReader
             reader.ParseBlock(new[] {
                     new STFReader.TokenProcessor("block1", () => { called1++; }),
             });
-            Assert.Equal(followingtoken, reader.ReadItem());
+            Assert.Equal(followingtoken, reader.ReadItem().ToString());
         }
 
         [Fact]

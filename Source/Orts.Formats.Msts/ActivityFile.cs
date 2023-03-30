@@ -521,7 +521,7 @@ namespace Orts.Formats.Msts
                 new STFReader.TokenProcessor("activityrestrictedspeedzones",()=>{ ActivityRestrictedSpeedZones = new ActivityRestrictedSpeedZones(stf); }),   // 27 files. To test, use EUROPE1\ACTIVITIES\lclsrvce.act
             };
             parser.AddRange(ORSpecificDataTokenProcessors(stf));
-            stf.ParseBlock(parser);
+            stf.ParseBlock(parser.ToArray());
         }
 
         // Used for explore in activity mode
@@ -547,7 +547,7 @@ namespace Orts.Formats.Msts
                 ),
             };
             parser.AddRange(ORSpecificDataTokenProcessors(stf));
-            stf.ParseBlock(parser);
+            stf.ParseBlock(parser.ToArray());
         }
 
         private IEnumerable<STFReader.TokenProcessor> ORSpecificDataTokenProcessors(STFReader stf)

@@ -293,7 +293,7 @@ namespace Orts.Simulation.RollingStocks
             stf.MustMatch("(");
             string s;
             
-            while ((s = stf.ReadItem()) != ")")
+            while ((s = stf.ReadItem().ToString()) != ")")
             {
                 var data = new ParticleEmitterData(stf);
                 if (!EffectData.ContainsKey(s))

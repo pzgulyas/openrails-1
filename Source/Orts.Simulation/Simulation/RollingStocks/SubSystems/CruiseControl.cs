@@ -273,7 +273,7 @@ namespace Orts.Simulation.RollingStocks.SubSystems
             stf.MustMatch("(");
             while (!stf.EndOfBlock())
             {
-                switch (stf.ReadItem().ToLower())
+                switch (stf.ReadItem().ToString().ToLower()) /// FIXME: To reduce the number of allocations, convert this whole block to use the STFReader.TokenProcessor, e.g. <see cref="FreightAnimations"/>
                 {
                     case "speedismph": SpeedIsMph = stf.ReadBoolBlock(false); break;
                     case "usethrottleincombinedcontrol": UseThrottleInCombinedControl = stf.ReadBoolBlock(false); break;

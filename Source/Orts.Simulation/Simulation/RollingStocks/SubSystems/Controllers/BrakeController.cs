@@ -298,8 +298,8 @@ namespace Orts.Simulation.RollingStocks.SubSystems.Controllers
                     MaximumValue = stf.ReadFloat(STFReader.UNITS.None, null);
                     StepSize = stf.ReadFloat(STFReader.UNITS.None, null);
                     CurrentValue = stf.ReadFloat(STFReader.UNITS.None, null);
-                    string token = stf.ReadItem(); // s/b numnotches
-                    if (string.Compare(token, "NumNotches", true) != 0) // handle error in gp38.eng where extra parameter provided before NumNotches statement 
+                    var token = stf.ReadItem(); // s/b numnotches
+                    if (MemoryExtensions.CompareTo(token.Span, "NumNotches".AsSpan(), StringComparison.OrdinalIgnoreCase) != 0) // handle error in gp38.eng where extra parameter provided before NumNotches statement 
                         stf.ReadItem();
                     stf.MustMatch("(");
                     stf.ReadInt(null);

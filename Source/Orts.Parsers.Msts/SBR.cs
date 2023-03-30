@@ -35,11 +35,13 @@ namespace Orts.Parsers.Msts
         public TokenID ID;
         public string Label;  // First data item may be a label ( usually a 0 byte )
 
+        static readonly byte[] buffer = new byte[34];
+
         public static SBR Open(string filename)
         {
             Stream fb = new FileStream(filename, FileMode.Open, FileAccess.Read);
 
-            byte[] buffer = new byte[34];
+            Array.Clear(buffer, 0, buffer.Length);
             fb.Read(buffer, 0, 2);
 
             bool unicode = (buffer[0] == 0xFF && buffer[1] == 0xFE);  // unicode header
@@ -189,16 +191,16 @@ namespace Orts.Parsers.Msts
         {
             if (isClosed) return;
 
-            string s = f.ReadItem();
-            string extraData = s;
-            if (s != "")
+            var s = f.ReadItem();
+            var extraData = s;
+            if (s.Length != 0)
             {
                 // we have extra data at the end of the file
-                while (s != "")
+                while (s.Length != 0)
                 {
-                    if (s != ")")  // we'll ignore extra )'s since the files are full of misformed brackets
+                    if (s.Span != ")".AsSpan())  // we'll ignore extra )'s since the files are full of misformed brackets
                     {
-                        TraceWarning("Expected end of file; got '" + s + "'");
+                        TraceWarning("Expected end of file; got '" + s.ToString() + "'");
                         f.Dispose();
                         isClosed = true;
                         return;
@@ -234,9 +236,9 @@ namespace Orts.Parsers.Msts
             UnicodeBlockReader block = new UnicodeBlockReader();
             block.f = f;
 
-            string token = f.ReadItem();
+            var token = f.ReadItem();
 
-            if (token == "(")
+            if (token.Span == "(".AsSpan())
             {
                 // ie 310.eng Line 349  (#_fire temp, fire mass, water mass, boil ...
                 block.ID = TokenID.comment;
@@ -244,9 +246,9 @@ namespace Orts.Parsers.Msts
             }
 
             // parse token
-            block.ID = GetTokenID(token);
+            block.ID = GetTokenID(token.ToString());
 
-            if (token == ")")
+            if (token.Span == ")".AsSpan())
             {
                 TraceWarning("Ignored extra close bracket");
                 return block;
@@ -255,9 +257,9 @@ namespace Orts.Parsers.Msts
             // now look for optional label, ie matrix MAIN ( ....
             token = f.ReadItem();
 
-            if (token != "(")
+            if (token.Span != "(".AsSpan())
             {
-                block.Label = token;
+                block.Label = token.ToString();
                 f.VerifyStartOfBlock();
             }
 
@@ -272,7 +274,7 @@ namespace Orts.Parsers.Msts
         private static void InitTokenTable()
         {
             TokenID[] tokenIDValues = (TokenID[])Enum.GetValues(typeof(TokenID));
-            TokenTable = new Dictionary<string, TokenID>(tokenIDValues.GetLength(0));
+            TokenTable = new Dictionary<string, TokenID>(tokenIDValues.GetLength(0), StringComparer.OrdinalIgnoreCase);
             foreach (TokenID tokenID in tokenIDValues)
             {
                 TokenTable.Add(tokenID.ToString().ToLower(), tokenID);
@@ -284,7 +286,7 @@ namespace Orts.Parsers.Msts
             if (TokenTable == null) InitTokenTable();
 
             TokenID tokenID = 0;
-            if (TokenTable.TryGetValue(token.ToLower(), out tokenID))
+            if (TokenTable.TryGetValue(token, out tokenID))
                 return tokenID;
             else if (string.Compare(token, "SKIP", true) == 0)
                 return TokenID.comment;
@@ -311,16 +313,16 @@ namespace Orts.Parsers.Msts
             int depth = 1;
             while (depth > 0)
             {
-                string token = f.ReadItem();
-                if (token == "")
+                var token = f.ReadItem();
+                if (token.Length == 0)
                 {
                     TraceWarning("Unexpected end of file");
                     atEndOfBlock = true;
                     return;
                 }
-                if (token == "(")
+                if (token.Span == "(".AsSpan())
                     ++depth;
-                if (token == ")")
+                if (token.Span == ")".AsSpan())
                     --depth;
             }
             atEndOfBlock = true;
@@ -340,16 +342,16 @@ namespace Orts.Parsers.Msts
         {
             if (!atEndOfBlock)
             {
-                string s = f.ReadItem();
-                if (s.StartsWith("#") || 0 == string.Compare(s, "comment", true))
+                var s = f.ReadItem();
+                if (s.Span.StartsWith("#".AsSpan()) || 0 == MemoryExtensions.CompareTo(s.Span, "comment".AsSpan(), StringComparison.OrdinalIgnoreCase))
                 {
                     // allow comments at end of block ie
                     // MaxReleaseRate( 1.4074  #For train position 31-45  use (1.86 - ( 0.0146 * 31 ))	)
                     Skip();
                     return;
                 }
-                if (s != ")")
-                    TraceWarning("Expected end of block; got '" + s + "'");
+                if (s.Span != ")".AsSpan())
+                    TraceWarning("Expected end of block; got '" + s.ToString() + "'");
 
                 atEndOfBlock = true;
             }
@@ -359,7 +361,7 @@ namespace Orts.Parsers.Msts
         public override int ReadInt() { return f.ReadInt(null); }
         public override uint ReadUInt() { return f.ReadUInt(null); }
         public override float ReadFloat() { return f.ReadFloat(STFReader.UNITS.None, null); }
-        public override string ReadString() { return f.ReadItem(); }
+        public override string ReadString() { return f.ReadItem().ToString(); }
 
         public override void TraceInformation(string message)
         {
@@ -463,7 +465,8 @@ namespace Orts.Parsers.Msts
                     TraceWarning("Remaining Bytes overflow");
                     RemainingBytes = 1000;
                 }
-                InputStream.ReadBytes((int)RemainingBytes);
+                Span<byte> discard = stackalloc byte[(int)RemainingBytes];
+                discard = InputStream.ReadBytes((int)RemainingBytes);
 
                 RemainingBytes = 0;
             }
