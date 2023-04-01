@@ -34,6 +34,7 @@ using System.Runtime.InteropServices;
 using System.Threading;
 using System.Windows.Forms;
 using Path = ORTS.Menu.Path;
+using Activity = ORTS.Menu.Activity;
 
 namespace ORTS
 {

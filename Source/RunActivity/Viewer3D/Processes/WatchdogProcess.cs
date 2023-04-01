@@ -282,7 +282,7 @@ namespace Orts.Viewer3D.Processes
             Thread.Suspend();
             try
             {
-                return new StackTrace(Thread, true);
+                return new StackTrace();// (Thread, true);
             }
             finally
             {

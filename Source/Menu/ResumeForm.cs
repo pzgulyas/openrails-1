@@ -62,6 +62,7 @@ using ORTS.Common;
 using ORTS.Menu;
 using ORTS.Settings;
 using Path = System.IO.Path;
+using Activity = ORTS.Menu.Activity;
 
 namespace ORTS
 {
