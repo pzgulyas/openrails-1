@@ -546,7 +546,7 @@ namespace Orts.Parsers.Msts
             if (item.Length == 0)
                 return 0x0;
             uint val;
-            if (uint.TryParse(item.ToString(), parseHex, parseNFI, out val)) return val;
+            if (uint.TryParse(item.Span, parseHex, parseNFI, out val)) return val;
             STFException.TraceWarning(this, "Cannot parse the constant hex string " + item.ToString());
             if (item.Span == ")".AsSpan()) StepBackOneItem();
             return defaultValue.GetValueOrDefault(0);
@@ -569,7 +569,7 @@ namespace Orts.Parsers.Msts
             int val;
             if (item.Length == 0) return 0;
             if (item.Span[item.Length - 1] == ',') item = item.Slice(0, item.Length - 1);
-            if (int.TryParse(item.ToString(), parseNum, parseNFI, out val)) return val;
+            if (int.TryParse(item.Span, parseNum, parseNFI, out val)) return val;
             STFException.TraceWarning(this, "Cannot parse the constant number " + item.ToString());
             if (item.Span == ")".AsSpan()) StepBackOneItem();
             return defaultValue.GetValueOrDefault(0);
@@ -592,7 +592,7 @@ namespace Orts.Parsers.Msts
             uint val;
             if (item.Length == 0) return 0;
             if (item.Span[item.Length - 1] == ',') item = item.Slice(0, item.Length - 1);
-            if (uint.TryParse(item.ToString(), parseNum, parseNFI, out val)) return val;
+            if (uint.TryParse(item.Span, parseNum, parseNFI, out val)) return val;
 
             STFException.TraceWarning(this, "Cannot parse the constant number " + item.ToString());
             if (item.Span == ")".AsSpan()) StepBackOneItem();
@@ -622,7 +622,7 @@ namespace Orts.Parsers.Msts
             double scale = ParseUnitSuffix(ref item, validUnits);
             if (item.Length == 0) return 0.0f;
             if (item.Span[item.Length - 1] == ',') item = item.Slice(0, item.Length - 1);
-            if (float.TryParse(item.ToString(), parseNum, parseNFI, out val)) return (scale == 1) ? val : (float)(scale * val);
+            if (float.TryParse(item.Span, parseNum, parseNFI, out val)) return (scale == 1) ? val : (float)(scale * val);
             STFException.TraceWarning(this, "Cannot parse the constant number " + item.ToString());
             if (item.Span == ")".AsSpan()) StepBackOneItem();
             return defaultValue.GetValueOrDefault(0);
@@ -646,7 +646,7 @@ namespace Orts.Parsers.Msts
             double val;
             if (item.Length == 0) return 0.0;
             if (item.Span[item.Length - 1] == ',') item = item.Slice(0, item.Length - 1);
-            if (double.TryParse(item.ToString(), parseNum, parseNFI, out val)) return val;
+            if (double.TryParse(item.Span, parseNum, parseNFI, out val)) return val;
             STFException.TraceWarning(this, "Cannot parse the constant number " + item.ToString());
             if (item.Span == ")".AsSpan()) StepBackOneItem();
             return defaultValue.GetValueOrDefault(0);
@@ -1368,7 +1368,7 @@ namespace Orts.Parsers.Msts
                     case ReadOnlyMemory<char> sz when MemoryExtensions.Equals(sz.Span, ")".AsSpan(), StringComparison.OrdinalIgnoreCase): return defaultValue;
                     default:
                         int v;
-                        if (int.TryParse(s.ToString(), NumberStyles.Any, parseNFI, out v))
+                        if (int.TryParse(s.Span, NumberStyles.Any, parseNFI, out v))
                         {
                             defaultValue = (v != 0);
                         }
