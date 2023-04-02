@@ -915,7 +915,7 @@ namespace Orts.MultiPlayer
                     using (var stf = new STFReader(simulator.BasePath + "\\trains\\trainset\\" + name, false))
                         stf.ParseFile(new STFReader.TokenProcessor[] {
                             new STFReader.TokenProcessor("wagon", ()=>{
-                                stf.ReadString();
+                                stf.SkipString();
                                 stf.ParseBlock(new STFReader.TokenProcessor[] {
                                     new STFReader.TokenProcessor("size", ()=>{ def = stf.ReadVector3Block(STFReader.UNITS.Distance, def); }),
                                 });

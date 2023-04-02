@@ -520,6 +520,14 @@ namespace Orts.Parsers.Msts
             return ReadItem(true).ToString();
         }
 
+        /// <summary>
+        /// Allocation free string skipping, to be used in places where the string result is discarded anyways.
+        /// </summary>
+        public void SkipString()
+        {
+            ReadItem(true);
+        }
+
         /// <summary>Read an hexidecimal encoded number {constant_item}
         /// </summary>
         /// <param name="defaultValue">the default value if an unexpected ')' token is found</param>

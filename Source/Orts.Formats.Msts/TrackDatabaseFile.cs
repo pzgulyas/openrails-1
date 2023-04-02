@@ -585,7 +585,7 @@ namespace Orts.Formats.Msts
         {
             Idx = idx;
             stf.MustMatch("(");
-            stf.ReadString();
+            stf.SkipString();
             ShapeIndex = stf.ReadUInt(null);
             stf.SkipRestOfBlock();
         }
@@ -808,7 +808,7 @@ namespace Orts.Formats.Msts
             WorldFileUiD = stf.ReadUInt(null); // UID in worldfile
             Flag1 = stf.ReadInt(null); // 0
             Flag2 = stf.ReadInt(null); // 1
-            stf.ReadString(); // 00 
+            stf.SkipString(); // 00 
             TileX = stf.ReadInt(null);
             TileZ = stf.ReadInt(null);
             X = stf.ReadFloat(STFReader.UNITS.None, null);

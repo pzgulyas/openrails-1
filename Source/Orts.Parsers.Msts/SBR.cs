@@ -21,6 +21,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Runtime.InteropServices;
 using System.Text;
 
 namespace Orts.Parsers.Msts
@@ -246,7 +247,7 @@ namespace Orts.Parsers.Msts
             }
 
             // parse token
-            block.ID = GetTokenID(token.ToString());
+            block.ID = GetTokenID(token);
 
             if (token.Span == ")".AsSpan())
             {
@@ -259,7 +260,8 @@ namespace Orts.Parsers.Msts
 
             if (token.Span != "(".AsSpan())
             {
-                block.Label = token.ToString();
+                if (token.Length > 0)
+                    block.Label = token.ToString();
                 f.VerifyStartOfBlock();
             }
 
@@ -269,30 +271,31 @@ namespace Orts.Parsers.Msts
         /// <summary>
         /// Used to convert token string to their equivalent enum TokenID
         /// </summary>
-        private static Dictionary<string, TokenID> TokenTable;
+        private static Dictionary<ReadOnlyMemory<char>, TokenID> TokenTable;
 
         private static void InitTokenTable()
         {
             TokenID[] tokenIDValues = (TokenID[])Enum.GetValues(typeof(TokenID));
-            TokenTable = new Dictionary<string, TokenID>(tokenIDValues.GetLength(0), StringComparer.OrdinalIgnoreCase);
+            TokenTable = new Dictionary<ReadOnlyMemory<char>, TokenID>(tokenIDValues.GetLength(0));
             foreach (TokenID tokenID in tokenIDValues)
             {
-                TokenTable.Add(tokenID.ToString().ToLower(), tokenID);
+                TokenTable.Add(tokenID.ToString().ToLower().AsMemory(), tokenID);
             }
         }
 
-        private TokenID GetTokenID(string token)
+        private TokenID GetTokenID(ReadOnlyMemory<char> token)
         {
             if (TokenTable == null) InitTokenTable();
 
-            TokenID tokenID = 0;
-            if (TokenTable.TryGetValue(token, out tokenID))
-                return tokenID;
-            else if (string.Compare(token, "SKIP", true) == 0)
+            foreach (var key in TokenTable.Keys)
+                if (MemoryExtensions.Equals(key.Span, token.Span, StringComparison.OrdinalIgnoreCase))
+                    return TokenTable[key];
+
+            if (MemoryExtensions.CompareTo(token.Span, "SKIP".AsSpan(), StringComparison.OrdinalIgnoreCase) == 0)
                 return TokenID.comment;
-            else if (string.Compare(token, "COMMENT", true) == 0)
+            else if (MemoryExtensions.CompareTo(token.Span, "COMMENT".AsSpan(), StringComparison.OrdinalIgnoreCase) == 0)
                 return TokenID.comment;
-            else if (token.StartsWith("#"))
+            else if (token.Span.StartsWith("#"))
                 return TokenID.comment;
             else
             {
@@ -395,24 +398,25 @@ namespace Orts.Parsers.Msts
         public BinaryFileReader(Stream inputStream, string filename, int tokenOffset)
         {
             Filename = filename;
-            InputStream = new BinaryReader(inputStream);
+            InputStream = inputStream;
             TokenOffset = tokenOffset;
         }
 
         public override void Skip()
         {
-            while (!EndOfBlock())
-                InputStream.ReadByte();
+            var b = 1;
+            while (b > 0)
+                b = InputStream.Read(Bytes, 0, Bytes.Length); // InputStream.ReadByte() causes byte[] allocation, don't use that here.
         }
 
         public override bool EndOfBlock()
         {
-            return InputStream.PeekChar() == -1;
+            return InputStream.Position >= InputStream.Length;
         }
 
         public override void VerifyEndOfBlock()
         {
-            if (!EndOfBlock())
+            if (InputStream.ReadByte() != -1)
                 TraceWarning("Expected end of file; got more data");
             InputStream.Close();
         }
@@ -424,10 +428,11 @@ namespace Orts.Parsers.Msts
     public class BinaryBlockReader : SBR
     {
         public string Filename;  // for error reporting
-        public BinaryReader InputStream;
+        public Stream InputStream;
         public uint RemainingBytes;  // number of bytes in this block not yet read from the stream
         public uint Flags;
         protected int TokenOffset;     // the binaryTokens are offset by this amount, ie for binary world files 
+        protected static readonly byte[] Bytes = new byte[1024]; // length must be min. 512
 
         public override SBR ReadSubBlock()
         {
@@ -437,40 +442,32 @@ namespace Orts.Parsers.Msts
             block.InputStream = InputStream;
             block.TokenOffset = TokenOffset;
 
-            int MSTSToken = InputStream.ReadUInt16();
+            // Anything other than Stream.Read() (like e.g. Stream.ReadByte()) causes allocation, which is undesirable here.
+            RemainingBytes -= (uint)InputStream.Read(Bytes, 0, 8); // UInt16 + UInt16 + UInt32
+            var ushorts = MemoryMarshal.Cast<byte, ushort>(Bytes.AsSpan().Slice(0, 4));
+            var MSTSToken = ushorts[0];
+            block.Flags = ushorts[1];
+            block.RemainingBytes = MemoryMarshal.Cast<byte, uint>(Bytes.AsSpan().Slice(4, 4))[0];
             block.ID = (TokenID)(MSTSToken + TokenOffset);
-            block.Flags = InputStream.ReadUInt16();
-            block.RemainingBytes = InputStream.ReadUInt32(); // record length
 
-            uint blockSize = block.RemainingBytes + 8; //for the header
-            RemainingBytes -= blockSize;
+            RemainingBytes -= block.RemainingBytes;
 
-            int labelLength = InputStream.ReadByte();
-            block.RemainingBytes -= 1;
+            block.RemainingBytes -= (uint)InputStream.Read(Bytes, 0, 1);
+            int labelLength = Bytes[0];
             if (labelLength > 0)
             {
-                byte[] buffer = InputStream.ReadBytes(labelLength * 2);
-                block.Label = System.Text.Encoding.Unicode.GetString(buffer, 0, labelLength * 2);
-                block.RemainingBytes -= (uint)labelLength * 2;
+                block.RemainingBytes -= (uint)InputStream.Read(Bytes, 0, labelLength * 2);
+                block.Label = System.Text.Encoding.Unicode.GetString(Bytes, 0, labelLength * 2);
             }
             return block;
         }
 
         public override void Skip()
         {
-            if (RemainingBytes > 0)
-            {
-                if (RemainingBytes > Int32.MaxValue)
-                {
-                    TraceWarning("Remaining Bytes overflow");
-                    RemainingBytes = 1000;
-                }
-                Span<byte> discard = stackalloc byte[(int)RemainingBytes];
-                discard = InputStream.ReadBytes((int)RemainingBytes);
-
-                RemainingBytes = 0;
-            }
+            while (RemainingBytes > 0)
+                RemainingBytes -= (uint)InputStream.Read(Bytes, 0, (int)Math.Min(Bytes.Length, RemainingBytes));
         }
+
         public override bool EndOfBlock()
         {
             return RemainingBytes == 0;
@@ -485,24 +482,30 @@ namespace Orts.Parsers.Msts
             }
         }
 
-        public override uint ReadFlags() { RemainingBytes -= 4; return InputStream.ReadUInt32(); }
-        public override int ReadInt() { RemainingBytes -= 4; return InputStream.ReadInt32(); }
-        public override uint ReadUInt() { RemainingBytes -= 4; return InputStream.ReadUInt32(); }
-        public override float ReadFloat() { RemainingBytes -= 4; return InputStream.ReadSingle(); }
+        public override uint ReadFlags() { RemainingBytes -= (uint)InputStream.Read(Bytes, 0, 4); return MemoryMarshal.Cast<byte, uint>(Bytes.AsSpan().Slice(0, 4))[0]; }
+        public override int ReadInt() { RemainingBytes -= (uint)InputStream.Read(Bytes, 0, 4); return MemoryMarshal.Cast<byte, int>(Bytes.AsSpan().Slice(0, 4))[0]; }
+        public override uint ReadUInt() { RemainingBytes -= (uint)InputStream.Read(Bytes, 0, 4); return MemoryMarshal.Cast<byte, uint>(Bytes.AsSpan().Slice(0, 4))[0]; }
+        public override float ReadFloat() { RemainingBytes -= (uint)InputStream.Read(Bytes, 0, 4); return MemoryMarshal.Cast<byte, float>(Bytes.AsSpan().Slice(0, 4))[0]; }
+        public ushort ReadUInt16() { RemainingBytes -= (uint)InputStream.Read(Bytes, 0, 2); return MemoryMarshal.Cast<byte, ushort>(Bytes.AsSpan().Slice(0, 2))[0]; }
         public override string ReadString()
         {
-            ushort count = InputStream.ReadUInt16();
+            string s = "";
+            ushort count = ReadUInt16();
             if (count > 0)
             {
-                byte[] b = InputStream.ReadBytes(count * 2);
-                string s = System.Text.Encoding.Unicode.GetString(b);
-                RemainingBytes -= (uint)(count * 2 + 2);
-                return s;
+                if (count * 2 < Bytes.Length)
+                {
+                    RemainingBytes -= (uint)InputStream.Read(Bytes, 0, count * 2);
+                    s = System.Text.Encoding.Unicode.GetString(Bytes, 0, count * 2);
+                }
+                else
+                {
+                    var b = new byte[count * 2]; // var b = (Span<byte>)stackalloc byte[count * 2]; in .NET6
+                    RemainingBytes -= (uint)InputStream.Read(b);
+                    s = System.Text.Encoding.Unicode.GetString(b);
+                }
             }
-            else
-            {
-                return "";
-            }
+            return s;
         }
 
         public override void TraceInformation(string message)
@@ -525,16 +528,16 @@ namespace Orts.Parsers.Msts
     {
         public static void TraceWarning(BinaryBlockReader sbr, string message)
         {
-            Trace.TraceWarning("{2} in {0}:byte {1}", sbr.Filename, sbr.InputStream.BaseStream.Position, message);
+            Trace.TraceWarning("{2} in {0}:byte {1}", sbr.Filename, sbr.InputStream.Position, message);
         }
 
         public static void TraceInformation(BinaryBlockReader sbr, string message)
         {
-            Trace.TraceInformation("{2} in {0}:byte {1}", sbr.Filename, sbr.InputStream.BaseStream.Position, message);
+            Trace.TraceInformation("{2} in {0}:byte {1}", sbr.Filename, sbr.InputStream.Position, message);
         }
 
         public SBRException(BinaryBlockReader sbr, string message)
-            : base(String.Format("{2} in {0}:byte {1}\n", sbr.Filename, sbr.InputStream.BaseStream.Position, message))
+            : base(String.Format("{2} in {0}:byte {1}\n", sbr.Filename, sbr.InputStream.Position, message))
         {
         }
     }

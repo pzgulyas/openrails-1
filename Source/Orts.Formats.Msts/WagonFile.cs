@@ -35,7 +35,7 @@ namespace Orts.Formats.Msts
             using (var stf = new STFReader(filePath, false))
                 stf.ParseFile(new STFReader.TokenProcessor[] {
                     new STFReader.TokenProcessor("wagon", ()=>{
-                        stf.ReadString();
+                        stf.SkipString();
                         stf.ParseBlock(new STFReader.TokenProcessor[] {
                             new STFReader.TokenProcessor("name", ()=>{ Name = stf.ReadStringBlock(null); }),
                         });

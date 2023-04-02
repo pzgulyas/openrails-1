@@ -51,7 +51,7 @@ namespace Orts.Formats.Msts
 
             public SDShape(STFReader stf)
             {
-                stf.ReadString(); // Ignore the filename string. TODO: Check if it agrees with the SD file name? Is this important?
+                stf.SkipString(); // Ignore the filename string. TODO: Check if it agrees with the SD file name? Is this important?
                 stf.ParseBlock(new STFReader.TokenProcessor[] {
                     new STFReader.TokenProcessor("esd_detail_level", ()=>{ ESD_Detail_Level = stf.ReadIntBlock(null); }),
                     new STFReader.TokenProcessor("esd_alternative_texture", ()=>{ ESD_Alternative_Texture = stf.ReadIntBlock(null); }),
