@@ -99,5 +99,7 @@ namespace Orts.Simulation.Signalling
         {
             ObjectState = thisState;
         }
+
+        public static readonly ObjectItemInfo None = new ObjectItemInfo(ObjectItemFindState.None);
     }
 }

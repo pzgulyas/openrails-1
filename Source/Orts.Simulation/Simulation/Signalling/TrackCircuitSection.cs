@@ -101,6 +101,8 @@ namespace Orts.Simulation.Signalling
 
         public List<troughInfoData[]> TroughInfo = null;          // full trough info data
 
+        readonly Dictionary<Train, float> TrainAheadResult = new Dictionary<Train, float>();
+
         public TrackCircuitSection(TrackNode thisNode, int orgINode, TrackSectionsFile tsectiondat, Signals thisSignals)
         {
             // Copy general info
@@ -1768,13 +1770,13 @@ namespace Orts.Simulation.Signalling
                 }
             }
 
-            Dictionary<Train, float> result = new Dictionary<Train, float>();
+            TrainAheadResult.Clear();
             if (trainFound != null)
                 if (distanceTrainAheadM >= offset) // train is indeed ahead
                 {
-                    result.Add(trainFound, (distanceTrainAheadM - offset));
+                    TrainAheadResult.Add(trainFound, (distanceTrainAheadM - offset));
                 }
-            return (result);
+            return (TrainAheadResult);
         }
 
         /// <summary>

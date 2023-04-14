@@ -4121,8 +4121,12 @@ namespace Orts.Simulation.Signalling
 
         public bool HasLockForTrain(int trainNumber, int subpath = 0)
         {
-            bool info = LockedTrains.Count > 0 && LockedTrains.Exists(item => item.Key.Equals(trainNumber) && item.Value.Equals(subpath));
-            return info;
+            foreach (var lockedTrain in  LockedTrains)
+            {
+                if (lockedTrain.Key == trainNumber && lockedTrain.Value == subpath)
+                    return true;
+            }
+            return false;
         }
 
         public bool CleanAllLock(int trainNumber)

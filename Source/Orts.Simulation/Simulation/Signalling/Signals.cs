@@ -1245,7 +1245,6 @@ namespace Orts.Simulation.Signalling
             float lengthOffset = routePosition;
 
             SignalObject foundObject = null;
-            TrackCircuitSignalItem thisItem = null;
 
             // loop through trackcircuits until :
             //  - end of track or route is found
@@ -1373,16 +1372,7 @@ namespace Orts.Simulation.Signalling
                 }
             }
 
-            if (foundObject != null)
-            {
-                thisItem = new TrackCircuitSignalItem(foundObject, totalLength);
-            }
-            else
-            {
-                thisItem = new TrackCircuitSignalItem(locstate);
-            }
-
-            return thisItem;
+            return foundObject != null ? new TrackCircuitSignalItem(foundObject, totalLength) : new TrackCircuitSignalItem(locstate);
         }
 
         /// <summary>
@@ -1417,7 +1407,7 @@ namespace Orts.Simulation.Signalling
                     int routeIndex, float routePosition, float maxDistance, ObjectItemInfo.ObjectItemType req_type,
                     Train.TCPosition thisPosition)
         {
-            TrackCircuitSignalItem foundItem = null;
+            TrackCircuitSignalItem foundItem = new TrackCircuitSignalItem(ObjectItemInfo.ObjectItemFindState.None);
 
             bool findSignal = false;
             bool findSpeedpost = false;
@@ -1538,9 +1528,9 @@ namespace Orts.Simulation.Signalling
 
             ObjectItemInfo returnItem = null;
 
-            if (foundItem == null)
+            if (foundItem.SignalState == ObjectItemInfo.ObjectItemFindState.None)
             {
-                returnItem = new ObjectItemInfo(ObjectItemInfo.ObjectItemFindState.None);
+                returnItem = ObjectItemInfo.None;
             }
             else if (foundItem.SignalState != ObjectItemInfo.ObjectItemFindState.Object)
             {
@@ -1595,9 +1585,9 @@ namespace Orts.Simulation.Signalling
             }
 
             ObjectItemInfo returnItem;
-            if (nextSignal == null)
+            if (nextSignal.SignalState == ObjectItemInfo.ObjectItemFindState.None)
             {
-                returnItem = new ObjectItemInfo(ObjectItemInfo.ObjectItemFindState.None);
+                returnItem = ObjectItemInfo.None;
             }
             else if (nextSignal.SignalState != ObjectItemInfo.ObjectItemFindState.Object)
             {
@@ -2524,8 +2514,7 @@ namespace Orts.Simulation.Signalling
                     }
                     else
                     {
-                        thisSignal.SignalLocation -= newSection.Length;
-                        replSigList.TrackCircuitItem.Add(thisSignal);
+                        replSigList.TrackCircuitItem.Add(new TrackCircuitSignalItem(thisSignal.SignalRef, thisSignal.SignalLocation - newSection.Length));
                     }
                 }
             }
@@ -2541,8 +2530,7 @@ namespace Orts.Simulation.Signalling
                     float sigLocation = thisSignal.SignalLocation;
                     if (sigLocation > replSection.Length)
                     {
-                        thisSignal.SignalLocation -= replSection.Length;
-                        newSigList.TrackCircuitItem.Add(thisSignal);
+                        newSigList.TrackCircuitItem.Add(new TrackCircuitSignalItem(thisSignal.SignalRef, thisSignal.SignalLocation - replSection.Length));
                     }
                     else
                     {
@@ -2566,8 +2554,7 @@ namespace Orts.Simulation.Signalling
                 }
                 else
                 {
-                    thisSpeedpost.SignalLocation -= newSection.Length;
-                    replSpeedList.TrackCircuitItem.Add(thisSpeedpost);
+                    replSpeedList.TrackCircuitItem.Add(new TrackCircuitSignalItem(thisSpeedpost.SignalRef, thisSpeedpost.SignalLocation - newSection.Length));
                 }
             }
 
@@ -2580,8 +2567,7 @@ namespace Orts.Simulation.Signalling
                 float sigLocation = thisSpeedpost.SignalLocation;
                 if (sigLocation > replSection.Length)
                 {
-                    thisSpeedpost.SignalLocation -= replSection.Length;
-                    newSpeedList.TrackCircuitItem.Add(thisSpeedpost);
+                    newSpeedList.TrackCircuitItem.Add(new TrackCircuitSignalItem(thisSpeedpost.SignalRef, thisSpeedpost.SignalLocation - replSection.Length));
                 }
                 else
                 {

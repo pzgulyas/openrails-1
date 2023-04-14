@@ -17,7 +17,7 @@
 
 namespace Orts.Simulation.Signalling
 {
-    public class TrackCircuitSignalItem
+    public struct TrackCircuitSignalItem
     {
         public ObjectItemInfo.ObjectItemFindState SignalState;  // returned state // 
         public SignalObject SignalRef;            // related SignalObject     //
@@ -39,6 +39,8 @@ namespace Orts.Simulation.Signalling
         public TrackCircuitSignalItem(ObjectItemInfo.ObjectItemFindState thisState)
         {
             SignalState = thisState;
+            SignalRef = null;
+            SignalLocation = 0;
         }
     }
 }
