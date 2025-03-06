@@ -35,7 +35,6 @@ namespace Orts.Simulation.RollingStocks.SubSystems.Brakes.MSTS
     {
         protected readonly static float OneAtmospherePSI = Bar.ToPSI(1);
         protected float MaxForcePressurePSI = KPa.ToPSI(KPa.FromInHg(21));    // relative pressure difference for max brake force
-        protected TrainCar Car;
         protected float HandbrakePercent;
         protected float CylPressurePSIA;
         // Commented out as never used

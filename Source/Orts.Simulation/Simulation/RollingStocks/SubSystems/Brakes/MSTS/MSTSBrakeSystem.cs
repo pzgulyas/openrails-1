@@ -40,10 +40,34 @@ namespace Orts.Simulation.RollingStocks.SubSystems.Brakes.MSTS
             }
         }
 
-        public abstract void Parse(string lowercasetoken, STFReader stf);
+        protected TrainCar Car;
+        public string BrakeMode { get; protected set; }
 
         public abstract void Update(float elapsedClockSeconds);
 
         public abstract void InitializeFromCopy(BrakeSystem copy);
+
+        public virtual void Parse(string lowercasetoken, STFReader stf)
+        {
+            switch (lowercasetoken)
+            {
+                case "wagon(ortsbrakemodename": BrakeMode = stf.ReadStringBlock("Base"); break;
+                case "wagon(ortsbrakemode":
+                    MSTSBrakeSystem newSystem = null;
+                    if (this is AirSinglePipe)
+                    {
+                        newSystem = new AirSinglePipe(Car);
+                        (newSystem as AirSinglePipe).InitializeDefault();
+                    }
+                    else if (this is AirTwinPipe)
+                        newSystem = new AirTwinPipe(Car);
+                    else if (this is VacuumSinglePipe)
+                        newSystem = new VacuumSinglePipe(Car);
+                    newSystem?.Parse(lowercasetoken, stf);
+                    if (!Car.BrakeSystems.ContainsKey(BrakeMode) && newSystem != null)
+                        Car.BrakeSystems.Add(newSystem.BrakeMode, newSystem);
+                    break;
+            }
+        }
     }
 }

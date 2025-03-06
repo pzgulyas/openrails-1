@@ -33,6 +33,31 @@ namespace Orts.Simulation.RollingStocks.SubSystems.Brakes
         SupplyReservoir
     }
 
+    public enum BrakeModes
+    {
+        G, // Goods
+        P, // Passanger
+        R, // Rapid
+        R_Mg, // Rapid with Magnetic Track Brakes
+        RR, // Rapid with accelerator
+        RR_Mg, // Rapid with accelerator and Magnetic Track Brakes
+        T, // Passanger railcar
+        EP, // Electro-Pneumatic
+        AF, // Air Fitted
+        AU, // Air Unfitted
+        LE, // Light Engine
+        PL, // Passanger Long train
+        PS, // Passanger Short train
+        VB, // Vacuum Brakes
+        VF, // Vacuum Fitted
+        VU, // Vacuum Unbraked
+    }
+    public enum FrictionType
+    {
+        Clasp,
+        Disc,
+    }
+
     public abstract class BrakeSystem
     {
         public float BrakeLine1PressurePSI = 90;    // main trainline pressure at this car

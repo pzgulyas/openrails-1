@@ -32,7 +32,6 @@ namespace Orts.Simulation.RollingStocks.SubSystems.Brakes.MSTS
 {
     public class AirSinglePipe : MSTSBrakeSystem
     {
-        protected TrainCar Car;
         readonly static float OneAtmospherePSI = 14.696f;
         protected float HandbrakePercent;
         protected float CylPressurePSI = 64;
@@ -190,7 +189,39 @@ namespace Orts.Simulation.RollingStocks.SubSystems.Brakes.MSTS
                 (Car as MSTSWagon).RetainerPositions = 4;
         }
 
-        public void InitializePedefinedSystem(string type, BrakeMode mode, FrictionType frictionType)
+        /// <summary>
+        /// Initialize a subsystems diff. Everything set to default for being possible to detect the changes.
+        /// </summary>
+        public void InitializeDefault()
+        {
+            BrakePipeVolumeM3 = default;
+            AutoCylPressurePSI = default;
+            AuxResPressurePSI = default;
+            EmergResPressurePSI = default;
+            SupplyResPressurePSI = default;
+            ControlResPressurePSI = default;
+            FullServPressurePSI = default;
+            EmergResVolumeM3 = default;
+            ReleaseRatePSIpS = default;
+            MaxReleaseRatePSIpS = default;
+            MaxApplicationRatePSIpS = default;
+            MaxAuxilaryChargingRatePSIpS = default;
+            BrakeInsensitivityPSIpS = default;
+            EmergencyDumpValveTimerS = default;
+            EmergResChargingRatePSIpS = default;
+            EmergAuxVolumeRatio = default;
+            RelayValveRatio = default;
+            RelayValveApplicationRatePSIpS = default;
+            RelayValveReleaseRatePSIpS = default;
+            CylStrokeM = default;
+            CylCount = default;
+            UniformChargingThresholdPSI = default;
+            UniformReleaseThresholdPSI = default;
+            AcceleratedApplicationLimitPSIpS = default;
+            AcceleratedEmergencyReleaseThresholdPSI = default;
+        }
+
+        public void InitializePedefinedSystem(string type, BrakeModes mode, FrictionType frictionType)
         {
             if (type == "KnorrKE") // With disc brakes
             {
@@ -198,7 +229,7 @@ namespace Orts.Simulation.RollingStocks.SubSystems.Brakes.MSTS
                 ReferencePressurePSI = frictionType == FrictionType.Disc ? Bar.ToPSI(3) : Bar.ToPSI(1.7f); // ORTSBrakeForceReferencePressure (), P mode
                 // Clasp brakes: 1.7 bar empty, 3.8 bar full
 
-                if (mode == BrakeMode.T)
+                if (mode == BrakeModes.T)
                 {
                     AuxResVolumeM3 = 0.009f; // ORTSAuxilaryResCapacity (), Guess based on 9L control reservoir for older Knorr valves
                     SupplyResChargingRatePSIpS = Bar.ToPSI(0.06f); // ORTSSupplyResChargingRate (), KE-1 0 to 5.0 bar in 80 to 88s
@@ -213,10 +244,10 @@ namespace Orts.Simulation.RollingStocks.SubSystems.Brakes.MSTS
                     AuxCylVolumeRatio = 2.53f; // TripleValveRatio (), for 3.6 bar use 2.53 and for 3.8 bar use 3.20
                     ReferencePressurePSI = Bar.ToPSI(3.6f); // ORTSBrakeForceReferencePressure ()
 
-                    mode = BrakeMode.P; // The railcar version of the KE distributor was permanently fixed in the P-mode
+                    mode = BrakeModes.P; // The railcar version of the KE distributor was permanently fixed in the P-mode
                 }
 
-                if (mode == BrakeMode.G)
+                if (mode == BrakeModes.G)
                 {
                     MaxReleaseRatePSIpS = Bar.ToPSI(0.13f); // MaxReleaseRate ()
                     MaxApplicationRatePSIpS = Bar.ToPSI(0.08f); // MaxApplicationRate ()
@@ -225,7 +256,7 @@ namespace Orts.Simulation.RollingStocks.SubSystems.Brakes.MSTS
                     RelayValveFitted = true;
                     RelayValveInshotPSI = 0; // ORTSBrakeRelayValveInshot ()
                 }
-                else if (mode == BrakeMode.P)
+                else if (mode == BrakeModes.P)
                 {
                     MaxReleaseRatePSIpS = Bar.ToPSI(0.24f); // MaxReleaseRate ()
                     MaxApplicationRatePSIpS = Bar.ToPSI(0.60f); // MaxApplicationRate ()
@@ -234,7 +265,7 @@ namespace Orts.Simulation.RollingStocks.SubSystems.Brakes.MSTS
                     RelayValveFitted = true;
                     RelayValveInshotPSI = Bar.ToPSI(-0.60f); // ORTSBrakeRelayValveInshot ()
                 }
-                else if (mode == BrakeMode.R)
+                else if (mode == BrakeModes.R)
                 {
                     MaxReleaseRatePSIpS = Bar.ToPSI(0.24f); // MaxReleaseRate ()
                     MaxApplicationRatePSIpS = Bar.ToPSI(0.60f); // MaxApplicationRate ()
@@ -252,19 +283,6 @@ namespace Orts.Simulation.RollingStocks.SubSystems.Brakes.MSTS
                     }
                 }
             }
-        }
-
-        public enum BrakeMode
-        {
-            G,
-            P,
-            R,
-            T,
-        }
-        public enum FrictionType
-        {
-            Clasp,
-            Disc,
         }
 
         public override bool GetHandbrakeStatus()
@@ -524,6 +542,7 @@ namespace Orts.Simulation.RollingStocks.SubSystems.Brakes.MSTS
                 case "engine(ortssupplyreschargingrate":
                 case "wagon(ortssupplyreschargingrate": SupplyResChargingRatePSIpS = stf.ReadFloatBlock(STFReader.UNITS.PressureRateDefaultPSIpS, null); break;
             }
+            base.Parse(lowercasetoken, stf);
         }
 
         public override void Save(BinaryWriter outf)

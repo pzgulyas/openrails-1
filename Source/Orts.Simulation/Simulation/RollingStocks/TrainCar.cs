@@ -543,7 +543,19 @@ namespace Orts.Simulation.RollingStocks
                 Train.MUDirection = Flipped ^ loco.UsingRearCab ? DirectionControl.Flip(value) : value;
             }
         }
-        public BrakeSystem BrakeSystem;
+
+        /// <summary>
+        /// Stores the multiple brakesystems loaded from the wag.
+        /// Key can be: Simple, Base, PresetG, PresetP, PresetR, G, P, R
+        /// </summary>
+        public readonly Dictionary<string, BrakeSystem> BrakeSystems = new Dictionary<string, BrakeSystem>();
+
+        /// <summary>
+        /// Points to one of the BrakeSystems. Can be changed by InitializeFromCopy() if the same type.
+        /// InitializeFromCopy() from the Base first, then from the Preset, then from the actual type.
+        /// Change between air and vacuum is only by reassignment.
+        /// </summary>
+        public BrakeSystem BrakeSystem { get; protected set; }
 
         public float PreviousSteamBrakeCylinderPressurePSI;
 
