@@ -190,6 +190,83 @@ namespace Orts.Simulation.RollingStocks.SubSystems.Brakes.MSTS
                 (Car as MSTSWagon).RetainerPositions = 4;
         }
 
+        public void InitializePedefinedSystem(string type, BrakeMode mode, FrictionType frictionType)
+        {
+            if (type == "KnorrKE") // With disc brakes
+            {
+                AuxCylVolumeRatio = 3.2f; // TripleValveRatio ()
+                ReferencePressurePSI = frictionType == FrictionType.Disc ? Bar.ToPSI(3) : Bar.ToPSI(1.7f); // ORTSBrakeForceReferencePressure (), P mode
+                // Clasp brakes: 1.7 bar empty, 3.8 bar full
+
+                if (mode == BrakeMode.T)
+                {
+                    AuxResVolumeM3 = 0.009f; // ORTSAuxilaryResCapacity (), Guess based on 9L control reservoir for older Knorr valves
+                    SupplyResChargingRatePSIpS = Bar.ToPSI(0.06f); // ORTSSupplyResChargingRate (), KE-1 0 to 5.0 bar in 80 to 88s
+                    BrakeInsensitivityPSIpS = Bar.ToPSI(pS.FrompM(0.59f)); // ORTSBrakeInsensitivity ()
+                    InitialApplicationThresholdPSI = Bar.ToPSI(0.08f); // ORTSInitialApplicationThreshold ()
+                    EmergencyValveActuationRatePSIpS = Bar.ToPSI(1.2f); // ORTSEmergencyValveActuationRate ()
+                    QuickActionFitted = false; // ORTSEmergencyQuickAction ()
+                    EmergencyDumpValveRatePSIpS = Bar.ToPSI(0.15f); // ORTSEmergencyDumpValveRate ()
+                    EmergencyDumpValveTimerS = 0; // ORTSEmergencyDumpValveTimer ()
+                    MaxTripleValveCylPressurePSI = Bar.ToPSI(3.8f); // ORTSMaxTripleValveCylinderPressure ()
+
+                    AuxCylVolumeRatio = 2.53f; // TripleValveRatio (), for 3.6 bar use 2.53 and for 3.8 bar use 3.20
+                    ReferencePressurePSI = Bar.ToPSI(3.6f); // ORTSBrakeForceReferencePressure ()
+
+                    mode = BrakeMode.P; // The railcar version of the KE distributor was permanently fixed in the P-mode
+                }
+
+                if (mode == BrakeMode.G)
+                {
+                    MaxReleaseRatePSIpS = Bar.ToPSI(0.13f); // MaxReleaseRate ()
+                    MaxApplicationRatePSIpS = Bar.ToPSI(0.08f); // MaxApplicationRate ()
+                    MaxAuxilaryChargingRatePSIpS = Bar.ToPSI(0.08f); // MaxAuxilaryChargingRate (), KE-1 inexhaustability 0%
+                    RelayValveRatio = frictionType == FrictionType.Disc ? 0.79f : 0.45f; // ORTSBrakeRelayValveRatio ()
+                    RelayValveFitted = true;
+                    RelayValveInshotPSI = 0; // ORTSBrakeRelayValveInshot ()
+                }
+                else if (mode == BrakeMode.P)
+                {
+                    MaxReleaseRatePSIpS = Bar.ToPSI(0.24f); // MaxReleaseRate ()
+                    MaxApplicationRatePSIpS = Bar.ToPSI(0.60f); // MaxApplicationRate ()
+                    MaxAuxilaryChargingRatePSIpS = Bar.ToPSI(0.24f); // MaxAuxilaryChargingRate (), KE-1 inexhaustability 0%
+                    RelayValveRatio = frictionType == FrictionType.Disc ? 0.79f : 0.45f; // ORTSBrakeRelayValveRatio ()
+                    RelayValveFitted = true;
+                    RelayValveInshotPSI = Bar.ToPSI(-0.60f); // ORTSBrakeRelayValveInshot ()
+                }
+                else if (mode == BrakeMode.R)
+                {
+                    MaxReleaseRatePSIpS = Bar.ToPSI(0.24f); // MaxReleaseRate ()
+                    MaxApplicationRatePSIpS = Bar.ToPSI(0.60f); // MaxApplicationRate ()
+                    MaxAuxilaryChargingRatePSIpS = Bar.ToPSI(0.24f); // MaxAuxilaryChargingRate (), KE-1 inexhaustability 0%
+                    RelayValveRatio = frictionType == FrictionType.Disc ? 1 : 0.45f; // ORTSBrakeRelayValveRatio ()
+                    RelayValveFitted = true;
+                    RelayValveInshotPSI = Bar.ToPSI(-0.60f); // ORTSBrakeRelayValveInshot ()
+                    
+                    // When used with disc brakes there is no need for two speed braking. In these distributors
+                    // a higher brake cylinder pressure is available at all speeds in the R-regime.
+                    if (frictionType != FrictionType.Disc)
+                    {
+                        TwoStageSpeedUpMpS = MpS.FromKpH(55); // ORTSTwoStageIncreasingSpeed ()
+                        TwoStageSpeedDownMpS = MpS.FromKpH(40); // ortstwostagedecreasingspeed ()
+                    }
+                }
+            }
+        }
+
+        public enum BrakeMode
+        {
+            G,
+            P,
+            R,
+            T,
+        }
+        public enum FrictionType
+        {
+            Clasp,
+            Disc,
+        }
+
         public override bool GetHandbrakeStatus()
         {
             return HandbrakePercent > 0;
