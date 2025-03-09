@@ -549,6 +549,7 @@ namespace Orts.Simulation.RollingStocks
         /// Key can be: Simple, Base, PresetG, PresetP, PresetR, G, P, R
         /// </summary>
         public readonly Dictionary<string, BrakeSystem> BrakeSystems = new Dictionary<string, BrakeSystem>();
+        public const string BrakeSystemBase = "Base";
 
         /// <summary>
         /// Points to one of the BrakeSystems. Can be changed by InitializeFromCopy() if the same type.

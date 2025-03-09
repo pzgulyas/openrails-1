@@ -1371,8 +1371,8 @@ namespace Orts.Simulation.RollingStocks
                     ; break;
                 case "wagon(brakesystemtype":
                     CarBrakeSystemType = stf.ReadStringBlock(null).ToLower();
-                    if (!BrakeSystems.ContainsKey("Base"))
-                        BrakeSystems.Add("Base", MSTSBrakeSystem.Create(CarBrakeSystemType, this));
+                    if (!BrakeSystems.ContainsKey(BrakeSystemBase))
+                        BrakeSystems.Add(BrakeSystemBase, MSTSBrakeSystem.Create(CarBrakeSystemType, this));
                     break;
                 case "wagon(brakeequipmenttype":
                     foreach (var equipment in stf.ReadStringBlock("").ToLower().Replace(" ", "").Split(','))
@@ -1640,7 +1640,7 @@ namespace Orts.Simulation.RollingStocks
                     else stf.SkipRestOfBlock();
                     break;
                 default:
-                    if (BrakeSystems.TryGetValue("Base", out var baseSystem) && baseSystem is MSTSBrakeSystem brakeSystem)
+                    if (BrakeSystems.TryGetValue(BrakeSystemBase, out var baseSystem) && baseSystem is MSTSBrakeSystem brakeSystem)
                         brakeSystem.Parse(lowercasetoken, stf);
                     break;
             }
@@ -1741,7 +1741,7 @@ namespace Orts.Simulation.RollingStocks
             IsFrictionBearing = copy.IsFrictionBearing;
             IsGreaseFrictionBearing = copy.IsGreaseFrictionBearing;
             CarBrakeSystemType = copy.CarBrakeSystemType;
-            BrakeSystem = MSTSBrakeSystem.Create(CarBrakeSystemType, this);
+            BrakeSystem = MSTSBrakeSystem.Create(CarBrakeSystemType, this); // FIXME
             EmergencyReservoirPresent = copy.EmergencyReservoirPresent;
             BrakeValve = copy.BrakeValve;
             HandBrakePresent = copy.HandBrakePresent;

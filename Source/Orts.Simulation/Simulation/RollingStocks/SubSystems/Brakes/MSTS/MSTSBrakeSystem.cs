@@ -15,6 +15,8 @@
 // You should have received a copy of the GNU General Public License
 // along with Open Rails.  If not, see <http://www.gnu.org/licenses/>.
 
+using System;
+using System.Collections.Generic;
 using Orts.Parsers.Msts;
 
 namespace Orts.Simulation.RollingStocks.SubSystems.Brakes.MSTS
@@ -41,33 +43,90 @@ namespace Orts.Simulation.RollingStocks.SubSystems.Brakes.MSTS
         }
 
         protected TrainCar Car;
-        public string BrakeMode { get; protected set; }
 
         public abstract void Update(float elapsedClockSeconds);
 
         public abstract void InitializeFromCopy(BrakeSystem copy);
 
+        public virtual void InitializeDefault() { }
+
+        public virtual bool InitializePredefined(string type, BrakeModes mode, FrictionType frictionType) { return false; }
+
         public virtual void Parse(string lowercasetoken, STFReader stf)
         {
+            MSTSBrakeSystem newSystem;
             switch (lowercasetoken)
             {
-                case "wagon(ortsbrakemodename": BrakeMode = stf.ReadStringBlock("Base"); break;
+                case "wagon(ortsbrakemodesfilter":
+                    stf.VerifyStartOfBlock();
+                    while (!stf.EndOfBlock())
+                        BrakeModesFilter.Add(stf.ReadString());
+                    break;
                 case "wagon(ortsbrakemode":
-                    MSTSBrakeSystem newSystem = null;
-                    if (this is AirSinglePipe)
+                    stf.VerifyStartOfBlock();
+                    MSTSBrakeSystem newBrakeSystem = null;
+                    while (!stf.EndOfBlock())
                     {
-                        newSystem = new AirSinglePipe(Car);
-                        (newSystem as AirSinglePipe).InitializeDefault();
+                        stf.ReadItem();
+                        var lowercasetoken2 = stf.Tree.ToLower();
+                        switch (lowercasetoken2)
+                        {
+                            case "wagon(ortsbrakemode(ortsbrakemodename":
+                                if (stf.ReadStringBlock(null) is var brakeMode && string.IsNullOrEmpty(brakeMode) && Enum.TryParse(brakeMode, out BrakeModes _))
+                                    BrakeMode = brakeMode;
+                                break;
+                            case "wagon(ortsbrakemode(brakesystemtype":
+                                var brakeSystemType = stf.ReadStringBlock(null).ToLower();
+                                if (BrakeMode != null && !Car.BrakeSystems.ContainsKey(BrakeMode))
+                                {
+                                    newBrakeSystem = Create(brakeSystemType, Car) as MSTSBrakeSystem;
+                                    newBrakeSystem.BrakeMode = BrakeMode;
+                                    newBrakeSystem.InitializeDefault();
+                                    newBrakeSystem.Diff = true;
+                                    Car.BrakeSystems.Add(BrakeMode, newBrakeSystem);
+                                }
+                                break;
+                            default:
+                                if (newBrakeSystem != null)
+                                {
+                                    lowercasetoken2 = "wagon" + lowercasetoken2.Substring(lowercasetoken2.LastIndexOf('('));
+                                    newBrakeSystem.Parse(lowercasetoken2, stf);
+                                }
+                                else
+                                {
+                                    stf.SkipRestOfBlock();
+                                }
+                                break;
+                        }
                     }
-                    else if (this is AirTwinPipe)
-                        newSystem = new AirTwinPipe(Car);
-                    else if (this is VacuumSinglePipe)
-                        newSystem = new VacuumSinglePipe(Car);
-                    newSystem?.Parse(lowercasetoken, stf);
-                    if (!Car.BrakeSystems.ContainsKey(BrakeMode) && newSystem != null)
-                        Car.BrakeSystems.Add(newSystem.BrakeMode, newSystem);
                     break;
             }
+        }
+
+        public enum BrakeModes
+        {
+            G, // Goods
+            P, // Passanger
+            R, // Rapid
+            RR, // Rapid with accelerator, <R>
+            R_Mg, // Rapid with Magnetic Track Brakes, R+Mg
+            RR_Mg, // Rapid with accelerator and Magnetic Track Brakes, <R>+Mg
+            T, // Passanger + railcar (FIXME, probably to be removed)
+            EP, // Electro-Pneumatic
+            LE, // Light Engine
+            PL, // Passanger Long train
+            PS, // Passanger Short train
+            AU, // Air Unfitted/unbraked
+
+            VB, // Vacuum Goods
+            VP, // Vacuum Passanger
+            VU, // Vacuum Unfitted/unbraked
+        }
+
+        public enum FrictionType
+        {
+            Clasp,
+            Disc,
         }
     }
 }

@@ -55,7 +55,7 @@ namespace Orts.Simulation.RollingStocks.SubSystems.Brakes.MSTS
         public override void InitializeFromCopy(BrakeSystem copy)
         {
             SingleTransferPipe thiscopy = (SingleTransferPipe)copy;
-            BrakePipeVolumeM3 = thiscopy.BrakePipeVolumeM3;
+            BrakePipeVolumeM3 = Diff && BrakePipeVolumeM3 != default ? BrakePipeVolumeM3 : thiscopy.BrakePipeVolumeM3;
         }
 
         public override string GetStatus(Dictionary<BrakeSystemComponent, PressureUnit> units)

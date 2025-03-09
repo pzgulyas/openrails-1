@@ -84,17 +84,48 @@ namespace Orts.Simulation.RollingStocks.SubSystems.Brakes.MSTS
         public override void InitializeFromCopy(BrakeSystem copy)
         {
             VacuumSinglePipe thiscopy = (VacuumSinglePipe)copy;
-            MaxForcePressurePSI = thiscopy.MaxForcePressurePSI;
-            MaxReleaseRatePSIpS = thiscopy.MaxReleaseRatePSIpS;
-            MaxApplicationRatePSIpS = thiscopy.MaxApplicationRatePSIpS;
-            CylCount = thiscopy.CylCount;
-            CylDiameterM = thiscopy.CylDiameterM;
-            CylStrokeM = thiscopy.CylStrokeM;
-            CylVolumeM3 = thiscopy.CylVolumeM3;
-            TotalCylVolumeM3 = thiscopy.TotalCylVolumeM3;
-            BrakePipeVolumeM3 = thiscopy.BrakePipeVolumeM3;
-            VacResVolM3 = thiscopy.VacResVolM3;
-            HasDirectAdmissionValue = thiscopy.HasDirectAdmissionValue;
+            MaxForcePressurePSI = Diff && MaxForcePressurePSI != default ? MaxForcePressurePSI : thiscopy.MaxForcePressurePSI;
+            MaxReleaseRatePSIpS = Diff && MaxReleaseRatePSIpS != default ? MaxReleaseRatePSIpS :thiscopy.MaxReleaseRatePSIpS;
+            MaxApplicationRatePSIpS = Diff && MaxApplicationRatePSIpS != default ? MaxApplicationRatePSIpS : thiscopy.MaxApplicationRatePSIpS;
+            CylCount = Diff && CylCount != default ? CylCount : thiscopy.CylCount;
+            CylDiameterM = Diff && CylDiameterM != default ? CylDiameterM : thiscopy.CylDiameterM;
+            CylStrokeM = Diff && CylStrokeM != default ? CylStrokeM : thiscopy.CylStrokeM;
+            CylVolumeM3 = Diff && CylVolumeM3 != default ? CylVolumeM3 : thiscopy.CylVolumeM3;
+            TotalCylVolumeM3 = Diff && TotalCylVolumeM3 != default ? TotalCylVolumeM3 : thiscopy.TotalCylVolumeM3;
+            BrakePipeVolumeM3 = Diff && BrakePipeVolumeM3 != default ? BrakePipeVolumeM3 : thiscopy.BrakePipeVolumeM3;
+            VacResVolM3 = Diff && VacResVolM3 != default ? VacResVolM3 : thiscopy.VacResVolM3;
+            HasDirectAdmissionValue = Diff && HasDirectAdmissionValue != default ? HasDirectAdmissionValue : thiscopy.HasDirectAdmissionValue;
+        }
+
+        public override void InitializeDefault()
+        {
+            BrakePipeVolumeM3 = default;
+            MaxForcePressurePSI = default;
+            HandbrakePercent = default;
+            CylPressurePSIA = default;
+            VacResPressurePSIA = default;
+            CylCount = default;
+            CylDiameterM = default;
+            CylStrokeM = default;
+            CylVolumeM3 = default;
+            TotalCylVolumeM3 = default;
+            VacResVolM3 = default;
+            HasDirectAdmissionValue = default;
+            DirectAdmissionValve = default;
+            MaxReleaseRatePSIpS = default;
+            MaxApplicationRatePSIpS = default;
+            LargeEjectorChargingRate = default;
+            TrainBrakePressureChanging = default;
+            BrakePipePressureChanging = default;
+            SoundTriggerCounter = default;
+            prevCylPressurePSIA = default;
+            prevBrakePipePressurePSI = default;
+            LocomotiveSteamBrakeFitted = default;
+            SteamBrakeCylinderPressurePSI = default;
+            SteamBrakeCompensation = default;
+            SteamBrakingCurrentFraction = default;
+
+            base.InitializeDefault();
         }
 
         // return vacuum reservior pressure adjusted for piston movement

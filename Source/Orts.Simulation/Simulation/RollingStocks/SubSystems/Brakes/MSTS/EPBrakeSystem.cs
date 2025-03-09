@@ -134,7 +134,7 @@ namespace Orts.Simulation.RollingStocks.SubSystems.Brakes.MSTS
         public override void InitializeFromCopy(BrakeSystem copy)
         {
             EPBrakeSystem thiscopy = (EPBrakeSystem)copy;
-            EPBrakeControlsBrakePipe = thiscopy.EPBrakeControlsBrakePipe;
+            EPBrakeControlsBrakePipe = Diff && EPBrakeControlsBrakePipe != default ? EPBrakeControlsBrakePipe : thiscopy.EPBrakeControlsBrakePipe;
             base.InitializeFromCopy(copy);
         }
 

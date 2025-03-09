@@ -189,10 +189,87 @@ namespace Orts.Simulation.RollingStocks.SubSystems.Brakes.MSTS
                 (Car as MSTSWagon).RetainerPositions = 4;
         }
 
+        public override bool GetHandbrakeStatus()
+        {
+            return HandbrakePercent > 0;
+        }
+
+        public override void InitializeFromCopy(BrakeSystem copy)
+        {
+            AirSinglePipe thiscopy = (AirSinglePipe)copy;
+            MaxCylPressurePSI = Diff && MaxCylPressurePSI != default ? MaxCylPressurePSI : thiscopy.MaxCylPressurePSI;
+            ReferencePressurePSI = Diff && ReferencePressurePSI != default ? ReferencePressurePSI : thiscopy.ReferencePressurePSI;
+            AuxResVolumeM3 = Diff && AuxResVolumeM3 != default ? AuxResVolumeM3 : thiscopy.AuxResVolumeM3;
+            AuxCylVolumeRatio = Diff && AuxCylVolumeRatio != default ? AuxCylVolumeRatio : thiscopy.AuxCylVolumeRatio;
+            AuxBrakeLineVolumeRatio = Diff && AuxBrakeLineVolumeRatio != default ? AuxBrakeLineVolumeRatio : thiscopy.AuxBrakeLineVolumeRatio;
+            EmergBrakeLineVolumeRatio = Diff && EmergBrakeLineVolumeRatio != default ? EmergBrakeLineVolumeRatio : thiscopy.EmergBrakeLineVolumeRatio;
+            SupplyBrakeLineVolumeRatio = Diff && SupplyBrakeLineVolumeRatio != default ? SupplyBrakeLineVolumeRatio : thiscopy.SupplyBrakeLineVolumeRatio;
+            CylBrakeLineVolumeRatio = Diff && CylBrakeLineVolumeRatio != default ? CylBrakeLineVolumeRatio : thiscopy.CylBrakeLineVolumeRatio;
+            EmergResVolumeM3 = Diff && EmergResVolumeM3 != default ? EmergResVolumeM3 : thiscopy.EmergResVolumeM3;
+            SupplyResVolumeM3 = Diff && SupplyResVolumeM3 != default ? SupplyResVolumeM3 : thiscopy.SupplyResVolumeM3;
+            BrakePipeVolumeM3 = Diff && BrakePipeVolumeM3 != default ? BrakePipeVolumeM3 : thiscopy.BrakePipeVolumeM3;
+            CylVolumeM3 = Diff && CylVolumeM3 != default ? CylVolumeM3 : thiscopy.CylVolumeM3;
+            TotalCylVolumeM3 = Diff && TotalCylVolumeM3 != default ? TotalCylVolumeM3 : thiscopy.TotalCylVolumeM3;
+            CylPipeVolumeM3 = Diff && CylPipeVolumeM3 != default ? CylPipeVolumeM3 : thiscopy.CylPipeVolumeM3;
+            CylDiameterM = Diff && CylDiameterM != default ? CylDiameterM : thiscopy.CylDiameterM;
+            CylAreaM2 = Diff && CylAreaM2 != default ? CylAreaM2 : thiscopy.CylAreaM2;
+            CylStrokeM = Diff && CylStrokeM != default ? CylStrokeM : thiscopy.CylStrokeM;
+            CylCount = Diff && CylCount != default ? CylCount : thiscopy.CylCount;
+            CylTravelTab = thiscopy.CylTravelTab == null ? null : new Interpolator(thiscopy.CylTravelTab);
+            CylSource = Diff && CylSource != default ? CylSource : thiscopy.CylSource;
+            RetainerPressureThresholdPSI = Diff && RetainerPressureThresholdPSI != default ? RetainerPressureThresholdPSI : thiscopy.RetainerPressureThresholdPSI;
+            ReleaseRatePSIpS = Diff && ReleaseRatePSIpS != default ? ReleaseRatePSIpS : thiscopy.ReleaseRatePSIpS;
+            MaxReleaseRatePSIpS = Diff && MaxReleaseRatePSIpS != default ? MaxReleaseRatePSIpS : thiscopy.MaxReleaseRatePSIpS;
+            MaxApplicationRatePSIpS = Diff && MaxApplicationRatePSIpS != default ? MaxApplicationRatePSIpS : thiscopy.MaxApplicationRatePSIpS;
+            MaxAuxilaryChargingRatePSIpS = Diff && MaxAuxilaryChargingRatePSIpS != default ? MaxAuxilaryChargingRatePSIpS : thiscopy.MaxAuxilaryChargingRatePSIpS;
+            BrakeInsensitivityPSIpS = Diff && BrakeInsensitivityPSIpS != default ? BrakeInsensitivityPSIpS : thiscopy.BrakeInsensitivityPSIpS;
+            EmergencyValveActuationRatePSIpS = Diff && EmergencyValveActuationRatePSIpS != default ? EmergencyValveActuationRatePSIpS : thiscopy.EmergencyValveActuationRatePSIpS;
+            EmergencyDumpValveRatePSIpS = Diff && EmergencyDumpValveRatePSIpS != default ? EmergencyDumpValveRatePSIpS : thiscopy.EmergencyDumpValveRatePSIpS;
+            EmergencyDumpValveTimerS = Diff && EmergencyDumpValveTimerS != default ? EmergencyDumpValveTimerS : thiscopy.EmergencyDumpValveTimerS;
+            QuickActionFitted = Diff && QuickActionFitted != default ? QuickActionFitted : thiscopy.QuickActionFitted;
+            EmergResChargingRatePSIpS = Diff && EmergResChargingRatePSIpS != default ? EmergResChargingRatePSIpS : thiscopy.EmergResChargingRatePSIpS;
+            EmergAuxVolumeRatio = Diff && EmergAuxVolumeRatio != default ? EmergAuxVolumeRatio : thiscopy.EmergAuxVolumeRatio;
+            SupplyResChargingRatePSIpS = Diff && SupplyResChargingRatePSIpS != default ? SupplyResChargingRatePSIpS : thiscopy.SupplyResChargingRatePSIpS;
+            TwoPipes = Diff && TwoPipes != default ? TwoPipes : thiscopy.TwoPipes;
+            MRPAuxResCharging = Diff && MRPAuxResCharging != default ? MRPAuxResCharging : thiscopy.MRPAuxResCharging;
+            HoldingValve = Diff && HoldingValve != default ? HoldingValve : thiscopy.HoldingValve;
+            RelayValveFitted = Diff && RelayValveFitted != default ? RelayValveFitted : thiscopy.RelayValveFitted;
+            RelayValveRatio = Diff && RelayValveRatio != default ? RelayValveRatio : thiscopy.RelayValveRatio;
+            RelayValveInshotPSI = Diff && RelayValveInshotPSI != default ? RelayValveInshotPSI : thiscopy.RelayValveInshotPSI;
+            EngineRelayValveRatio = Diff && EngineRelayValveRatio != default ? EngineRelayValveRatio : thiscopy.EngineRelayValveRatio;
+            EngineRelayValveInshotPSI = Diff && EngineRelayValveInshotPSI != default ? EngineRelayValveInshotPSI : thiscopy.EngineRelayValveInshotPSI;
+            RelayValveApplicationRatePSIpS = Diff && RelayValveApplicationRatePSIpS != default ? RelayValveApplicationRatePSIpS : thiscopy.RelayValveApplicationRatePSIpS;
+            RelayValveReleaseRatePSIpS = Diff && RelayValveReleaseRatePSIpS != default ? RelayValveReleaseRatePSIpS : thiscopy.RelayValveReleaseRatePSIpS;
+            MaxTripleValveCylPressurePSI = Diff && MaxTripleValveCylPressurePSI != default ? MaxTripleValveCylPressurePSI : thiscopy.MaxTripleValveCylPressurePSI;
+            EmergResQuickRelease = Diff && EmergResQuickRelease != default ? EmergResQuickRelease : thiscopy.EmergResQuickRelease;
+            UniformChargingThresholdPSI = Diff && UniformChargingThresholdPSI != default ? UniformChargingThresholdPSI : thiscopy.UniformChargingThresholdPSI;
+            UniformChargingRatio = Diff && UniformChargingRatio != default ? UniformChargingRatio : thiscopy.UniformChargingRatio;
+            UniformReleaseThresholdPSI = Diff && UniformReleaseThresholdPSI != default ? UniformReleaseThresholdPSI : thiscopy.UniformReleaseThresholdPSI;
+            UniformReleaseRatio = Diff && UniformReleaseRatio != default ? UniformReleaseRatio : thiscopy.UniformReleaseRatio;
+            QuickServiceLimitPSI = Diff && QuickServiceLimitPSI != default ? QuickServiceLimitPSI : thiscopy.QuickServiceLimitPSI;
+            QuickServiceApplicationRatePSIpS = Diff && QuickServiceApplicationRatePSIpS != default ? QuickServiceApplicationRatePSIpS : thiscopy.QuickServiceApplicationRatePSIpS;
+            QuickServiceVentRatePSIpS = Diff && QuickServiceVentRatePSIpS != default ? QuickServiceVentRatePSIpS : thiscopy.QuickServiceVentRatePSIpS;
+            QuickServiceBulbVolumeM3 = Diff && QuickServiceBulbVolumeM3 != default ? QuickServiceBulbVolumeM3 : thiscopy.QuickServiceBulbVolumeM3;
+            BulbBrakeLineVolumeRatio = Diff && BulbBrakeLineVolumeRatio != default ? BulbBrakeLineVolumeRatio : thiscopy.BulbBrakeLineVolumeRatio;
+            AcceleratedApplicationFactor = Diff && AcceleratedApplicationFactor != default ? AcceleratedApplicationFactor : thiscopy.AcceleratedApplicationFactor;
+            AcceleratedApplicationLimitPSIpS = Diff && AcceleratedApplicationLimitPSIpS != default ? AcceleratedApplicationLimitPSIpS : thiscopy.AcceleratedApplicationLimitPSIpS;
+            InitialApplicationThresholdPSI = Diff && InitialApplicationThresholdPSI != default ? InitialApplicationThresholdPSI : thiscopy.InitialApplicationThresholdPSI;
+            TripleValveSensitivityPSI = Diff && TripleValveSensitivityPSI != default ? TripleValveSensitivityPSI : thiscopy.TripleValveSensitivityPSI;
+            BrakeCylinderSpringPressurePSI = Diff && BrakeCylinderSpringPressurePSI != default ? BrakeCylinderSpringPressurePSI : thiscopy.BrakeCylinderSpringPressurePSI;
+            ServiceMaxCylPressurePSI = Diff && ServiceMaxCylPressurePSI != default ? ServiceMaxCylPressurePSI : thiscopy.ServiceMaxCylPressurePSI;
+            ServiceApplicationRatePSIpS = Diff && ServiceApplicationRatePSIpS != default ? ServiceApplicationRatePSIpS : thiscopy.ServiceApplicationRatePSIpS;
+            TwoStageLowPressurePSI = Diff && TwoStageLowPressurePSI != default ? TwoStageLowPressurePSI : thiscopy.TwoStageLowPressurePSI;
+            TwoStageRelayValveRatio = Diff && TwoStageRelayValveRatio != default ? TwoStageRelayValveRatio : thiscopy.TwoStageRelayValveRatio;
+            TwoStageSpeedUpMpS = Diff && TwoStageSpeedUpMpS != default ? TwoStageSpeedUpMpS : thiscopy.TwoStageSpeedUpMpS;
+            TwoStageSpeedDownMpS = Diff && TwoStageSpeedDownMpS != default ? TwoStageSpeedDownMpS : thiscopy.TwoStageSpeedDownMpS;
+            HighSpeedReducingPressurePSI = Diff && HighSpeedReducingPressurePSI != default ? HighSpeedReducingPressurePSI : thiscopy.HighSpeedReducingPressurePSI;
+            LegacyEmergencyValve = Diff && LegacyEmergencyValve != default ? LegacyEmergencyValve : thiscopy.LegacyEmergencyValve;
+        }
+
         /// <summary>
         /// Initialize a subsystems diff. Everything set to default for being possible to detect the changes.
         /// </summary>
-        public void InitializeDefault()
+        public override void InitializeDefault()
         {
             BrakePipeVolumeM3 = default;
             AutoCylPressurePSI = default;
@@ -219,147 +296,8 @@ namespace Orts.Simulation.RollingStocks.SubSystems.Brakes.MSTS
             UniformReleaseThresholdPSI = default;
             AcceleratedApplicationLimitPSIpS = default;
             AcceleratedEmergencyReleaseThresholdPSI = default;
-        }
 
-        public void InitializePedefinedSystem(string type, BrakeModes mode, FrictionType frictionType)
-        {
-            if (type == "KnorrKE") // With disc brakes
-            {
-                AuxCylVolumeRatio = 3.2f; // TripleValveRatio ()
-                ReferencePressurePSI = frictionType == FrictionType.Disc ? Bar.ToPSI(3) : Bar.ToPSI(1.7f); // ORTSBrakeForceReferencePressure (), P mode
-                // Clasp brakes: 1.7 bar empty, 3.8 bar full
-
-                if (mode == BrakeModes.T)
-                {
-                    AuxResVolumeM3 = 0.009f; // ORTSAuxilaryResCapacity (), Guess based on 9L control reservoir for older Knorr valves
-                    SupplyResChargingRatePSIpS = Bar.ToPSI(0.06f); // ORTSSupplyResChargingRate (), KE-1 0 to 5.0 bar in 80 to 88s
-                    BrakeInsensitivityPSIpS = Bar.ToPSI(pS.FrompM(0.59f)); // ORTSBrakeInsensitivity ()
-                    InitialApplicationThresholdPSI = Bar.ToPSI(0.08f); // ORTSInitialApplicationThreshold ()
-                    EmergencyValveActuationRatePSIpS = Bar.ToPSI(1.2f); // ORTSEmergencyValveActuationRate ()
-                    QuickActionFitted = false; // ORTSEmergencyQuickAction ()
-                    EmergencyDumpValveRatePSIpS = Bar.ToPSI(0.15f); // ORTSEmergencyDumpValveRate ()
-                    EmergencyDumpValveTimerS = 0; // ORTSEmergencyDumpValveTimer ()
-                    MaxTripleValveCylPressurePSI = Bar.ToPSI(3.8f); // ORTSMaxTripleValveCylinderPressure ()
-
-                    AuxCylVolumeRatio = 2.53f; // TripleValveRatio (), for 3.6 bar use 2.53 and for 3.8 bar use 3.20
-                    ReferencePressurePSI = Bar.ToPSI(3.6f); // ORTSBrakeForceReferencePressure ()
-
-                    mode = BrakeModes.P; // The railcar version of the KE distributor was permanently fixed in the P-mode
-                }
-
-                if (mode == BrakeModes.G)
-                {
-                    MaxReleaseRatePSIpS = Bar.ToPSI(0.13f); // MaxReleaseRate ()
-                    MaxApplicationRatePSIpS = Bar.ToPSI(0.08f); // MaxApplicationRate ()
-                    MaxAuxilaryChargingRatePSIpS = Bar.ToPSI(0.08f); // MaxAuxilaryChargingRate (), KE-1 inexhaustability 0%
-                    RelayValveRatio = frictionType == FrictionType.Disc ? 0.79f : 0.45f; // ORTSBrakeRelayValveRatio ()
-                    RelayValveFitted = true;
-                    RelayValveInshotPSI = 0; // ORTSBrakeRelayValveInshot ()
-                }
-                else if (mode == BrakeModes.P)
-                {
-                    MaxReleaseRatePSIpS = Bar.ToPSI(0.24f); // MaxReleaseRate ()
-                    MaxApplicationRatePSIpS = Bar.ToPSI(0.60f); // MaxApplicationRate ()
-                    MaxAuxilaryChargingRatePSIpS = Bar.ToPSI(0.24f); // MaxAuxilaryChargingRate (), KE-1 inexhaustability 0%
-                    RelayValveRatio = frictionType == FrictionType.Disc ? 0.79f : 0.45f; // ORTSBrakeRelayValveRatio ()
-                    RelayValveFitted = true;
-                    RelayValveInshotPSI = Bar.ToPSI(-0.60f); // ORTSBrakeRelayValveInshot ()
-                }
-                else if (mode == BrakeModes.R)
-                {
-                    MaxReleaseRatePSIpS = Bar.ToPSI(0.24f); // MaxReleaseRate ()
-                    MaxApplicationRatePSIpS = Bar.ToPSI(0.60f); // MaxApplicationRate ()
-                    MaxAuxilaryChargingRatePSIpS = Bar.ToPSI(0.24f); // MaxAuxilaryChargingRate (), KE-1 inexhaustability 0%
-                    RelayValveRatio = frictionType == FrictionType.Disc ? 1 : 0.45f; // ORTSBrakeRelayValveRatio ()
-                    RelayValveFitted = true;
-                    RelayValveInshotPSI = Bar.ToPSI(-0.60f); // ORTSBrakeRelayValveInshot ()
-                    
-                    // When used with disc brakes there is no need for two speed braking. In these distributors
-                    // a higher brake cylinder pressure is available at all speeds in the R-regime.
-                    if (frictionType != FrictionType.Disc)
-                    {
-                        TwoStageSpeedUpMpS = MpS.FromKpH(55); // ORTSTwoStageIncreasingSpeed ()
-                        TwoStageSpeedDownMpS = MpS.FromKpH(40); // ortstwostagedecreasingspeed ()
-                    }
-                }
-            }
-        }
-
-        public override bool GetHandbrakeStatus()
-        {
-            return HandbrakePercent > 0;
-        }
-
-        public override void InitializeFromCopy(BrakeSystem copy)
-        {
-            AirSinglePipe thiscopy = (AirSinglePipe)copy;
-            MaxCylPressurePSI = thiscopy.MaxCylPressurePSI;
-            ReferencePressurePSI = thiscopy.ReferencePressurePSI;
-            AuxResVolumeM3 = thiscopy.AuxResVolumeM3;
-            AuxCylVolumeRatio = thiscopy.AuxCylVolumeRatio;
-            AuxBrakeLineVolumeRatio = thiscopy.AuxBrakeLineVolumeRatio;
-            EmergBrakeLineVolumeRatio = thiscopy.EmergBrakeLineVolumeRatio;
-            SupplyBrakeLineVolumeRatio = thiscopy.SupplyBrakeLineVolumeRatio;
-            CylBrakeLineVolumeRatio = thiscopy.CylBrakeLineVolumeRatio;
-            EmergResVolumeM3 = thiscopy.EmergResVolumeM3;
-            SupplyResVolumeM3 = thiscopy.SupplyResVolumeM3;
-            BrakePipeVolumeM3 = thiscopy.BrakePipeVolumeM3;
-            CylVolumeM3 = thiscopy.CylVolumeM3;
-            TotalCylVolumeM3 = thiscopy.TotalCylVolumeM3;
-            CylPipeVolumeM3 = thiscopy.CylPipeVolumeM3;
-            CylDiameterM = thiscopy.CylDiameterM;
-            CylAreaM2 = thiscopy.CylAreaM2;
-            CylStrokeM = thiscopy.CylStrokeM;
-            CylCount = thiscopy.CylCount;
-            CylTravelTab = thiscopy.CylTravelTab == null ? null : new Interpolator(thiscopy.CylTravelTab);
-            CylSource = thiscopy.CylSource;
-            RetainerPressureThresholdPSI = thiscopy.RetainerPressureThresholdPSI;
-            ReleaseRatePSIpS = thiscopy.ReleaseRatePSIpS;
-            MaxReleaseRatePSIpS = thiscopy.MaxReleaseRatePSIpS;
-            MaxApplicationRatePSIpS = thiscopy.MaxApplicationRatePSIpS;
-            MaxAuxilaryChargingRatePSIpS = thiscopy.MaxAuxilaryChargingRatePSIpS;
-            BrakeInsensitivityPSIpS = thiscopy.BrakeInsensitivityPSIpS;
-            EmergencyValveActuationRatePSIpS = thiscopy.EmergencyValveActuationRatePSIpS;
-            EmergencyDumpValveRatePSIpS = thiscopy.EmergencyDumpValveRatePSIpS;
-            EmergencyDumpValveTimerS = thiscopy.EmergencyDumpValveTimerS;
-            QuickActionFitted = thiscopy.QuickActionFitted;
-            EmergResChargingRatePSIpS = thiscopy.EmergResChargingRatePSIpS;
-            EmergAuxVolumeRatio = thiscopy.EmergAuxVolumeRatio;
-            SupplyResChargingRatePSIpS = thiscopy.SupplyResChargingRatePSIpS;
-            TwoPipes = thiscopy.TwoPipes;
-            MRPAuxResCharging = thiscopy.MRPAuxResCharging;
-            HoldingValve = thiscopy.HoldingValve;
-            RelayValveFitted = thiscopy.RelayValveFitted;
-            RelayValveRatio = thiscopy.RelayValveRatio;
-            RelayValveInshotPSI = thiscopy.RelayValveInshotPSI;
-            EngineRelayValveRatio = thiscopy.EngineRelayValveRatio;
-            EngineRelayValveInshotPSI = thiscopy.EngineRelayValveInshotPSI;
-            RelayValveApplicationRatePSIpS = thiscopy.RelayValveApplicationRatePSIpS;
-            RelayValveReleaseRatePSIpS = thiscopy.RelayValveReleaseRatePSIpS;
-            MaxTripleValveCylPressurePSI = thiscopy.MaxTripleValveCylPressurePSI;
-            EmergResQuickRelease = thiscopy.EmergResQuickRelease;
-            UniformChargingThresholdPSI = thiscopy.UniformChargingThresholdPSI;
-            UniformChargingRatio = thiscopy.UniformChargingRatio;
-            UniformReleaseThresholdPSI = thiscopy.UniformReleaseThresholdPSI;
-            UniformReleaseRatio = thiscopy.UniformReleaseRatio;
-            QuickServiceLimitPSI = thiscopy.QuickServiceLimitPSI;
-            QuickServiceApplicationRatePSIpS = thiscopy.QuickServiceApplicationRatePSIpS;
-            QuickServiceVentRatePSIpS = thiscopy.QuickServiceVentRatePSIpS;
-            QuickServiceBulbVolumeM3 = thiscopy.QuickServiceBulbVolumeM3;
-            BulbBrakeLineVolumeRatio = thiscopy.BulbBrakeLineVolumeRatio;
-            AcceleratedApplicationFactor = thiscopy.AcceleratedApplicationFactor;
-            AcceleratedApplicationLimitPSIpS = thiscopy.AcceleratedApplicationLimitPSIpS;
-            InitialApplicationThresholdPSI = thiscopy.InitialApplicationThresholdPSI;
-            TripleValveSensitivityPSI = thiscopy.TripleValveSensitivityPSI;
-            BrakeCylinderSpringPressurePSI = thiscopy.BrakeCylinderSpringPressurePSI;
-            ServiceMaxCylPressurePSI = thiscopy.ServiceMaxCylPressurePSI;
-            ServiceApplicationRatePSIpS = thiscopy.ServiceApplicationRatePSIpS;
-            TwoStageLowPressurePSI = thiscopy.TwoStageLowPressurePSI;
-            TwoStageRelayValveRatio = thiscopy.TwoStageRelayValveRatio;
-            TwoStageSpeedUpMpS = thiscopy.TwoStageSpeedUpMpS;
-            TwoStageSpeedDownMpS = thiscopy.TwoStageSpeedDownMpS;
-            HighSpeedReducingPressurePSI = thiscopy.HighSpeedReducingPressurePSI;
-            LegacyEmergencyValve = thiscopy.LegacyEmergencyValve;
+            base.InitializeDefault();
         }
 
         // Get the brake BC & BP for EOT conditions
@@ -2545,6 +2483,75 @@ namespace Orts.Simulation.RollingStocks.SubSystems.Brakes.MSTS
             {
                 MaxCylPressurePSI = loco.TrainBrakeController.MaxPressurePSI * AuxCylVolumeRatio / (1 + AuxCylVolumeRatio);
             }
+        }
+
+        public override bool InitializePredefined(string type, BrakeModes mode, FrictionType frictionType)
+        {
+            Diff = true;
+            if (type == "Knorr_KE") // With disc brakes
+            {
+                AuxCylVolumeRatio = 3.2f; // TripleValveRatio ()
+                ReferencePressurePSI = frictionType == FrictionType.Disc ? Bar.ToPSI(3) : Bar.ToPSI(1.7f); // ORTSBrakeForceReferencePressure (), P mode
+                // Clasp brakes: 1.7 bar empty, 3.8 bar full
+
+                if (mode == BrakeModes.T)
+                {
+                    AuxResVolumeM3 = 0.009f; // ORTSAuxilaryResCapacity (), Guess based on 9L control reservoir for older Knorr valves
+                    SupplyResChargingRatePSIpS = Bar.ToPSI(0.06f); // ORTSSupplyResChargingRate (), KE-1 0 to 5.0 bar in 80 to 88s
+                    BrakeInsensitivityPSIpS = Bar.ToPSI(pS.FrompM(0.59f)); // ORTSBrakeInsensitivity ()
+                    InitialApplicationThresholdPSI = Bar.ToPSI(0.08f); // ORTSInitialApplicationThreshold ()
+                    EmergencyValveActuationRatePSIpS = Bar.ToPSI(1.2f); // ORTSEmergencyValveActuationRate ()
+                    QuickActionFitted = false; // ORTSEmergencyQuickAction ()
+                    EmergencyDumpValveRatePSIpS = Bar.ToPSI(0.15f); // ORTSEmergencyDumpValveRate ()
+                    EmergencyDumpValveTimerS = 0; // ORTSEmergencyDumpValveTimer ()
+                    MaxTripleValveCylPressurePSI = Bar.ToPSI(3.8f); // ORTSMaxTripleValveCylinderPressure ()
+
+                    AuxCylVolumeRatio = 2.53f; // TripleValveRatio (), for 3.6 bar use 2.53 and for 3.8 bar use 3.20
+                    ReferencePressurePSI = Bar.ToPSI(3.6f); // ORTSBrakeForceReferencePressure ()
+
+                    mode = BrakeModes.P; // The railcar version of the KE distributor was permanently fixed in the P-mode
+                }
+
+                if (mode == BrakeModes.G)
+                {
+                    MaxReleaseRatePSIpS = Bar.ToPSI(0.13f); // MaxReleaseRate ()
+                    MaxApplicationRatePSIpS = Bar.ToPSI(0.08f); // MaxApplicationRate ()
+                    MaxAuxilaryChargingRatePSIpS = Bar.ToPSI(0.08f); // MaxAuxilaryChargingRate (), KE-1 inexhaustability 0%
+                    RelayValveRatio = frictionType == FrictionType.Disc ? 0.79f : 0.45f; // ORTSBrakeRelayValveRatio ()
+                    RelayValveFitted = true;
+                    RelayValveInshotPSI = 0; // ORTSBrakeRelayValveInshot ()
+                    return true;
+                }
+                else if (mode == BrakeModes.P)
+                {
+                    MaxReleaseRatePSIpS = Bar.ToPSI(0.24f); // MaxReleaseRate ()
+                    MaxApplicationRatePSIpS = Bar.ToPSI(0.60f); // MaxApplicationRate ()
+                    MaxAuxilaryChargingRatePSIpS = Bar.ToPSI(0.24f); // MaxAuxilaryChargingRate (), KE-1 inexhaustability 0%
+                    RelayValveRatio = frictionType == FrictionType.Disc ? 0.79f : 0.45f; // ORTSBrakeRelayValveRatio ()
+                    RelayValveFitted = true;
+                    RelayValveInshotPSI = Bar.ToPSI(-0.60f); // ORTSBrakeRelayValveInshot ()
+                    return true;
+                }
+                else if (mode == BrakeModes.R)
+                {
+                    MaxReleaseRatePSIpS = Bar.ToPSI(0.24f); // MaxReleaseRate ()
+                    MaxApplicationRatePSIpS = Bar.ToPSI(0.60f); // MaxApplicationRate ()
+                    MaxAuxilaryChargingRatePSIpS = Bar.ToPSI(0.24f); // MaxAuxilaryChargingRate (), KE-1 inexhaustability 0%
+                    RelayValveRatio = frictionType == FrictionType.Disc ? 1 : 0.45f; // ORTSBrakeRelayValveRatio ()
+                    RelayValveFitted = true;
+                    RelayValveInshotPSI = Bar.ToPSI(-0.60f); // ORTSBrakeRelayValveInshot ()
+
+                    // When used with disc brakes there is no need for two speed braking. In these distributors
+                    // a higher brake cylinder pressure is available at all speeds in the R-regime.
+                    if (frictionType != FrictionType.Disc)
+                    {
+                        TwoStageSpeedUpMpS = MpS.FromKpH(55); // ORTSTwoStageIncreasingSpeed ()
+                        TwoStageSpeedDownMpS = MpS.FromKpH(40); // ortstwostagedecreasingspeed ()
+                    }
+                    return true;
+                }
+            }
+            return false;
         }
     }
 }
