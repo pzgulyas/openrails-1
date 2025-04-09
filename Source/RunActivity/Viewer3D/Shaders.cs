@@ -25,6 +25,7 @@ using Microsoft.Xna.Framework.Content.Pipeline;
 using Microsoft.Xna.Framework.Graphics;
 using ORTS.Common;
 using Orts.Viewer3D.Processes;
+using Orts.Simulation.RollingStocks;
 
 namespace Orts.Viewer3D
 {
@@ -144,6 +145,13 @@ namespace Orts.Viewer3D
         Vector3 _sunDirection;
         bool _imageTextureIsNight;
 
+        //const float HalfShadowBrightness = 0.75;
+        const float HalfNightBrightness = 0.6f;
+        const float ShadowBrightness = 0.5f;
+        public float NightBrightness = 0.2f;
+        float FullBrightness = 1.0f;
+        float NightEffect;
+        
         /// <summary>
         /// The position of the sampler states inside the hlsl shader:
         /// baseColor, metallicRoughness, occlusion, normal, emissive
@@ -175,14 +183,6 @@ namespace Orts.Viewer3D
             view.SetValue(v);
             projection.SetValue(p);
 
-            int vIn = Program.Simulator.Settings.DayAmbientLight;
-            
-            float FullBrightness = (float)vIn / 20.0f ;
-            //const float HalfShadowBrightness = 0.75;
-            const float HalfNightBrightness = 0.6f;
-            const float ShadowBrightness = 0.5f;
-            const float NightBrightness = 0.2f;
-
             if (_imageTextureIsNight)
             {
                 nightColorModifier.SetValue(FullBrightness);
@@ -191,15 +191,8 @@ namespace Orts.Viewer3D
             }
             else
             {
-                // The following constants define the beginning and the end conditions of
-                // the day-night transition. Values refer to the Y postion of LightVector.
-                const float startNightTrans = 0.1f;
-                const float finishNightTrans = -0.1f;
-
-                var nightEffect = MathHelper.Clamp((_sunDirection.Y - finishNightTrans) / (startNightTrans - finishNightTrans), 0, 1);
-
-                nightColorModifier.SetValue(MathHelper.Lerp(NightBrightness, FullBrightness, nightEffect));
-                halfNightColorModifier.SetValue(MathHelper.Lerp(HalfNightBrightness, FullBrightness, nightEffect));
+                nightColorModifier.SetValue(MathHelper.Lerp(NightBrightness, FullBrightness, NightEffect));
+                halfNightColorModifier.SetValue(MathHelper.Lerp(HalfNightBrightness, FullBrightness, NightEffect));
                 vegetationAmbientModifier.SetValue(MathHelper.Lerp(ShadowBrightness, FullBrightness, _zBias_Lighting.Y));
             }
         }
@@ -242,6 +235,43 @@ namespace Orts.Viewer3D
         {
             _sunDirection = sunDirection;
             zFar.SetValue(zFarDistance);
+
+            // The following constants define the beginning and the end conditions of
+            // the day-night transition. Values refer to the Y postion of LightVector.
+            const float startNightTrans = 0.1f;
+            const float finishNightTrans = -0.1f;
+
+            NightEffect = MathHelper.Clamp((sunDirection.Y - finishNightTrans) / (startNightTrans - finishNightTrans), 0, 1);
+
+            NightBrightness = 0.2f;
+            FullBrightness = Program.Simulator.Settings.DayAmbientLight / 20.0f;
+
+            var overcastAmbientLightCoef = 1.0f - (Program.Simulator.Weather.CloudCoverFactor / 3.0f);
+            var ambientLightCoef = Program.Simulator.Weather.SeasonAmbientLightCoef * Program.Simulator.Weather.DayTimeAmbientLightCoef * overcastAmbientLightCoef;
+            FullBrightness *= ambientLightCoef;
+            NightBrightness *= ambientLightCoef;
+
+            Program.Viewer.Simulator.CabInDarkTunnel = false;
+            if (Program.Viewer.Camera.IsUnderground && Program.Viewer.Camera.AttachedCar is TrainCar c &&
+                c.CarTunnelData.LengthMOfTunnelAheadFront > 0 && c.CarTunnelData.FrontPositionBeyondStartOfTunnel > 0)
+            {
+                if (c.CarTunnelData.LengthMOfTunnelAheadFront + c.CarTunnelData.LengthMOfTunnelBehindRear > c.CarTunnelData.FrontPositionBeyondStartOfTunnel)
+                {
+                    // Dark tunnel
+                    FullBrightness = NightBrightness;
+                    NightBrightness = 0.05f;
+                    Program.Viewer.Simulator.CabInDarkTunnel = true;
+                }
+                else
+                {
+                    var transientLength = 35;
+                    var transientCoeff = 1 - Math.Min((float)c.CarTunnelData.FrontPositionBeyondStartOfTunnel, (float)c.CarTunnelData.LengthMOfTunnelAheadFront) / transientLength;
+                    FullBrightness *= transientCoeff;
+                    NightBrightness *= transientCoeff;
+                    if (FullBrightness < 0.05f) FullBrightness = 0.05f;
+                    if (NightBrightness < 0.05f) NightBrightness = 0.05f;
+                }
+            }
         }
 
         public float SignalLightIntensity { set { signalLightIntensity.SetValue(value); } }
@@ -777,9 +807,9 @@ namespace Orts.Viewer3D
             light2Pos.SetValue(light2Position);
         }
 
-        public void SetData(Vector3 sunDirection, bool isNightTexture, bool isDashLight, float overcast)
+        public void SetData(bool isDashLight, float cabNightColorModifier)
         {
-            nightColorModifier.SetValue(MathHelper.Lerp(0.2f + (isDashLight ? 0.15f : 0), 1, isNightTexture ? 1 : MathHelper.Clamp((sunDirection.Y + 0.1f) / 0.2f, 0, 1) * MathHelper.Clamp(1.5f - overcast, 0, 1)));
+            nightColorModifier.SetValue(cabNightColorModifier);
             lightOn.SetValue(isDashLight);
         }
 

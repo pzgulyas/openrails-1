@@ -970,6 +970,13 @@ namespace Orts.Viewer3D
 
             if (UserInput.IsPressed(UserCommand.GameFullscreen)) { RenderProcess.ToggleFullScreen(); }
             if (!MPManager.IsMultiPlayer() && UserInput.IsPressed(UserCommand.GamePause)) Simulator.Paused = !Simulator.Paused;
+            if (!MPManager.IsMultiPlayer() && UserInput.IsDown(UserCommand.DebugClockForwards))
+                Simulator.HourSpeed = 3600;
+            else if (!MPManager.IsMultiPlayer() && UserInput.IsDown(UserCommand.DebugClockBackwards))
+                Simulator.HourSpeed = -3600;
+            else
+                Simulator.HourSpeed = 1;
+
             if (!MPManager.IsMultiPlayer() && UserInput.IsPressed(UserCommand.DebugSpeedUp))
             {
                 Simulator.GameSpeed *= 1.5f;

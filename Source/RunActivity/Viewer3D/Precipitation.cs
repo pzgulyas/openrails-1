@@ -1,4 +1,4 @@
-// COPYRIGHT 2009 - 2023 by the Open Rails project.
+﻿// COPYRIGHT 2009 - 2023 by the Open Rails project.
 //
 // This file is part of Open Rails.
 //
@@ -26,6 +26,7 @@ using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using ORTS.Common;
 using Orts.Simulation;
+using Orts.Simulation.RollingStocks;
 
 namespace Orts.Viewer3D
 {
@@ -33,13 +34,17 @@ namespace Orts.Viewer3D
     {
         public const float MinIntensityPPSPM2 = 0;
 
-        public const float MaxIntensityPPSPM2 = 0.015f;
+        public static float MaxIntensityPPSPM2 = 1;
 
         readonly Viewer Viewer;
         readonly Weather Weather;
 
         readonly Material Material;
-        readonly PrecipitationPrimitive Precipitation;
+        readonly PrecipitationPrimitive Precipitation1;
+        readonly PrecipitationPrimitive Precipitation2;
+        readonly PrecipitationPrimitive Precipitation3;
+        readonly PrecipitationPrimitive Precipitation4;
+        readonly PrecipitationPrimitive Precipitation5;
 
         public PrecipitationViewer(Viewer viewer)
         {
@@ -47,16 +52,42 @@ namespace Orts.Viewer3D
             Weather = viewer.Simulator.Weather;
 
             Material = viewer.MaterialManager.Load("Precipitation");
-            Precipitation = new PrecipitationPrimitive(Viewer.GraphicsDevice);
+            Precipitation1 = new PrecipitationPrimitive(Viewer.GraphicsDevice);
+            Precipitation2 = new PrecipitationPrimitive(Viewer.GraphicsDevice);
+            Precipitation3 = new PrecipitationPrimitive(Viewer.GraphicsDevice);
+            Precipitation4 = new PrecipitationPrimitive(Viewer.GraphicsDevice);
+            Precipitation5 = new PrecipitationPrimitive(Viewer.GraphicsDevice);
+
+            if (Viewer.AdapterMemory / 1024 / 1024 < 2048)
+                MaxIntensityPPSPM2 = 0.1f;
 
             Reset();
         }
 
         public void PrepareFrame(RenderFrame frame, ElapsedTime elapsedTime)
         {
+            if (Viewer.Camera.IsUnderground && Viewer.Camera.AttachedCar is TrainCar c &&
+                c.CarTunnelData.LengthMOfTunnelAheadFront > 0 && c.CarTunnelData.LengthMOfTunnelBehindRear > 0)
+            {
+                return;
+            }
+
             var gameTime = (float)Viewer.Simulator.GameTime;
-            Precipitation.DynamicUpdate(Weather);
-            Precipitation.Update(gameTime, elapsedTime, Weather.PrecipitationIntensityPPSPM2, Viewer);
+            Precipitation1.DynamicUpdate1(Weather);
+            Precipitation1.Update(gameTime, elapsedTime, Weather.PrecipitationIntensityPPSPM2, Viewer);
+            Precipitation1.Update(gameTime, elapsedTime, Weather.PrecipitationIntensityPPSPM2 * (2f / 3f), Viewer);
+            Precipitation2.DynamicUpdate2(Weather);
+            Precipitation2.Update(gameTime, elapsedTime, Weather.PrecipitationIntensityPPSPM2 * (1f / 3f), Viewer);
+
+            if (Viewer.Simulator.WeatherType == Formats.Msts.WeatherType.Snow)
+            {
+                Precipitation3.DynamicUpdate3(Weather);
+                Precipitation3.Update(gameTime, elapsedTime, Weather.PrecipitationIntensityPPSPM2 / 100f, Viewer);
+                Precipitation4.DynamicUpdate4(Weather);
+                Precipitation4.Update(gameTime, elapsedTime, Weather.PrecipitationIntensityPPSPM2 / 100f, Viewer);
+                Precipitation5.DynamicUpdate5(Weather);
+                Precipitation5.Update(gameTime, elapsedTime, Weather.PrecipitationIntensityPPSPM2 / 100f, Viewer);
+            }
 
             // Note: This is quite a hack. We ideally should be able to pass this through RenderItem somehow.
             var xnaWorldLocation = Matrix.Identity;
@@ -64,18 +95,26 @@ namespace Orts.Viewer3D
             xnaWorldLocation.M21 = Viewer.Camera.TileX;
             xnaWorldLocation.M22 = Viewer.Camera.TileZ;
 
-            frame.AddPrimitive(Material, Precipitation, RenderPrimitiveGroup.Precipitation, ref xnaWorldLocation);
+            frame.AddPrimitive(Material, Precipitation1, RenderPrimitiveGroup.Precipitation, ref xnaWorldLocation);
+            frame.AddPrimitive(Material, Precipitation2, RenderPrimitiveGroup.Precipitation, ref xnaWorldLocation);
+            frame.AddPrimitive(Material, Precipitation3, RenderPrimitiveGroup.Precipitation, ref xnaWorldLocation);
+            frame.AddPrimitive(Material, Precipitation4, RenderPrimitiveGroup.Precipitation, ref xnaWorldLocation);
+            frame.AddPrimitive(Material, Precipitation5, RenderPrimitiveGroup.Precipitation, ref xnaWorldLocation);
         }
 
         public void Reset()
         {
             var gameTime = (float)Viewer.Simulator.GameTime;
-            Precipitation.Initialize(Viewer.Simulator.WeatherType);
+            Precipitation1.Initialize(Viewer.Simulator.WeatherType);
+            Precipitation2.Initialize(Viewer.Simulator.WeatherType);
+            Precipitation3.Initialize(Viewer.Simulator.WeatherType);
+            Precipitation4.Initialize(Viewer.Simulator.WeatherType);
+            Precipitation5.Initialize(Viewer.Simulator.WeatherType);
 
             // Camera is null during first initialisation.
             if (Viewer.Camera != null)
             {
-                Precipitation.Update(gameTime, null, Weather.PrecipitationIntensityPPSPM2, Viewer);
+                Precipitation1.Update(gameTime, null, Weather.PrecipitationIntensityPPSPM2, Viewer);
             }
         }
 
@@ -101,6 +140,10 @@ namespace Orts.Viewer3D
         const float ParticleBoxLengthM = 500;
         const float ParticleBoxWidthM = 500;
         const float ParticleBoxHeightM = 43;
+        const float ParticleBoxHeightMDynamicMinimum = 15;
+        float ParticleBoxHeightMDynamic;
+        float SnowFallChangeChaosTimer;
+        float SnowFallChangeChaos;
 
         const int IndicesPerParticle = 6;
         const int VerticiesPerParticle = 4;
@@ -130,7 +173,8 @@ namespace Orts.Viewer3D
         }
 
         float ParticleDuration;
-        HeightCache Heights;
+        readonly HeightCache Heights;
+        Vector2 ParticleDirectionModifier;
 
         // Particle buffer goes like this:
         //   +--active>-----new>--+
@@ -148,9 +192,7 @@ namespace Orts.Viewer3D
         public PrecipitationPrimitive(GraphicsDevice graphicsDevice)
         {
             // Snow is the slower particle, hence longer duration, hence more particles in total.
-            MaxParticles = (int)(PrecipitationViewer.MaxIntensityPPSPM2 * ParticleBoxLengthM * ParticleBoxWidthM * ParticleBoxHeightM / SnowVelocityMpS / ParticleVelocityFactor);
-            Debug.Assert(MaxParticles * VerticiesPerParticle < ushort.MaxValue, "The maximum number of precipitation verticies must be able to fit in a ushort (16bit unsigned) index buffer.");
-
+            MaxParticles = (int)(2 * PrecipitationViewer.MaxIntensityPPSPM2 * ParticleBoxLengthM * ParticleBoxWidthM * ParticleBoxHeightM / SnowVelocityMpS / ParticleVelocityFactor);
             Vertices = new ParticleVertex[MaxParticles * VerticiesPerParticle];
             VertexDeclaration = new VertexDeclaration(ParticleVertex.SizeInBytes, ParticleVertex.VertexElements);
             VertexStride = Marshal.SizeOf(typeof(ParticleVertex));
@@ -170,22 +212,22 @@ namespace Orts.Viewer3D
 
         static IndexBuffer InitIndexBuffer(GraphicsDevice graphicsDevice, int numIndices)
         {
-            var indices = new ushort[numIndices];
-            var index = 0;
+            var indices = new uint[numIndices];
+            uint index = 0;
             for (var i = 0; i < numIndices; i += IndicesPerParticle)
             {
-                indices[i] = (ushort)index;
-                indices[i + 1] = (ushort)(index + 1);
-                indices[i + 2] = (ushort)(index + 2);
+                indices[i] = index;
+                indices[i + 1] = index + 1;
+                indices[i + 2] = index + 2;
 
-                indices[i + 3] = (ushort)(index + 2);
-                indices[i + 4] = (ushort)(index + 3);
-                indices[i + 5] = (ushort)index;
+                indices[i + 3] = index + 2;
+                indices[i + 4] = index + 3;
+                indices[i + 5] = index;
 
                 index += VerticiesPerParticle;
             }
 
-            var indexBuffer = new IndexBuffer(graphicsDevice, typeof(ushort), numIndices, BufferUsage.WriteOnly);
+            var indexBuffer = new IndexBuffer(graphicsDevice, typeof(uint), numIndices, BufferUsage.WriteOnly);
             indexBuffer.SetData(indices);
             return indexBuffer;
         }
@@ -240,20 +282,44 @@ namespace Orts.Viewer3D
 
         public void Initialize(Orts.Formats.Msts.WeatherType weather)
         {
-            ParticleDuration = ParticleBoxHeightM / (weather == Orts.Formats.Msts.WeatherType.Snow ? SnowVelocityMpS : RainVelocityMpS) / ParticleVelocityFactor;
+            ParticleDuration = ParticleBoxHeightMDynamicMinimum / (weather == Orts.Formats.Msts.WeatherType.Snow ? SnowVelocityMpS : RainVelocityMpS) / ParticleVelocityFactor;
             FirstActiveParticle = FirstNewParticle = FirstFreeParticle = FirstRetiredParticle = 0;
             ParticlesToEmit = TimeParticlesLastEmitted = 0;
             DrawCounter = 0;
+            ParticleDirectionModifier = new Vector2(1, 0);
         }
 
-        public void DynamicUpdate(Weather weather)
+        public void DynamicUpdate1(Weather weather)
         {
-            if (weather.PrecipitationLiquidity == 0 || weather.PrecipitationLiquidity == 1)
-            {
-                return;
-            }
+            ParticleDuration = ParticleBoxHeightMDynamic / ((RainVelocityMpS - SnowVelocityMpS) * weather.PrecipitationLiquidity + SnowVelocityMpS) / ParticleVelocityFactor;
+            ParticleDirectionModifier = new Vector2(1, 0);
+        }
 
-            ParticleDuration = ParticleBoxHeightM / (((RainVelocityMpS - SnowVelocityMpS) * weather.PrecipitationLiquidity) + SnowVelocityMpS) / ParticleVelocityFactor;
+        public void DynamicUpdate2(Weather weather)
+        {
+            float snowVelocityMpS = SnowVelocityMpS * 0.75f;
+            ParticleDuration = ParticleBoxHeightMDynamic / ((RainVelocityMpS - snowVelocityMpS) * weather.PrecipitationLiquidity + snowVelocityMpS) / ParticleVelocityFactor;
+            ParticleDirectionModifier = new Vector2(1, Simulator.Random.Next(-2, 3));
+        }
+
+        public void DynamicUpdate3(Weather weather)
+        {
+            float snowVelocityMpS = SnowVelocityMpS * 0.50f;
+            ParticleDuration = ParticleBoxHeightMDynamic / ((RainVelocityMpS - snowVelocityMpS) * weather.PrecipitationLiquidity + snowVelocityMpS) / ParticleVelocityFactor;
+            ParticleDirectionModifier = new Vector2(-1, 0);
+        }
+
+        public void DynamicUpdate4(Weather weather)
+        {
+            float snowVelocityMpS = SnowVelocityMpS * 0.35f;
+            ParticleDuration = ParticleBoxHeightMDynamic / ((RainVelocityMpS - snowVelocityMpS) * weather.PrecipitationLiquidity + snowVelocityMpS) / ParticleVelocityFactor;
+            ParticleDirectionModifier = new Vector2(1, 0);
+        }
+        public void DynamicUpdate5(Weather weather)
+        {
+            float snowVelocityMpS = SnowVelocityMpS * 0.25f;
+            ParticleDuration = ParticleBoxHeightMDynamic / ((RainVelocityMpS - snowVelocityMpS) * weather.PrecipitationLiquidity + snowVelocityMpS) / ParticleVelocityFactor;
+            ParticleDirectionModifier = new Vector2(-1, 0);
         }
 
         public void Update(float currentTime, ElapsedTime elapsedTime, float particlesPerSecondPerM2, Viewer viewer)
@@ -262,7 +328,9 @@ namespace Orts.Viewer3D
             var scenery = viewer.World.Scenery;
             var worldLocation = viewer.Camera.CameraWorldLocation;
             var particleDirection2D = viewer.World.WeatherControl.PrecipitationSlewMpS;
-            var particleDirection3D = new Vector3(particleDirection2D.X, 0, particleDirection2D.Y);
+            var particleDirection3D = new Vector3(particleDirection2D.X * ParticleDirectionModifier.X + ParticleDirectionModifier.Y, 0, particleDirection2D.Y);
+
+            ParticleBoxHeightMDynamic = MathHelper.Clamp(ParticleBoxHeightM / particlesPerSecondPerM2 / 4, ParticleBoxHeightMDynamicMinimum, ParticleBoxHeightM);
 
             if (TimeParticlesLastEmitted == 0)
             {
@@ -292,13 +360,27 @@ namespace Orts.Viewer3D
                 var particle = (FirstFreeParticle + 1) % MaxParticles;
                 var vertex = particle * VerticiesPerParticle;
 
-                for (var j = 0; j < VerticiesPerParticle; j++)
+                if (viewer.Simulator.Weather.PrecipitationLiquidity > 0.5)
                 {
-                    Vertices[vertex + j].StartPosition_StartTime = new Vector4(position.XNAMatrix.Translation - (particleDirection3D * ParticleDuration), time);
-                    Vertices[vertex + j].StartPosition_StartTime.Y += ParticleBoxHeightM;
-                    Vertices[vertex + j].EndPosition_EndTime = new Vector4(position.XNAMatrix.Translation, time + ParticleDuration);
-                    Vertices[vertex + j].TileXZ_Vertex = new Vector4(position.TileX, position.TileZ, j, 0);
+                    SnowFallChangeChaos = 0;
                 }
+                else
+                {
+                    SnowFallChangeChaosTimer += elapsedTime.ClockSeconds;
+                    if (SnowFallChangeChaosTimer > 1)
+                        SnowFallChangeChaosTimer = 0;
+
+                    SnowFallChangeChaos = SnowFallChangeChaosTimer < 0.5 ? -10 : 10;
+                }
+
+                for (var j = 0; j < VerticiesPerParticle; j++)
+                    {
+                        Vertices[vertex + j].StartPosition_StartTime = new Vector4(position.XNAMatrix.Translation - (particleDirection3D * ParticleDuration), time);
+                        Vertices[vertex + j].StartPosition_StartTime.X += SnowFallChangeChaos;
+                        Vertices[vertex + j].StartPosition_StartTime.Y += ParticleBoxHeightMDynamic;
+                        Vertices[vertex + j].EndPosition_EndTime = new Vector4(position.XNAMatrix.Translation, time + ParticleDuration);
+                        Vertices[vertex + j].TileXZ_Vertex = new Vector4(position.TileX, position.TileZ, j, 0);
+                    }
 
                 FirstFreeParticle = particle;
                 ParticlesToEmit--;

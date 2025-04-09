@@ -188,6 +188,7 @@ float4 PSSky(VERTEX_OUTPUT In) : COLOR
 		}
 	
 	// Fogging
+	FogColor.rgb = FogColor.rgb * 1.3;
 	skyColor.rgb = lerp(skyColor.rgb, FogColor.rgb, saturate((1 - In.Normal.y) * Fog.x));
 	
 	// Calculate angular difference between LightVector and vertex normal, radians
@@ -196,36 +197,39 @@ float4 PSSky(VERTEX_OUTPUT In) : COLOR
 	
 	// Sun glow
 	// Coefficients selected by the author to achieve the desired appearance - fot limits the effect
-	skyColor += angleRcp * Fog.y;
+	skyColor += angleRcp * Fog.y * 0.5;
 	
+	float SunSizeCoef = LightVector.y * 10;	
+	if (SunSizeCoef > 3) SunSizeCoef = 3;
+
 	// increase orange at sunset and yellow at sunrise - fog limits the effect
 	if (LightVector.x < 0)
 	{
 		// These if-statements prevent the yellow-flash effect
 		if (LightVector.y > 0.13)
 		{
-			skyColor.rg += SkyColor.z*2 * angleRcp * Fog.z;
-			skyColor.r += SkyColor.z*2 * angleRcp * Fog.z;
+			skyColor.rg += SkyColor.z * (8 - SunSizeCoef) * angleRcp * Fog.z * 0.5;
+			skyColor.r += SkyColor.z * (8 - SunSizeCoef) * angleRcp * Fog.z * 0.5;
 		}
 	
 		else
 		{
-			skyColor.rg += angleRcp * 0.075 * SkyColor.y;
-			skyColor.r += angleRcp * 0.075 * SkyColor.y;
+			skyColor.rg += angleRcp * 0.300 * SkyColor.y * 0.5;
+			skyColor.r += pow(angleRcp * 0.300 * SkyColor.y, 3);
 		}
 	}
 	else
 	{
 		if (LightVector.y > 0.15)
 		{
-			skyColor.rg += SkyColor.z*3 * angleRcp * Fog.z;
-			skyColor.r += SkyColor.z * angleRcp * Fog.z;
+			skyColor.rg += SkyColor.z * (12 - SunSizeCoef) * angleRcp * Fog.z * 0.5;
+			skyColor.r += SkyColor.z * (12 - SunSizeCoef) * angleRcp * Fog.z * 0.5;
 		}
 	
 		else
 		{
-			skyColor.rg += angleRcp * 0.075 * SkyColor.y;
-			skyColor.r += pow(angleRcp * 0.075 * SkyColor.y,2);
+			skyColor.rg += angleRcp * 0.300 * SkyColor.y * 0.5;
+			skyColor.r += pow(angleRcp * 0.300 * SkyColor.y, 1);
 		}
 	}
 	
@@ -242,13 +246,16 @@ float4 PSMoon(VERTEX_OUTPUT In) : COLOR
 	float4 moonMask = tex2D(MoonMaskSampler, In.TexCoord);
 	
 	// Fade moon during daylight
-	moonColor.a *= MoonColor.x;
+	moonColor.a *= MoonColor.x * 0;
 	
 	// Fogging
 	moonColor.rgb = lerp(moonColor.rgb, FogColor.rgb, saturate((1 - In.Normal.y) * Fog.x));
 	
 	// Mask stars behind dark side (mask fades in)
-	moonColor.a += moonMask.r * MoonColor.y;
+	moonColor.a += moonMask.r * MoonColor.y * 0.2;
+
+	if (moonColor.a > 0)	
+		moonColor *= (1 + moonColor.a) + moonColor.a;	
 		
 	return moonColor;
 }
@@ -257,7 +264,9 @@ float4 PSClouds(VERTEX_OUTPUT In) : COLOR
 {
 	float2 TexCoord = In.TexCoord.xy * CloudScalePosition.xy - CloudScalePosition.zw;
 	float4 cloudColor = tex2D(CloudMapSampler, TexCoord);
-	float alpha = cloudColor.a;
+	float alpha = cloudColor.a * 0.1;
+	
+	cloudColor.rgb *= 1.75; 
 	
     // Fogging
     cloudColor.rgb = lerp(cloudColor.rgb, FogColor.rgb, saturate((1 - In.Normal.y) * Fog.x));
@@ -268,7 +277,14 @@ float4 PSClouds(VERTEX_OUTPUT In) : COLOR
 		alpha += Overcast.x;
 		// Reduce contrast and brightness
 		float3 color = ContrastSaturationBrightness(cloudColor.xyz, 1.0, Overcast.z, Overcast.y); // Brightness and saturation are really need to be exchanged?
-		cloudColor = float4(color, alpha);
+		float CloudDim = 0.2 + (Overcast.x * (1 + (Overcast.x - 0.8)));		
+
+		if (Overcast.x > 0.8)
+		{	
+			cloudColor = float4(color * CloudDim, alpha);
+		}
+		else
+			cloudColor = float4(color, alpha);		
 	}
 	else
 	{
@@ -287,21 +303,21 @@ float4 PSClouds(VERTEX_OUTPUT In) : COLOR
 
 technique Sky {
    pass Pass_0 {
-	  VertexShader = compile vs_4_0_level_9_1 VSSky();
-	  PixelShader = compile ps_4_0_level_9_1 PSSky();
+	  VertexShader = compile vs_4_0_level_9_3 VSSky();
+	  PixelShader = compile ps_4_0_level_9_3 PSSky();
    }
 }
 
 technique Moon {
    pass Pass_0 {
-	  VertexShader = compile vs_4_0_level_9_1 VSMoon();
-	  PixelShader = compile ps_4_0_level_9_1 PSMoon();
+	  VertexShader = compile vs_4_0_level_9_3 VSMoon();
+	  PixelShader = compile ps_4_0_level_9_3 PSMoon();
    }
 }
 
 technique Clouds {
    pass Pass_0 {
-	  VertexShader = compile vs_4_0_level_9_1 VSSky();
-	  PixelShader = compile ps_4_0_level_9_1 PSClouds();
+	  VertexShader = compile vs_4_0_level_9_3 VSSky();
+	  PixelShader = compile ps_4_0_level_9_3 PSClouds();
    }
 }

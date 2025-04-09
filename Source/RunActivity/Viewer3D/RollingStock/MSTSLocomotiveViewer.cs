@@ -1177,6 +1177,7 @@ namespace Orts.Viewer3D.RollingStock
         private int _Location;
         private bool _isNightTexture;
         private bool HasCabLightDirectory = false;
+        private float CabNightColorModifier;
         public Dictionary<(CabViewControlType, int), CabViewControlRenderer> ControlMap;
         public string[] ActiveScreen = { "default", "default", "default", "default", "default", "default", "default", "default" };
 
@@ -1467,8 +1468,8 @@ namespace Orts.Viewer3D.RollingStock
             if (!_Locomotive.ShowCab)
                 return;
 
-            bool Dark = _Viewer.MaterialManager.sunDirection.Y <= -0.085f || _Viewer.Camera.IsUnderground;
-            bool CabLight = _Locomotive.CabLightOn;
+            bool Dark = _Viewer.MaterialManager.sunDirection.Y <= -0.085f || _Viewer.Simulator.CabInDarkTunnel;
+            bool CabLight = _Viewer.Simulator.CabLightOn = _Locomotive.CabLightOn;
 
             CabCamera cbc = _Viewer.Camera as CabCamera;
             if (cbc != null)
@@ -1484,6 +1485,39 @@ namespace Orts.Viewer3D.RollingStock
             _CabTexture = CABTextureManager.GetTexture(_Locomotive.CabViewList[i].CVFFile.TwoDViews[_Location], Dark, CabLight, out _isNightTexture, HasCabLightDirectory);
             if (_CabTexture == SharedMaterialManager.MissingTexture)
                 return;
+
+            var overcastAmbientLightCoef = 1.0f - (_Viewer.Simulator.Weather.CloudCoverFactor / 3.0f);
+            var ambientLightCoef = _Viewer.Simulator.Weather.SeasonAmbientLightCoef * _Viewer.Simulator.Weather.DayTimeAmbientLightCoef * overcastAmbientLightCoef;
+            var overcast = _Viewer.Settings.UseMSTSEnv ? _Viewer.World.MSTSSky.mstsskyovercastFactor : _Viewer.Simulator.Weather.CloudCoverFactor;
+
+            CabNightColorModifier = ambientLightCoef *
+                MathHelper.Lerp(_Viewer.MaterialManager.SceneryShader.NightBrightness, 1,
+                Dark ? 1 : MathHelper.Clamp((_Viewer.MaterialManager.sunDirection.Y + 0.1f) / 0.2f, 0, 1) * MathHelper.Clamp(1.5f - overcast, 0, 1));
+
+            Program.Viewer.Simulator.CabInDarkTunnel = false;
+            if (_Viewer.Camera.IsUnderground && _Viewer.Camera.AttachedCar == _Locomotive
+                && _Locomotive.CarTunnelData.LengthMOfTunnelAheadFront > 0 && _Locomotive.CarTunnelData.FrontPositionBeyondStartOfTunnel > 0)
+            {
+                if (_Locomotive.CarTunnelData.LengthMOfTunnelAheadFront + _Locomotive.CarTunnelData.LengthMOfTunnelBehindRear > _Locomotive.CarTunnelData.FrontPositionBeyondStartOfTunnel)
+                {
+                    // Dark tunnel
+                    CabNightColorModifier = 0.075f;
+                    Dark = _Viewer.Simulator.CabInDarkTunnel = true;
+                }
+                else
+                {
+                    var transientLength = 35;
+                    CabNightColorModifier *= 1 - Math.Min((float)_Locomotive.CarTunnelData.FrontPositionBeyondStartOfTunnel, (float)_Locomotive.CarTunnelData.LengthMOfTunnelAheadFront) / transientLength;
+                    if (CabNightColorModifier < 0.075f)
+                        CabNightColorModifier = 0.075f;
+                }
+            }
+
+            if (_Viewer.Simulator.CabLightOn)
+                CabNightColorModifier = 1;
+
+            _Viewer.Simulator.DashLightCanActivate = CabNightColorModifier < 0.30f || Dark;
+
 
             if (_PrevScreenSize != _Viewer.DisplaySize && _Shader != null)
             {
@@ -1533,7 +1567,7 @@ namespace Orts.Viewer3D.RollingStock
             {
                 // TODO: Readd ability to control night time lighting.
                 float overcast = _Viewer.Settings.UseMSTSEnv ? _Viewer.World.MSTSSky.mstsskyovercastFactor : _Viewer.Simulator.Weather.CloudCoverFactor;
-                _Shader.SetData(_Viewer.MaterialManager.sunDirection, _isNightTexture, false, overcast);
+                _Shader.SetData(false, CabNightColorModifier);
                 _Shader.SetTextureData(cabRect.Left, cabRect.Top, cabRect.Width, cabRect.Height);
                 _Shader.CurrentTechnique.Passes[0].Apply();
             }
@@ -1730,7 +1764,10 @@ namespace Orts.Viewer3D.RollingStock
         {
             ControlDial = control;
 
-            Texture = CABTextureManager.GetTexture(Control.ACEFile, false, false, out IsNightTexture, HasCabLightDirectory);
+            var dark = Viewer.MaterialManager.sunDirection.Y <= -0.085f || Viewer.Simulator.CabInDarkTunnel;
+            var dashLight = Viewer.Simulator.DashLightCanActivate && Locomotive.CabLightOn;
+
+            Texture = CABTextureManager.GetTexture(Control.ACEFile, dark, dashLight, out IsNightTexture, HasCabLightDirectory);
             if (ControlDial.Height < Texture.Height)
                 Scale = (float)(ControlDial.Height / Texture.Height);
             Origin = new Vector2((float)Texture.Width / 2, ControlDial.Center / Scale);
@@ -1738,9 +1775,10 @@ namespace Orts.Viewer3D.RollingStock
 
         public override void PrepareFrame(RenderFrame frame, ElapsedTime elapsedTime)
         {
-            var dark = Viewer.MaterialManager.sunDirection.Y <= -0.085f || Viewer.Camera.IsUnderground;
+            var dark = Viewer.MaterialManager.sunDirection.Y <= -0.085f || Viewer.Simulator.CabInDarkTunnel;
+            var dashLight = Viewer.Simulator.DashLightCanActivate && Locomotive.CabLightOn;
 
-            Texture = CABTextureManager.GetTexture(Control.ACEFile, dark, Locomotive.CabLightOn, out IsNightTexture, HasCabLightDirectory);
+            Texture = CABTextureManager.GetTexture(Control.ACEFile, dark, dashLight, out IsNightTexture, HasCabLightDirectory);
             if (Texture == SharedMaterialManager.MissingTexture)
                 return;
 
@@ -1793,8 +1831,11 @@ namespace Orts.Viewer3D.RollingStock
             Gauge = control;
             if ((Control.ControlType.Type == CABViewControlTypes.REVERSER_PLATE) || (Gauge.ControlStyle == CABViewControlStyles.POINTER))
             {
+                var dark = Viewer.MaterialManager.sunDirection.Y <= -0.085f || Viewer.Simulator.CabInDarkTunnel;
+                var dashLight = Viewer.Simulator.DashLightCanActivate && Locomotive.CabLightOn;
+
                 DrawColor = Color.White;
-                Texture = CABTextureManager.GetTexture(Control.ACEFile, false, Locomotive.CabLightOn, out IsNightTexture, HasCabLightDirectory);
+                Texture = CABTextureManager.GetTexture(Control.ACEFile, dark, dashLight, out IsNightTexture, HasCabLightDirectory);
                 SourceRectangle.Width = (int)Texture.Width;
                 SourceRectangle.Height = (int)Texture.Height;
             }
@@ -1808,9 +1849,12 @@ namespace Orts.Viewer3D.RollingStock
         public CabViewGaugeRenderer(Viewer viewer, MSTSLocomotive locomotive, CVCFirebox control, CabShader shader)
             : base(viewer, locomotive, control, shader)
         {
+            var dark = Viewer.MaterialManager.sunDirection.Y <= -0.085f || Viewer.Simulator.CabInDarkTunnel;
+            var dashLight = Viewer.Simulator.DashLightCanActivate && Locomotive.CabLightOn;
+
             Gauge = control;
             HasCabLightDirectory = CABTextureManager.LoadTextures(Viewer, control.FireACEFile);
-            Texture = CABTextureManager.GetTexture(control.FireACEFile, false, Locomotive.CabLightOn, out IsNightTexture, HasCabLightDirectory);
+            Texture = CABTextureManager.GetTexture(control.FireACEFile, dark, dashLight, out IsNightTexture, HasCabLightDirectory);
             DrawColor = Color.White;
             SourceRectangle.Width = (int)Texture.Width;
             SourceRectangle.Height = (int)Texture.Height;
@@ -1830,8 +1874,10 @@ namespace Orts.Viewer3D.RollingStock
         {
             if (!(Gauge is CVCFirebox))
             {
-                var dark = Viewer.MaterialManager.sunDirection.Y <= -0.085f || Viewer.Camera.IsUnderground;
-                Texture = CABTextureManager.GetTexture(Control.ACEFile, dark, Locomotive.CabLightOn, out IsNightTexture, HasCabLightDirectory);
+                var dark = Viewer.MaterialManager.sunDirection.Y <= -0.085f || Viewer.Simulator.CabInDarkTunnel;
+                var dashLight = Viewer.Simulator.DashLightCanActivate && Locomotive.CabLightOn;
+
+                Texture = CABTextureManager.GetTexture(Control.ACEFile, dark, dashLight, out IsNightTexture, HasCabLightDirectory);
             }
             if (Texture == SharedMaterialManager.MissingTexture)
                 return;
@@ -2076,9 +2122,10 @@ namespace Orts.Viewer3D.RollingStock
 
         protected void PrepareFrameForIndex(RenderFrame frame, ElapsedTime elapsedTime, int index)
         {
-            var dark = Viewer.MaterialManager.sunDirection.Y <= -0.085f || Viewer.Camera.IsUnderground;
+            var dark = Viewer.MaterialManager.sunDirection.Y <= -0.085f || Viewer.Simulator.CabInDarkTunnel;
+            var dashLight = Locomotive.CabLightOn && Viewer.Simulator.DashLightCanActivate;
 
-            Texture = CABTextureManager.GetTextureByIndexes(Control.ACEFile, index, dark, Locomotive.CabLightOn, out IsNightTexture, HasCabLightDirectory);
+            Texture = CABTextureManager.GetTextureByIndexes(Control.ACEFile, index, dark, dashLight, out IsNightTexture, HasCabLightDirectory);
             if (Texture == SharedMaterialManager.MissingTexture)
                 return;
 

@@ -75,12 +75,22 @@ namespace Orts.Simulation
             Moderate,
             Heavy,
         }
+
+        public enum WeatherKind
+        {
+            Clear,
+            Overcast,
+            Precipitation,
+            Dynamic,
+        }
     }
 
     public class Weather
     {
         // Fog/visibility distance. Ranges from 10m (can't see anything), 5km (medium), 20km (clear) to 100km (clear arctic).
         public float VisibilityM;
+        public float MorningVisibilityM;
+        public float DaytimeVisibilityM;
 
         // Cloud cover factor: 0.0 = almost no clouds; 0.1 = wispy clouds; 1.0 = total overcast.
         public float CloudCoverFactor;
@@ -108,5 +118,18 @@ namespace Orts.Simulation
             get => (float)Math.Atan2(WindInstantaneousDirection.X, -WindInstantaneousDirection.Y);
             set => WindInstantaneousDirection = new Vector2((float)Math.Sin(value), -(float)Math.Cos(value));
         }
+
+        public float SeasonAmbientLightCoef;
+        public float DayTimeAmbientLightChangeCoef;
+        public float DayTimeAmbientLightCoef;
+        public float GameTimeToHoursLowBorder;
+        public float GameTimeToHoursHighBorder;
+        public float MorningFogHour;
+        public float EveningFogHour;
+        public float NightStartHour;
+        public float NightEndHour;
+        public float SeasonFogMin;
+        public float SeasonFogMax;
+        public int WindSpeedFactor; // Index into WindSpeedBeaufortMpS
     }
 }

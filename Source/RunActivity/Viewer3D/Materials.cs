@@ -941,7 +941,7 @@ namespace Orts.Viewer3D
            return oneMore;
        }
 
-        protected bool IsNightTimeOrUnderground() => (Options & SceneryMaterialOptions.UndergroundTexture) != 0 && (Viewer.MaterialManager.sunDirection.Y < -0.085f || Viewer.Camera.IsUnderground) || Viewer.MaterialManager.sunDirection.Y < -(float)KeyLengthRemainder() / 5000f;
+        protected bool IsNightTimeOrUnderground() => (Options & SceneryMaterialOptions.UndergroundTexture) != 0 && (Viewer.MaterialManager.sunDirection.Y < -0.085f || Viewer.Simulator.CabInDarkTunnel) || Viewer.MaterialManager.sunDirection.Y < -(float)KeyLengthRemainder() / 5000f;
 
         public override void SetState(GraphicsDevice graphicsDevice, Material previousMaterial)
         {
@@ -1111,7 +1111,7 @@ namespace Orts.Viewer3D
         {
             var timeOffset = ((float)KeyLengthRemainder()) / 5000f; // TODO for later use for pseudorandom texture switch time
             if (NightTexture != null && NightTexture != SharedMaterialManager.MissingTexture && (((Options & SceneryMaterialOptions.UndergroundTexture) != 0 &&
-                (Viewer.MaterialManager.sunDirection.Y < -0.085f || Viewer.Camera.IsUnderground)) || Viewer.MaterialManager.sunDirection.Y < 0.0f - ((float)KeyLengthRemainder()) / 5000f))
+                (Viewer.MaterialManager.sunDirection.Y < -0.085f || Viewer.Simulator.CabInDarkTunnel)) || Viewer.MaterialManager.sunDirection.Y < 0.0f - ((float)KeyLengthRemainder()) / 5000f))
                 return NightTexture;
 
             return Texture;

@@ -187,22 +187,17 @@ namespace Orts.Viewer3D
                 if (UserInput.IsDown(UserCommand.DebugFogIncrease)) mstsskyfogDistance = MathHelper.Clamp(mstsskyfogDistance - elapsedTime.RealSeconds * mstsskyfogDistance, 10, 100000);
                 if (UserInput.IsDown(UserCommand.DebugFogDecrease)) mstsskyfogDistance = MathHelper.Clamp(mstsskyfogDistance + elapsedTime.RealSeconds * mstsskyfogDistance, 10, 100000);
             }
-            // Don't let clock shift if multiplayer.
-            if (!MPManager.IsMultiPlayer())
-            {
-                // Shift the clock forwards or backwards at 1h-per-second.
-                if (UserInput.IsDown(UserCommand.DebugClockForwards)) MSTSSkyViewer.Simulator.ClockTime += elapsedTime.RealSeconds * 3600;
-                if (UserInput.IsDown(UserCommand.DebugClockBackwards)) MSTSSkyViewer.Simulator.ClockTime -= elapsedTime.RealSeconds * 3600;
-            }
             // Server needs to notify clients of weather changes.
             if (MPManager.IsServer())
             {
                 if (UserInput.IsReleased(UserCommand.DebugOvercastIncrease) || UserInput.IsReleased(UserCommand.DebugOvercastDecrease) || UserInput.IsReleased(UserCommand.DebugFogIncrease) || UserInput.IsReleased(UserCommand.DebugFogDecrease))
                 {
                     manager.SetEnvInfo(mstsskyovercastFactor, mstsskyfogDistance);
-                    MPManager.Notify(new MSGWeather(-1, mstsskyovercastFactor, -1, mstsskyfogDistance).ToString());
+                    MPManager.Notify(new MSGWeather(-1, mstsskyovercastFactor, -1, -1, mstsskyfogDistance, -1000, -1000).ToString());
                 }
             }
+
+            ////////////////////////////////////////////////////////////////////
 
             skySteps.SetSunAndMoonDirection(ref mstsskysolarDirection, ref mstsskylunarDirection, mstsskysolarPosArray, mstsskylunarPosArray,
                 MSTSSkyViewer.Simulator.ClockTime);

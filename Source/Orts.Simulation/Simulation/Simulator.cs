@@ -29,6 +29,7 @@ using Orts.Simulation.RollingStocks.SubSystems.PowerSupplies;
 using Orts.Simulation.RollingStocks.SubSystems;
 using Orts.Simulation.Signalling;
 using Orts.Simulation.Timetables;
+using Orts.Simulation;
 using ORTS.Common;
 using ORTS.Scripting.Api;
 using ORTS.Settings;
@@ -66,6 +67,7 @@ namespace Orts.Simulation
 
         public bool Paused = true;          // start off paused, set to true once the viewer is fully loaded and initialized
         public float GameSpeed = 1;
+        public float HourSpeed = 1;
         /// <summary>
         /// Monotonically increasing time value (in seconds) for the simulation. Starts at 0 and only ever increases, at <see cref="GameSpeed"/>.
         /// Does not change if game is <see cref="Paused"/>.
@@ -115,6 +117,8 @@ namespace Orts.Simulation
         public AI AI;
         public SeasonType Season;
         public WeatherType WeatherType;
+        public WeatherConstants.WeatherKind WeatherKind;
+        public WeatherConstants.Condition WeatherCondition;
         public string UserWeatherFile = string.Empty;
         public SignalConfigurationFile SIGCFG;
         public string ExplorePathFile;
@@ -175,6 +179,12 @@ namespace Orts.Simulation
         public bool PlayerIsInCab = false;
         public readonly bool MilepostUnitsMetric;
         public bool OpenDoorsInAITrains;
+
+        public int UpdateCounter;
+        const int FULLUPDATECYCLE = 10;
+        public bool DashLightCanActivate;
+        public bool CabLightOn;
+        public bool CabInDarkTunnel;
 
         public int ActiveMovingTableIndex = -1;
         public MovingTable ActiveMovingTable
@@ -787,7 +797,7 @@ namespace Orts.Simulation
         /// </summary>
         public float GetElapsedClockSeconds(float elapsedRealSeconds)
         {
-            return elapsedRealSeconds * (Paused ? 0 : GameSpeed);
+            return elapsedRealSeconds * (Paused ? 0 : GameSpeed * HourSpeed);
         }
 
         /// <summary>
@@ -801,6 +811,9 @@ namespace Orts.Simulation
             // Advance the times.
             GameTime += elapsedClockSeconds;
             ClockTime += elapsedClockSeconds;
+
+            UpdateCounter++;
+            UpdateCounter %= FULLUPDATECYCLE;
 
             // Check if there is a request to switch to another played train
 

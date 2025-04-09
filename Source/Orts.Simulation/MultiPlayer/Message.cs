@@ -1,4 +1,4 @@
-// COPYRIGHT 2012, 2013 by the Open Rails project.
+﻿// COPYRIGHT 2012, 2013 by the Open Rails project.
 // 
 // This file is part of Open Rails.
 // 
@@ -3522,31 +3522,47 @@ namespace Orts.MultiPlayer
     {
         public int weather;
         public float overcast;
-        public float pricipitation;
+        public float precipitation;
+        public float liquidity;
         public float fog;
+        public float windspeed;
+        public float windDirection;
 
         public MSGWeather(string m)
         {
-            weather = -1; overcast = pricipitation = fog = -1;
+            weather = -1; overcast = precipitation = liquidity = fog = -1;  windspeed = windDirection = -1000;
             var tmp = m.Split(' ');
             weather = int.Parse(tmp[0]);
             overcast = float.Parse(tmp[1], CultureInfo.InvariantCulture);
-            pricipitation = float.Parse(tmp[2], CultureInfo.InvariantCulture);
-            fog = float.Parse(tmp[3], CultureInfo.InvariantCulture);
+            precipitation = float.Parse(tmp[2], CultureInfo.InvariantCulture);
+            liquidity = float.Parse(tmp[3], CultureInfo.InvariantCulture);
+            fog = float.Parse(tmp[4], CultureInfo.InvariantCulture);
+            windspeed = float.Parse(tmp[5], CultureInfo.InvariantCulture);
+            windDirection = float.Parse(tmp[6], CultureInfo.InvariantCulture);
         }
 
-        public MSGWeather(int w, float o, float p, float f)
+        public MSGWeather(int w, float o, float p, float l, float f, float ws, float wd)
         {
-            weather = -1; overcast = pricipitation = fog = -1;
+            weather = -1; overcast = precipitation = liquidity = fog = -1; windspeed = windDirection = -1000;
             if (w >= 0) weather = w;
             if (o >= 0) overcast = o;
-            if (p >= 0) pricipitation = p;
+            if (p >= 0) precipitation = p;
+            if (l >= 0) liquidity = l;
             if (f >= 0) fog = f;
+            if (ws > -1000) windspeed = ws;
+            if (wd > -1000) windDirection = wd;
         }
 
         public override string ToString()
         {
-            var tmp = "WEATHER " + weather + " " + overcast.ToString(CultureInfo.InvariantCulture) + " " + pricipitation.ToString(CultureInfo.InvariantCulture) + " " + fog.ToString(CultureInfo.InvariantCulture);
+            var tmp = "WEATHER " 
+                + weather 
+                + " " + overcast.ToString(CultureInfo.InvariantCulture) 
+                + " " + precipitation.ToString(CultureInfo.InvariantCulture) 
+                + " " + liquidity.ToString(CultureInfo.InvariantCulture)
+                + " " + fog.ToString(CultureInfo.InvariantCulture)
+                + " " + windspeed.ToString(CultureInfo.InvariantCulture)
+                + " " + windDirection.ToString(CultureInfo.InvariantCulture);
             return " " + tmp.Length + ": " + tmp;
         }
 
@@ -3561,14 +3577,26 @@ namespace Orts.MultiPlayer
             {
                 MPManager.Instance().overcastFactor = overcast;
             }
-            if (pricipitation >= 0)
+            if (precipitation >= 0)
             {
-                MPManager.Instance().pricipitationIntensity = pricipitation;
+                MPManager.Instance().precipitationIntensity = precipitation;
+            }
+            if (liquidity >= 0)
+            {
+                MPManager.Instance().precipitationLiquidity = liquidity;
             }
             if (fog >= 0)
             {
                 MPManager.Instance().fogDistance = fog;
             }
+            if (windspeed > -1000)
+            {
+                MPManager.Instance().windSpeedFactor = windspeed;
+            }            
+            if (windDirection > -1000)
+            {
+                MPManager.Instance().windDirectionFactor = windDirection;
+            }            
             MPManager.Instance().weatherChanged = true;
         }
     }

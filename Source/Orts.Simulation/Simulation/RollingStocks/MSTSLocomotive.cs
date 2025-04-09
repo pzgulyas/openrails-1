@@ -2351,9 +2351,9 @@ namespace Orts.Simulation.RollingStocks
 
                 Trace.TraceInformation("Adhesion Conditions: {0}", LocomotiveAxle.AdhesionConditions);
 
-                Trace.TraceInformation("Fog - Min {0} fog {1}", Math.Min((Simulator.Weather.FogDistance * 2.75e-4f + 0.45f), 1.0f), Simulator.Weather.FogDistance);
+                Trace.TraceInformation("Fog - Min {0} fog {1}", Math.Min((Simulator.Weather.VisibilityM * 2.75e-4f + 0.45f), 1.0f), Simulator.Weather.VisibilityM);
 
-                Trace.TraceInformation("Rain - Min {0} pric {1}", Math.Min((Simulator.Weather.PricipitationIntensityPPSPM2 * 0.0078f + 0.45f), 0.607f), Simulator.Weather.PricipitationIntensityPPSPM2);
+                Trace.TraceInformation("Rain - Min {0} pric {1}", Math.Min((Simulator.Weather.PrecipitationIntensityPPSPM2 * 0.0078f + 0.45f), 0.607f), Simulator.Weather.PrecipitationIntensityPPSPM2);
 
             }
 #endif
