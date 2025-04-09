@@ -29,6 +29,7 @@ using Orts.Simulation.RollingStocks.SubSystems.PowerSupplies;
 using Orts.Simulation.RollingStocks.SubSystems;
 using Orts.Simulation.Signalling;
 using Orts.Simulation.Timetables;
+using Orts.Simulation;
 using ORTS.Common;
 using ORTS.Scripting.Api;
 using ORTS.Settings;
@@ -115,6 +116,8 @@ namespace Orts.Simulation
         public AI AI;
         public SeasonType Season;
         public WeatherType WeatherType;
+        public WeatherConstants.WeatherKind WeatherKind;
+        public WeatherConstants.Condition WeatherCondition;
         public string UserWeatherFile = string.Empty;
         public SignalConfigurationFile SIGCFG;
         public string ExplorePathFile;

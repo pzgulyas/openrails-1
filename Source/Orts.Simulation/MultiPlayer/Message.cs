@@ -1,4 +1,4 @@
-// COPYRIGHT 2012, 2013 by the Open Rails project.
+﻿// COPYRIGHT 2012, 2013 by the Open Rails project.
 // 
 // This file is part of Open Rails.
 // 
@@ -3515,38 +3515,58 @@ namespace Orts.MultiPlayer
         }
     }
 
-#endregion MSGText
+    #endregion MSGText
 
-#region MSGWeather
+    #region MSGWeather
     public class MSGWeather : Message
     {
         public int weather;
         public float overcast;
         public float pricipitation;
+        public float liquidity;
         public float fog;
+        public float windspeed;
+        public float windDirection;
+        public float snowVelocity;
 
         public MSGWeather(string m)
         {
-            weather = -1; overcast = pricipitation = fog = -1;
+            weather = -1; overcast = pricipitation = liquidity = fog = -1; windspeed = windDirection = -1000; snowVelocity = -1;
             var tmp = m.Split(' ');
             weather = int.Parse(tmp[0]);
             overcast = float.Parse(tmp[1], CultureInfo.InvariantCulture);
             pricipitation = float.Parse(tmp[2], CultureInfo.InvariantCulture);
-            fog = float.Parse(tmp[3], CultureInfo.InvariantCulture);
+            liquidity = float.Parse(tmp[3], CultureInfo.InvariantCulture);
+            fog = float.Parse(tmp[4], CultureInfo.InvariantCulture);
+            windspeed = float.Parse(tmp[5], CultureInfo.InvariantCulture);
+            windDirection = float.Parse(tmp[6], CultureInfo.InvariantCulture);
+            snowVelocity = float.Parse(tmp[7], CultureInfo.InvariantCulture);
         }
 
-        public MSGWeather(int w, float o, float p, float f)
+        public MSGWeather(int w, float o, float p, float l, float f, float ws, float wd, float sv)
         {
-            weather = -1; overcast = pricipitation = fog = -1;
+            weather = -1; overcast = pricipitation = liquidity = fog = -1; windspeed = windDirection = -1000; snowVelocity = -1;
             if (w >= 0) weather = w;
             if (o >= 0) overcast = o;
             if (p >= 0) pricipitation = p;
+            if (l >= 0) liquidity = l;
             if (f >= 0) fog = f;
+            if (ws > -1000) windspeed = ws;
+            if (wd > -1000) windDirection = wd;
+            if (sv >= 0) snowVelocity = sv;
         }
 
         public override string ToString()
         {
-            var tmp = "WEATHER " + weather + " " + overcast.ToString(CultureInfo.InvariantCulture) + " " + pricipitation.ToString(CultureInfo.InvariantCulture) + " " + fog.ToString(CultureInfo.InvariantCulture);
+            var tmp = "WEATHER "
+                + weather
+                + " " + overcast.ToString(CultureInfo.InvariantCulture)
+                + " " + pricipitation.ToString(CultureInfo.InvariantCulture)
+                + " " + liquidity.ToString(CultureInfo.InvariantCulture)
+                + " " + fog.ToString(CultureInfo.InvariantCulture)
+                + " " + windspeed.ToString(CultureInfo.InvariantCulture)
+                + " " + windDirection.ToString(CultureInfo.InvariantCulture)
+                + " " + snowVelocity.ToString(CultureInfo.InvariantCulture);
             return " " + tmp.Length + ": " + tmp;
         }
 
@@ -3565,17 +3585,33 @@ namespace Orts.MultiPlayer
             {
                 MPManager.Instance().pricipitationIntensity = pricipitation;
             }
+            if (liquidity >= 0)
+            {
+                MPManager.Instance().pricipitationLiquidity = liquidity;
+            }
             if (fog >= 0)
             {
                 MPManager.Instance().fogDistance = fog;
+            }
+            if (windspeed > -1000)
+            {
+                MPManager.Instance().windSpeedFactor = windspeed;
+            }
+            if (windDirection > -1000)
+            {
+                MPManager.Instance().windDirectionFactor = windDirection;
+            }
+            if (snowVelocity >= 0)
+            {
+                MPManager.Instance().snowSpeedFactor = snowVelocity;
             }
             MPManager.Instance().weatherChanged = true;
         }
     }
 
-#endregion MSGWeather
+    #endregion MSGWeather
 
-#region MSGAider
+    #region MSGAider
     public class MSGAider : Message
     {
         public string user;

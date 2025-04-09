@@ -1,4 +1,4 @@
-// COPYRIGHT 2009 - 2023 by the Open Rails project.
+﻿// COPYRIGHT 2009 - 2023 by the Open Rails project.
 //
 // This file is part of Open Rails.
 //
@@ -40,6 +40,10 @@ namespace Orts.Viewer3D
 
         readonly Material Material;
         readonly PrecipitationPrimitive Precipitation;
+        readonly PrecipitationPrimitive Precipitation2;
+        readonly PrecipitationPrimitive Precipitation3;
+        readonly PrecipitationPrimitive Precipitation4;
+        readonly PrecipitationPrimitive Precipitation5;
 
         public PrecipitationViewer(Viewer viewer)
         {
@@ -48,15 +52,37 @@ namespace Orts.Viewer3D
 
             Material = viewer.MaterialManager.Load("Precipitation");
             Precipitation = new PrecipitationPrimitive(Viewer.GraphicsDevice);
+            Precipitation2 = new PrecipitationPrimitive(Viewer.GraphicsDevice);
+            Precipitation3 = new PrecipitationPrimitive(Viewer.GraphicsDevice);
+            Precipitation4 = new PrecipitationPrimitive(Viewer.GraphicsDevice);
+            Precipitation5 = new PrecipitationPrimitive(Viewer.GraphicsDevice);
 
             Reset();
         }
 
         public void PrepareFrame(RenderFrame frame, ElapsedTime elapsedTime)
         {
+            if (Program.Simulator.PlayerCarIsInTunnelBeginM > 0f && Program.Simulator.PlayerCarIsInTunnelEndM > 0f && Program.Simulator.PlayerCarIsInTunnel)
+            {
+                return;
+            }
+
             var gameTime = (float)Viewer.Simulator.GameTime;
             Precipitation.DynamicUpdate(Weather);
             Precipitation.Update(gameTime, elapsedTime, Weather.PrecipitationIntensityPPSPM2, Viewer);
+            Precipitation.Update(gameTime, elapsedTime, Weather.PrecipitationIntensityPPSPM2 * (2f / 3f), Viewer);
+            Precipitation2.DynamicUpdate2(Weather);
+            Precipitation2.Update(gameTime, elapsedTime, Weather.PrecipitationIntensityPPSPM2 * (1f / 3f), Viewer);
+
+            if (Viewer.Simulator.WeatherType == Formats.Msts.WeatherType.Snow)
+            {
+                Precipitation3.DynamicUpdate3(Weather);
+                Precipitation3.Update(gameTime, elapsedTime, Weather.PrecipitationIntensityPPSPM2 / 100f, Viewer);
+                Precipitation4.DynamicUpdate4(Weather);
+                Precipitation4.Update(gameTime, elapsedTime, Weather.PrecipitationIntensityPPSPM2 / 100f, Viewer);
+                Precipitation5.DynamicUpdate5(Weather);
+                Precipitation5.Update(gameTime, elapsedTime, Weather.PrecipitationIntensityPPSPM2 / 100f, Viewer);
+            }
 
             // Note: This is quite a hack. We ideally should be able to pass this through RenderItem somehow.
             var xnaWorldLocation = Matrix.Identity;
@@ -65,6 +91,10 @@ namespace Orts.Viewer3D
             xnaWorldLocation.M22 = Viewer.Camera.TileZ;
 
             frame.AddPrimitive(Material, Precipitation, RenderPrimitiveGroup.Precipitation, ref xnaWorldLocation);
+            frame.AddPrimitive(Material, Precipitation2, RenderPrimitiveGroup.Precipitation, ref xnaWorldLocation);
+            frame.AddPrimitive(Material, Precipitation3, RenderPrimitiveGroup.Precipitation, ref xnaWorldLocation);
+            frame.AddPrimitive(Material, Precipitation4, RenderPrimitiveGroup.Precipitation, ref xnaWorldLocation);
+            frame.AddPrimitive(Material, Precipitation5, RenderPrimitiveGroup.Precipitation, ref xnaWorldLocation);
         }
 
         public void Reset()
@@ -248,12 +278,42 @@ namespace Orts.Viewer3D
 
         public void DynamicUpdate(Weather weather)
         {
-            if (weather.PrecipitationLiquidity == 0 || weather.PrecipitationLiquidity == 1)
-            {
-                return;
-            }
-
             ParticleDuration = ParticleBoxHeightM / (((RainVelocityMpS - SnowVelocityMpS) * weather.PrecipitationLiquidity) + SnowVelocityMpS) / ParticleVelocityFactor;
+        }
+
+        public void DynamicUpdate2(Weather weather)
+        {
+            //if (weather.PrecipitationLiquidity == 0 || weather.PrecipitationLiquidity == 1) return;
+            float snowVelocityMpS = SnowVelocityMpS * 0.75f;
+            ParticleDuration = ParticleBoxHeightMDynamic / ((RainVelocityMpS - snowVelocityMpS) * weather.PrecipitationLiquidity + snowVelocityMpS) / ParticleVelocityFactor;
+            wind.X = 18 * weather.PrecipitationLiquidity + Simulator.Random.Next(-2, 3);
+            ParticleDirection = wind;
+        }
+
+        public void DynamicUpdate3(Weather weather)
+        {
+            //if (weather.PrecipitationLiquidity == 0 || weather.PrecipitationLiquidity == 1) return;
+            float snowVelocityMpS = SnowVelocityMpS * 0.50f;
+            ParticleDuration = ParticleBoxHeightMDynamic / ((RainVelocityMpS - snowVelocityMpS) * weather.PrecipitationLiquidity + snowVelocityMpS) / ParticleVelocityFactor;
+            wind.X *= -1f;
+            ParticleDirection = wind;
+        }
+
+        public void DynamicUpdate4(Weather weather)
+        {
+            //if (weather.PrecipitationLiquidity == 0 || weather.PrecipitationLiquidity == 1) return;
+            float snowVelocityMpS = SnowVelocityMpS * 0.35f;
+            ParticleDuration = ParticleBoxHeightMDynamic / ((RainVelocityMpS - snowVelocityMpS) * weather.PrecipitationLiquidity + snowVelocityMpS) / ParticleVelocityFactor;
+            wind.X *= -1f;
+            ParticleDirection = wind;
+        }
+        public void DynamicUpdate5(Weather weather)
+        {
+            //if (weather.PrecipitationLiquidity == 0 || weather.PrecipitationLiquidity == 1) return;
+            float snowVelocityMpS = SnowVelocityMpS * 0.25f;
+            ParticleDuration = ParticleBoxHeightMDynamic / ((RainVelocityMpS - snowVelocityMpS) * weather.PrecipitationLiquidity + snowVelocityMpS) / ParticleVelocityFactor;
+            wind.X *= -1f;
+            ParticleDirection = wind;
         }
 
         public void Update(float currentTime, ElapsedTime elapsedTime, float particlesPerSecondPerM2, Viewer viewer)

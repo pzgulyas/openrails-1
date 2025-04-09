@@ -183,6 +183,179 @@ namespace Orts.Viewer3D
             const float ShadowBrightness = 0.5f;
             const float NightBrightness = 0.2f;
 
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+            // Icik            
+            // Mění intenzitu okolního světla v závislosti na ročním období a denní době
+            float GameTimeToHours = (float)Program.Simulator.ClockTime / 60f / 60f;
+            while (GameTimeToHours > 24f) GameTimeToHours = GameTimeToHours - 24f;
+            Program.Simulator.GameTimeHours = GameTimeToHours;
+
+            //Program.Simulator.Confirmer.Information("DayTimeAmbientLightCoef = " + Program.Simulator.DayTimeAmbientLightCoef);            
+
+            Program.Simulator.SeasonAmbientLightCoef = SeasonAmbientLightCoef;
+            switch (Program.Simulator.Season)
+            {
+                case SeasonType.Spring:
+                    {
+                        SeasonAmbientLightCoef = 0.9f;
+                        GameTimeToHoursLowBorder = 10f;
+                        GameTimeToHoursHighBorder = 12f;
+                        DayTimeAmbientLightChangeCoef = 1f;
+                        MorningFogDistance = 1000f;
+                        MorningFogHour = 7f;
+                        EveningFogHour = 5f;
+
+                        if (GameTimeToHours > GameTimeToHoursHighBorder)
+                            Program.Simulator.DayTimeAmbientLightCoef = GameTimeToHoursHighBorder / GameTimeToHoursLowBorder - ((GameTimeToHours / GameTimeToHoursHighBorder - 1) * DayTimeAmbientLightChangeCoef);
+                        else
+                            Program.Simulator.DayTimeAmbientLightCoef = GameTimeToHours / GameTimeToHoursLowBorder;
+
+                        Program.Simulator.DayTimeAmbientLightCoef = MathHelper.Clamp(Program.Simulator.DayTimeAmbientLightCoef, 0.5f, 1.0f);
+                    }
+                    break;
+                case SeasonType.Summer:
+                    {
+                        SeasonAmbientLightCoef = 1.1f;
+                        GameTimeToHoursLowBorder = 10f;
+                        GameTimeToHoursHighBorder = 15f;
+                        DayTimeAmbientLightChangeCoef = 3f;
+                        MorningFogDistance = 2000f;
+                        MorningFogHour = 6f;
+                        EveningFogHour = 5f;
+
+                        if (GameTimeToHours > GameTimeToHoursHighBorder)
+                            Program.Simulator.DayTimeAmbientLightCoef = GameTimeToHoursHighBorder / GameTimeToHoursLowBorder - ((GameTimeToHours / GameTimeToHoursHighBorder - 1) * DayTimeAmbientLightChangeCoef);
+                        else
+                            Program.Simulator.DayTimeAmbientLightCoef = GameTimeToHours / GameTimeToHoursLowBorder;
+
+                        Program.Simulator.DayTimeAmbientLightCoef = MathHelper.Clamp(Program.Simulator.DayTimeAmbientLightCoef, 0.5f, 1.0f);
+                    }
+                    break;
+                case SeasonType.Autumn:
+                    {
+                        SeasonAmbientLightCoef = 0.8f;
+                        GameTimeToHoursLowBorder = 12f;
+                        GameTimeToHoursHighBorder = 13f;
+                        DayTimeAmbientLightChangeCoef = 1f;
+                        MorningFogDistance = 200f;
+                        MorningFogHour = 7f;
+                        EveningFogHour = 5f;
+
+                        if (GameTimeToHours > GameTimeToHoursHighBorder)
+                            Program.Simulator.DayTimeAmbientLightCoef = GameTimeToHoursHighBorder / GameTimeToHoursLowBorder - ((GameTimeToHours / GameTimeToHoursHighBorder - 1) * DayTimeAmbientLightChangeCoef);
+                        else
+                            Program.Simulator.DayTimeAmbientLightCoef = GameTimeToHours / GameTimeToHoursLowBorder;
+
+                        Program.Simulator.DayTimeAmbientLightCoef = MathHelper.Clamp(Program.Simulator.DayTimeAmbientLightCoef, 0.5f, 1.0f);
+                    }
+                    break;
+                case SeasonType.Winter:
+                    {
+                        SeasonAmbientLightCoef = 0.6f;
+                        GameTimeToHoursLowBorder = 10f;
+                        GameTimeToHoursHighBorder = 12f;
+                        DayTimeAmbientLightChangeCoef = 1f;
+                        MorningFogDistance = 500f;
+                        MorningFogHour = 8f;
+                        EveningFogHour = 4f;
+
+                        if (GameTimeToHours > GameTimeToHoursHighBorder)
+                            Program.Simulator.DayTimeAmbientLightCoef = GameTimeToHoursHighBorder / GameTimeToHoursLowBorder - ((GameTimeToHours / GameTimeToHoursHighBorder - 1) * DayTimeAmbientLightChangeCoef);
+                        else
+                            Program.Simulator.DayTimeAmbientLightCoef = GameTimeToHours / GameTimeToHoursLowBorder;
+
+                        Program.Simulator.DayTimeAmbientLightCoef = MathHelper.Clamp(Program.Simulator.DayTimeAmbientLightCoef, 0.5f, 1.0f);
+                    }
+                    break;
+            }
+
+            // Ranní mlha
+            if (GameTimeToHours < MorningFogHour && GameTimeToHours > EveningFogHour)
+            {
+                if (Program.Simulator.Weather.FogDistance > MorningFogDistance)
+                    Program.Simulator.Weather.FogDistance -= 0.020f * Program.Simulator.OneSecondLoop * Program.Simulator.TimeSpeedCoef;
+                if (Program.Simulator.Weather.FogDistance < MorningFogDistance)
+                    Program.Simulator.Weather.FogDistance += 0.020f * Program.Simulator.OneSecondLoop * Program.Simulator.TimeSpeedCoef;
+                if (MorningFogFirstRun)
+                    Program.Simulator.Weather.FogDistance = MorningFogDistance;
+            }
+            else
+            {
+                if (Program.Simulator.Weather.FogDistance < Program.Simulator.FogDistanceFinal)
+                    Program.Simulator.Weather.FogDistance += 0.020f * Program.Simulator.OneSecondLoop * Program.Simulator.TimeSpeedCoef;
+                if (Program.Simulator.Weather.FogDistance > Program.Simulator.FogDistanceFinal)
+                    Program.Simulator.Weather.FogDistance -= 0.020f * Program.Simulator.OneSecondLoop * Program.Simulator.TimeSpeedCoef;
+            }
+            MorningFogFirstRun = false;
+
+            // Mění intenzitu okolního světla v závislosti na zatažení oblohy
+            Program.Simulator.OvercastAmbientLightCoef = 1.0f - (Program.Simulator.Weather.OvercastFactor / 3.0f);
+
+            if (!NightBrightnessSet)
+            {
+                switch (NightBrightness)
+                {
+                    case 0: NightBrightness = 0.05f; break;
+                    case 1: NightBrightness = 0.10f; break;
+                    case 2: NightBrightness = 0.20f; break;
+                    case 3: NightBrightness = 0.30f; break;
+                    case 4: NightBrightness = 0.40f; break;
+                    case 5: NightBrightness = 0.50f; break;
+                    case 6: NightBrightness = 0.60f; break;
+                    case 7: NightBrightness = 0.70f; break;
+                    case 8: NightBrightness = 0.80f; break;
+                    case 9: NightBrightness = 0.90f; break;
+                    case 10: NightBrightness = 1.00f; break;
+                }
+                NightBrightnessValue = NightBrightness;
+                NightBrightnessSet = true;
+                Program.Simulator._NightBrightnessValue = (float)NightBrightnessValue;
+            }
+
+            DayBrightnessCoef = Program.Simulator.Settings.DayAmbientLight / 20.0f;
+            // Zařídí tmu v tunelu
+            Program.Simulator.TunnelActivateM = 0;
+            if (Program.Simulator.TunnelLengthM > 35 && Program.Simulator.PlayerCarIsInTunnelBeginM > 0)
+            {
+                if (Program.Simulator.PlayerCarIsInTunnelBeginM > 0 && Program.Simulator.PlayerCarIsInTunnelBeginM < 35)
+                {
+                    vIn = Program.Simulator.Settings.DayAmbientLight;
+                    vIn = vIn - (Program.Simulator.PlayerCarIsInTunnelBeginM * DayBrightnessCoef);
+                    if (vIn < 1) vIn = 1;
+
+                    NightBrightness = NightBrightnessValue;
+                    NightBrightness = NightBrightness - (Program.Simulator.PlayerCarIsInTunnelBeginM * (NightBrightnessValue / 35.0f));
+                    if (NightBrightness < 0.05f) NightBrightness = 0.05f;
+                }
+                else
+                if (Program.Simulator.PlayerCarIsInTunnelEndM > 0 && Program.Simulator.PlayerCarIsInTunnelEndM < 35)
+                {
+                    vIn = Program.Simulator.Settings.DayAmbientLight;
+                    vIn = vIn - (Program.Simulator.PlayerCarIsInTunnelEndM * DayBrightnessCoef);
+                    if (vIn < 1) vIn = 1;
+
+                    NightBrightness = NightBrightnessValue;
+                    NightBrightness = NightBrightness - (Program.Simulator.PlayerCarIsInTunnelEndM * (NightBrightnessValue / 35.0f));
+                    if (NightBrightness < 0.05f) NightBrightness = 0.05f;
+                }
+                else
+                if (Program.Simulator.CabInDarkTunnel)
+                {
+                    NightBrightness = 0.05f;
+                    vIn = NightBrightnessValue;
+                }
+            }
+
+            if (Program.Simulator.TunnelLengthM < Program.Simulator.PlayerCarIsInTunnelBeginM)
+            {
+                vIn = Program.Simulator.Settings.DayAmbientLight;
+                Program.Simulator.CabInDarkTunnel = false;
+            }
+
+            float FullBrightness = (float)vIn / 20.0f * SeasonAmbientLightCoef * Program.Simulator.DayTimeAmbientLightCoef * Program.Simulator.OvercastAmbientLightCoef;
+            NightBrightness = NightBrightnessValue * SeasonAmbientLightCoef * Program.Simulator.DayTimeAmbientLightCoef * Program.Simulator.OvercastAmbientLightCoef;
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
             if (_imageTextureIsNight)
             {
                 nightColorModifier.SetValue(FullBrightness);
@@ -777,10 +950,68 @@ namespace Orts.Viewer3D
             light2Pos.SetValue(light2Position);
         }
 
+        float CabnightColorModifier;
+        float CabnightColorModifierValue;
+        bool IsNightTexture;
+
         public void SetData(Vector3 sunDirection, bool isNightTexture, bool isDashLight, float overcast)
         {
-            nightColorModifier.SetValue(MathHelper.Lerp(0.2f + (isDashLight ? 0.15f : 0), 1, isNightTexture ? 1 : MathHelper.Clamp((sunDirection.Y + 0.1f) / 0.2f, 0, 1) * MathHelper.Clamp(1.5f - overcast, 0, 1)));
+            //nightColorModifier.SetValue(MathHelper.Lerp(0.2f + (isDashLight ? 0.15f : 0), 1, isNightTexture ? 1 : MathHelper.Clamp((sunDirection.Y + 0.1f) / 0.2f, 0, 1) * MathHelper.Clamp(1.5f - overcast, 0, 1)));
+            //lightOn.SetValue(isDashLight);
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+            IsNightTexture = false;
+            if (Program.Simulator.CabInDarkTunnel || Program.Viewer.MaterialManager.sunDirection.Y <= -0.085f)
+            {
+                IsNightTexture = true;
+            }
+
+            if (!IsNightTexture)
+                nightColorModifier.SetValue(MathHelper.Lerp(Program.Simulator._NightBrightnessValue, 1, MathHelper.Clamp((sunDirection.Y + 0.1f) / 0.2f, 0, 1) * MathHelper.Clamp(1.5f - overcast, 0, 1)) * Program.Simulator.SeasonAmbientLightCoef * Program.Simulator.DayTimeAmbientLightCoef * Program.Simulator.OvercastAmbientLightCoef);
+            CabnightColorModifierValue = nightColorModifier.GetValueSingle();
+
             lightOn.SetValue(isDashLight);
+
+            // Icik
+            // Zařídí tmu v kabině v tunelu
+            Program.Simulator.CabInDarkTunnel = false;
+            if (Program.Simulator.TunnelLengthM > 35 && Program.Simulator.PlayerCarIsInTunnelBeginM > 0)
+            {
+                CabnightColorModifier = CabnightColorModifierValue;
+                if (Program.Simulator.PlayerCarIsInTunnelBeginM > 0 && Program.Simulator.PlayerCarIsInTunnelBeginM < 35)
+                {
+                    CabnightColorModifier = CabnightColorModifier - (Program.Simulator.PlayerCarIsInTunnelBeginM * 0.035f * Program.Simulator.SeasonAmbientLightCoef * Program.Simulator.DayTimeAmbientLightCoef * Program.Simulator.OvercastAmbientLightCoef);
+                    nightColorModifier.SetValue(MathHelper.Clamp(CabnightColorModifier, 0.075f, CabnightColorModifierValue));
+                    Program.Simulator.CabInDarkTunnel = false;
+                }
+                else
+                if (Program.Simulator.PlayerCarIsInTunnelEndM > 0 && Program.Simulator.PlayerCarIsInTunnelEndM < 35)
+                {
+                    CabnightColorModifier = CabnightColorModifier - (Program.Simulator.PlayerCarIsInTunnelEndM * 0.035f * Program.Simulator.SeasonAmbientLightCoef * Program.Simulator.DayTimeAmbientLightCoef * Program.Simulator.OvercastAmbientLightCoef);
+                    nightColorModifier.SetValue(MathHelper.Clamp(CabnightColorModifier, 0.075f, CabnightColorModifierValue));
+                    Program.Simulator.CabInDarkTunnel = false;
+                }
+                else
+                if (Program.Simulator.PlayerCarIsInTunnel)
+                {
+                    nightColorModifier.SetValue(0.075f);
+                    Program.Simulator.CabInDarkTunnel = true;
+                }
+            }
+
+            if (Program.Simulator.CabLightActivate || Program.Simulator.CabFloodLightActivate || IsNightTexture)
+            {
+                if (!Program.Simulator.CabFloodLightActivate)
+                    nightColorModifier.SetValue(0.5f + (Program.Simulator.CabLightActivate ? 0.5f : 0));
+                else
+                    nightColorModifier.SetValue(Math.Max(nightColorModifier.GetValueSingle(), 0.5f + (Program.Simulator.CabFloodLightActivate ? 0.3f : 0)));
+            }
+
+            Program.Simulator.DashLightCanActivate = false;
+            if (CabnightColorModifierValue < 0.30f || IsNightTexture)
+            {
+                Program.Simulator.DashLightCanActivate = true;
+            }
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
         }
 
         public CabShader(GraphicsDevice graphicsDevice, Vector4 light1Position, Vector4 light2Position, Vector3 light1Color, Vector3 light2Color)
