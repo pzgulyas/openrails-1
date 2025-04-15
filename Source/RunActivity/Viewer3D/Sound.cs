@@ -1504,6 +1504,10 @@ namespace Orts.Viewer3D
                 case Orts.Formats.Msts.VolumeCurve.Controls.Variable3Controlled: return car.Variable3;
                 case Orts.Formats.Msts.VolumeCurve.Controls.BrakeCylControlled: return car.BrakeSystem.GetCylPressurePSI();
                 case Orts.Formats.Msts.VolumeCurve.Controls.CurveForceControlled: return car.CurveForceNFiltered;
+                case Orts.Formats.Msts.VolumeCurve.Controls.SeasonsControlled: return (float)Program.Simulator.Season;
+                case Orts.Formats.Msts.VolumeCurve.Controls.DayTimeControlled: return (float)Program.Simulator.DayTimeH;
+                case Orts.Formats.Msts.VolumeCurve.Controls.PricipitationIntensityControlled:
+                    return Program.Simulator.Weather.PrecipitationLiquidity > 0.5f ? Program.Simulator.Weather.PrecipitationIntensityPPSPM2 : 0;
                 default: return 0;
             }
         }

@@ -80,6 +80,7 @@ namespace Orts.Simulation
         public double ClockTime;
         // while Simulator.Update() is running, objects are adjusted to this target time 
         // after Simulator.Update() is complete, the simulator state matches this time
+        public double DayTimeH;
 
         public readonly UserSettings Settings;
 
@@ -811,6 +812,10 @@ namespace Orts.Simulation
             // Advance the times.
             GameTime += elapsedClockSeconds;
             ClockTime += elapsedClockSeconds;
+            
+            var dayTimeH = ClockTime / 3600.0;
+            while (dayTimeH >= 24.0) dayTimeH -= 24.0;
+            DayTimeH = dayTimeH;
 
             UpdateCounter++;
             UpdateCounter %= FULLUPDATECYCLE;
