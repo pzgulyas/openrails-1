@@ -71,7 +71,7 @@ namespace Orts.Viewer3D
         // Variables used for wind calculations
         const int WindSpeedBeaufort = 6;
         const float WindInstantaneousDirectionLimitRad = (float)(45 * Math.PI / 180);
-        readonly float WindInstantaneousSpeedLimit = WeatherConstants.WindSpeedGustMpS[(int)WeatherConstants.Condition.Light];
+        readonly float WindInstantaneousSpeedLimit = WeatherConstants.WindSpeedGustMpS[(int)WeatherFile.Condition.Light];
         const float WindNoiseScale = 10;
         readonly float WindInstantaneousDirectionNoiseStart = (float)Viewer.Random.NextDouble() * WindNoiseScale;
         readonly float WindInstantaneousSpeedNoiseStart = (float)Viewer.Random.NextDouble() * WindNoiseScale;
@@ -96,106 +96,86 @@ namespace Orts.Viewer3D
             {
                 case SeasonType.Spring:
                     ClearSound = new List<SoundSourceBase>() {
-                    new SoundSource(viewer, Events.Source.MSTSInGame, ORTSPaths.GetFileFromFolders(pathArray, "clear_in.sms"), false),
-                    new SoundSource(viewer, Events.Source.MSTSInGame, ORTSPaths.GetFileFromFolders(pathArray, "clear_ex.sms"), false),
-                    new SoundSource(viewer, Events.Source.MSTSInGame, ORTSPaths.GetFileFromFolders(pathArray, "SpringDay.sms"), false),
+                        new SoundSource(viewer, Events.Source.MSTSInGame, ORTSPaths.GetFileFromFolders(pathArray, "clear_in.sms"), false),
+                        new SoundSource(viewer, Events.Source.MSTSInGame, ORTSPaths.GetFileFromFolders(pathArray, "clear_ex.sms"), false),
+                        new SoundSource(viewer, Events.Source.MSTSInGame, ORTSPaths.GetFileFromFolders(pathArray, "SpringDay.sms"), false),
                     };
                     ClearSoundNight = new List<SoundSourceBase>() {
-                    new SoundSource(viewer, Events.Source.MSTSInGame, ORTSPaths.GetFileFromFolders(pathArray, "clear_in.sms"), false),
-                    new SoundSource(viewer, Events.Source.MSTSInGame, ORTSPaths.GetFileFromFolders(pathArray, "clear_ex.sms"), false),
-                    new SoundSource(viewer, Events.Source.MSTSInGame, ORTSPaths.GetFileFromFolders(pathArray, "SpringNight.sms"), false),
+                        new SoundSource(viewer, Events.Source.MSTSInGame, ORTSPaths.GetFileFromFolders(pathArray, "clear_in.sms"), false),
+                        new SoundSource(viewer, Events.Source.MSTSInGame, ORTSPaths.GetFileFromFolders(pathArray, "clear_ex.sms"), false),
+                        new SoundSource(viewer, Events.Source.MSTSInGame, ORTSPaths.GetFileFromFolders(pathArray, "SpringNight.sms"), false),
                     };
                     RainSound = new List<SoundSourceBase>() {
-                    new SoundSource(viewer, Events.Source.MSTSInGame, ORTSPaths.GetFileFromFolders(pathArray, "Rain_in.sms"), false),
-                    new SoundSource(viewer, Events.Source.MSTSInGame, ORTSPaths.GetFileFromFolders(pathArray, "Rain_ex.sms"), false),
+                        new SoundSource(viewer, Events.Source.MSTSInGame, ORTSPaths.GetFileFromFolders(pathArray, "Rain_in.sms"), false),
+                        new SoundSource(viewer, Events.Source.MSTSInGame, ORTSPaths.GetFileFromFolders(pathArray, "Rain_ex.sms"), false),
                     };
                     SnowSound = new List<SoundSourceBase>() {
-                    new SoundSource(viewer, Events.Source.MSTSInGame, ORTSPaths.GetFileFromFolders(pathArray, "Snow_in.sms"), false),
-                    new SoundSource(viewer, Events.Source.MSTSInGame, ORTSPaths.GetFileFromFolders(pathArray, "Snow_ex.sms"), false),
+                        new SoundSource(viewer, Events.Source.MSTSInGame, ORTSPaths.GetFileFromFolders(pathArray, "Snow_in.sms"), false),
+                        new SoundSource(viewer, Events.Source.MSTSInGame, ORTSPaths.GetFileFromFolders(pathArray, "Snow_ex.sms"), false),
                     };
                     break;
                 case SeasonType.Summer:
                     ClearSound = new List<SoundSourceBase>() {
-                    new SoundSource(viewer, Events.Source.MSTSInGame, ORTSPaths.GetFileFromFolders(pathArray, "clear_in.sms"), false),
-                    new SoundSource(viewer, Events.Source.MSTSInGame, ORTSPaths.GetFileFromFolders(pathArray, "clear_ex.sms"), false),
-                    new SoundSource(viewer, Events.Source.MSTSInGame, ORTSPaths.GetFileFromFolders(pathArray, "SummerDay.sms"), false),
+                        new SoundSource(viewer, Events.Source.MSTSInGame, ORTSPaths.GetFileFromFolders(pathArray, "clear_in.sms"), false),
+                        new SoundSource(viewer, Events.Source.MSTSInGame, ORTSPaths.GetFileFromFolders(pathArray, "clear_ex.sms"), false),
+                        new SoundSource(viewer, Events.Source.MSTSInGame, ORTSPaths.GetFileFromFolders(pathArray, "SummerDay.sms"), false),
                     };
                     ClearSoundNight = new List<SoundSourceBase>() {
-                    new SoundSource(viewer, Events.Source.MSTSInGame, ORTSPaths.GetFileFromFolders(pathArray, "clear_in.sms"), false),
-                    new SoundSource(viewer, Events.Source.MSTSInGame, ORTSPaths.GetFileFromFolders(pathArray, "clear_ex.sms"), false),
-                    new SoundSource(viewer, Events.Source.MSTSInGame, ORTSPaths.GetFileFromFolders(pathArray, "SummerNight.sms"), false),
+                        new SoundSource(viewer, Events.Source.MSTSInGame, ORTSPaths.GetFileFromFolders(pathArray, "clear_in.sms"), false),
+                        new SoundSource(viewer, Events.Source.MSTSInGame, ORTSPaths.GetFileFromFolders(pathArray, "clear_ex.sms"), false),
+                        new SoundSource(viewer, Events.Source.MSTSInGame, ORTSPaths.GetFileFromFolders(pathArray, "SummerNight.sms"), false),
                     };
-
-                    if (Viewer.Simulator.ActivityRun != null && Viewer.Simulator.WeatherKind < WeatherConstants.WeatherKind.Precipitation)
-                    {
-                        RainSound = new List<SoundSourceBase>() {
+                    RainSound = new List<SoundSourceBase>() {
                         new SoundSource(viewer, Events.Source.MSTSInGame, ORTSPaths.GetFileFromFolders(pathArray, "Rain_in.sms"), false),
                         new SoundSource(viewer, Events.Source.MSTSInGame, ORTSPaths.GetFileFromFolders(pathArray, "Rain_ex.sms"), false),
-                        };
-                    }
-                    else
+                    };
+                    if (Viewer.Simulator.ActivityRun == null || Viewer.Simulator.WeatherKind == WeatherFile.WeatherType.Precipitation)
                     {
-                        RainSound = new List<SoundSourceBase>() {
-                        new SoundSource(viewer, Events.Source.MSTSInGame, ORTSPaths.GetFileFromFolders(pathArray, "Rain_in.sms"), false),
-                        new SoundSource(viewer, Events.Source.MSTSInGame, ORTSPaths.GetFileFromFolders(pathArray, "Rain_ex.sms"), false),
-                        new SoundSource(viewer, Events.Source.MSTSInGame, ORTSPaths.GetFileFromFolders(pathArray, "Thunder.sms"), false),
-                        };
+                        RainSound.Add(new SoundSource(viewer, Events.Source.MSTSInGame, ORTSPaths.GetFileFromFolders(pathArray, "Thunder.sms"), false));
                     }
                     SnowSound = new List<SoundSourceBase>() {
-                    new SoundSource(viewer, Events.Source.MSTSInGame, ORTSPaths.GetFileFromFolders(pathArray, "Snow_in.sms"), false),
-                    new SoundSource(viewer, Events.Source.MSTSInGame, ORTSPaths.GetFileFromFolders(pathArray, "Snow_ex.sms"), false),
+                        new SoundSource(viewer, Events.Source.MSTSInGame, ORTSPaths.GetFileFromFolders(pathArray, "Snow_in.sms"), false),
+                        new SoundSource(viewer, Events.Source.MSTSInGame, ORTSPaths.GetFileFromFolders(pathArray, "Snow_ex.sms"), false),
                     };
                     break;
                 case SeasonType.Autumn:
                     ClearSound = new List<SoundSourceBase>() {
-                    new SoundSource(viewer, Events.Source.MSTSInGame, ORTSPaths.GetFileFromFolders(pathArray, "clear_in.sms"), false),
-                    new SoundSource(viewer, Events.Source.MSTSInGame, ORTSPaths.GetFileFromFolders(pathArray, "clear_ex.sms"), false),
-                    new SoundSource(viewer, Events.Source.MSTSInGame, ORTSPaths.GetFileFromFolders(pathArray, "AutumnDay.sms"), false),
+                        new SoundSource(viewer, Events.Source.MSTSInGame, ORTSPaths.GetFileFromFolders(pathArray, "clear_in.sms"), false),
+                        new SoundSource(viewer, Events.Source.MSTSInGame, ORTSPaths.GetFileFromFolders(pathArray, "clear_ex.sms"), false),
+                        new SoundSource(viewer, Events.Source.MSTSInGame, ORTSPaths.GetFileFromFolders(pathArray, "AutumnDay.sms"), false),
                     };
                     ClearSoundNight = new List<SoundSourceBase>() {
-                    new SoundSource(viewer, Events.Source.MSTSInGame, ORTSPaths.GetFileFromFolders(pathArray, "clear_in.sms"), false),
-                    new SoundSource(viewer, Events.Source.MSTSInGame, ORTSPaths.GetFileFromFolders(pathArray, "clear_ex.sms"), false),
-                    new SoundSource(viewer, Events.Source.MSTSInGame, ORTSPaths.GetFileFromFolders(pathArray, "AutumnNight.sms"), false),
+                        new SoundSource(viewer, Events.Source.MSTSInGame, ORTSPaths.GetFileFromFolders(pathArray, "clear_in.sms"), false),
+                        new SoundSource(viewer, Events.Source.MSTSInGame, ORTSPaths.GetFileFromFolders(pathArray, "clear_ex.sms"), false),
+                        new SoundSource(viewer, Events.Source.MSTSInGame, ORTSPaths.GetFileFromFolders(pathArray, "AutumnNight.sms"), false),
                     };
                     RainSound = new List<SoundSourceBase>() {
-                    new SoundSource(viewer, Events.Source.MSTSInGame, ORTSPaths.GetFileFromFolders(pathArray, "Rain_in.sms"), false),
-                    new SoundSource(viewer, Events.Source.MSTSInGame, ORTSPaths.GetFileFromFolders(pathArray, "Rain_ex.sms"), false),
+                        new SoundSource(viewer, Events.Source.MSTSInGame, ORTSPaths.GetFileFromFolders(pathArray, "Rain_in.sms"), false),
+                        new SoundSource(viewer, Events.Source.MSTSInGame, ORTSPaths.GetFileFromFolders(pathArray, "Rain_ex.sms"), false),
                     };
                     SnowSound = new List<SoundSourceBase>() {
-                    new SoundSource(viewer, Events.Source.MSTSInGame, ORTSPaths.GetFileFromFolders(pathArray, "Snow_in.sms"), false),
-                    new SoundSource(viewer, Events.Source.MSTSInGame, ORTSPaths.GetFileFromFolders(pathArray, "Snow_ex.sms"), false),
+                        new SoundSource(viewer, Events.Source.MSTSInGame, ORTSPaths.GetFileFromFolders(pathArray, "Snow_in.sms"), false),
+                        new SoundSource(viewer, Events.Source.MSTSInGame, ORTSPaths.GetFileFromFolders(pathArray, "Snow_ex.sms"), false),
                     };
                     break;
                 case SeasonType.Winter:
                     ClearSound = new List<SoundSourceBase>() {
-                    new SoundSource(viewer, Events.Source.MSTSInGame, ORTSPaths.GetFileFromFolders(pathArray, "clear_in.sms"), false),
-                    new SoundSource(viewer, Events.Source.MSTSInGame, ORTSPaths.GetFileFromFolders(pathArray, "clear_ex.sms"), false),
-                    new SoundSource(viewer, Events.Source.MSTSInGame, ORTSPaths.GetFileFromFolders(pathArray, "WinterDay.sms"), false),
+                        new SoundSource(viewer, Events.Source.MSTSInGame, ORTSPaths.GetFileFromFolders(pathArray, "clear_in.sms"), false),
+                        new SoundSource(viewer, Events.Source.MSTSInGame, ORTSPaths.GetFileFromFolders(pathArray, "clear_ex.sms"), false),
+                        new SoundSource(viewer, Events.Source.MSTSInGame, ORTSPaths.GetFileFromFolders(pathArray, "WinterDay.sms"), false),
                     };
                     ClearSoundNight = new List<SoundSourceBase>() {
-                    new SoundSource(viewer, Events.Source.MSTSInGame, ORTSPaths.GetFileFromFolders(pathArray, "clear_in.sms"), false),
-                    new SoundSource(viewer, Events.Source.MSTSInGame, ORTSPaths.GetFileFromFolders(pathArray, "clear_ex.sms"), false),
-                    new SoundSource(viewer, Events.Source.MSTSInGame, ORTSPaths.GetFileFromFolders(pathArray, "WinterNight.sms"), false),
+                        new SoundSource(viewer, Events.Source.MSTSInGame, ORTSPaths.GetFileFromFolders(pathArray, "clear_in.sms"), false),
+                        new SoundSource(viewer, Events.Source.MSTSInGame, ORTSPaths.GetFileFromFolders(pathArray, "clear_ex.sms"), false),
+                        new SoundSource(viewer, Events.Source.MSTSInGame, ORTSPaths.GetFileFromFolders(pathArray, "WinterNight.sms"), false),
                     };
-
-                    if (Viewer.Simulator.ActivityRun != null && Viewer.Simulator.WeatherKind < WeatherConstants.WeatherKind.Precipitation)
-                    {
-                        RainSound = new List<SoundSourceBase>() {
+                    RainSound = new List<SoundSourceBase>() {
                         new SoundSource(viewer, Events.Source.MSTSInGame, ORTSPaths.GetFileFromFolders(pathArray, "Rain_in.sms"), false),
                         new SoundSource(viewer, Events.Source.MSTSInGame, ORTSPaths.GetFileFromFolders(pathArray, "Rain_ex.sms"), false),
-                        };
-                    }
-                    else
-                    {
-                        RainSound = new List<SoundSourceBase>() {
-                        new SoundSource(viewer, Events.Source.MSTSInGame, ORTSPaths.GetFileFromFolders(pathArray, "Rain_in.sms"), false),
-                        new SoundSource(viewer, Events.Source.MSTSInGame, ORTSPaths.GetFileFromFolders(pathArray, "Rain_ex.sms"), false),
-                        new SoundSource(viewer, Events.Source.MSTSInGame, ORTSPaths.GetFileFromFolders(pathArray, "Thunder.sms"), false),
-                        };
-                    }
+                    };
                     SnowSound = new List<SoundSourceBase>() {
-                    new SoundSource(viewer, Events.Source.MSTSInGame, ORTSPaths.GetFileFromFolders(pathArray, "Snow_in.sms"), false),
-                    new SoundSource(viewer, Events.Source.MSTSInGame, ORTSPaths.GetFileFromFolders(pathArray, "Snow_ex.sms"), false),
+                        new SoundSource(viewer, Events.Source.MSTSInGame, ORTSPaths.GetFileFromFolders(pathArray, "Snow_in.sms"), false),
+                        new SoundSource(viewer, Events.Source.MSTSInGame, ORTSPaths.GetFileFromFolders(pathArray, "Snow_ex.sms"), false),
                     };
                     break;
             }
@@ -277,49 +257,47 @@ namespace Orts.Viewer3D
         {
             switch (Viewer.Simulator.WeatherKind)
             {
-                case WeatherConstants.WeatherKind.Clear:
-                    switch (Viewer.Simulator.Season)
-                    {
-                        case SeasonType.Spring:
-                            Viewer.Simulator.WeatherType = WeatherType.Clear;
-                            Weather.CloudCoverFactor = 0.15f;
-                            Weather.VisibilityM = 8300f;
-                            Weather.PrecipitationLiquidity = 1.0f;
-                            Weather.PrecipitationIntensityPPSPM2 = 0.0f;
-                            break;
-                        case SeasonType.Summer:
-                            Viewer.Simulator.WeatherType = WeatherType.Clear;
-                            Weather.CloudCoverFactor = 0.1f;
-                            Weather.VisibilityM = 12000f;
-                            Weather.PrecipitationLiquidity = 1.0f;
-                            Weather.PrecipitationIntensityPPSPM2 = 0.0f;
-                            break;
-                        case SeasonType.Autumn:
-                            Viewer.Simulator.WeatherType = WeatherType.Clear;
-                            Weather.CloudCoverFactor = 0.2f;
-                            Weather.VisibilityM = 25000f;
-                            Weather.PrecipitationLiquidity = 1.0f;
-                            Weather.PrecipitationIntensityPPSPM2 = 0.0f;
-                            break;
-                        case SeasonType.Winter:
-                            Viewer.Simulator.WeatherType = WeatherType.Clear;
-                            Weather.CloudCoverFactor = 0.15f;
-                            Weather.VisibilityM = 30500f;
-                            Weather.PrecipitationLiquidity = 0.0f;
-                            Weather.PrecipitationIntensityPPSPM2 = 0.0f;
-                            break;
-                    }
+                case WeatherFile.WeatherType.Clear:
                     switch (Viewer.Simulator.WeatherCondition)
                     {
-                        case WeatherConstants.Condition.Light: Weather.WindSpeedFactor = 2; break;
-                        case WeatherConstants.Condition.Moderate: Weather.WindSpeedFactor = 4; break;
-                        case WeatherConstants.Condition.Heavy: Weather.WindSpeedFactor = 6; break;
-                    }
-                    break;
-                case WeatherConstants.WeatherKind.Overcast:
-                    switch (Viewer.Simulator.WeatherCondition)
-                    {
-                        case WeatherConstants.Condition.Light:
+                        case WeatherFile.Condition.Light:
+                            switch (Viewer.Simulator.Season)
+                            {
+                                case SeasonType.Spring:
+                                    Viewer.Simulator.WeatherType = WeatherType.Clear;
+                                    Weather.CloudCoverFactor = 0.15f;
+                                    Weather.VisibilityM = 8300f;
+                                    Weather.PrecipitationLiquidity = 1.0f;
+                                    Weather.PrecipitationIntensityPPSPM2 = 0.0f;
+                                    Weather.WindSpeedFactor = 2;
+                                    break;
+                                case SeasonType.Summer:
+                                    Viewer.Simulator.WeatherType = WeatherType.Clear;
+                                    Weather.CloudCoverFactor = 0.1f;
+                                    Weather.VisibilityM = 12000f;
+                                    Weather.PrecipitationLiquidity = 1.0f;
+                                    Weather.PrecipitationIntensityPPSPM2 = 0.0f;
+                                    Weather.WindSpeedFactor = 1;
+                                    break;
+                                case SeasonType.Autumn:
+                                    Viewer.Simulator.WeatherType = WeatherType.Clear;
+                                    Weather.CloudCoverFactor = 0.2f;
+                                    Weather.VisibilityM = 25000f;
+                                    Weather.PrecipitationLiquidity = 1.0f;
+                                    Weather.PrecipitationIntensityPPSPM2 = 0.0f;
+                                    Weather.WindSpeedFactor = 2;
+                                    break;
+                                case SeasonType.Winter:
+                                    Viewer.Simulator.WeatherType = WeatherType.Clear;
+                                    Weather.CloudCoverFactor = 0.15f;
+                                    Weather.VisibilityM = 30500f;
+                                    Weather.PrecipitationLiquidity = 0.0f;
+                                    Weather.PrecipitationIntensityPPSPM2 = 0.0f;
+                                    Weather.WindSpeedFactor = 4;
+                                    break;
+                            }
+                            break;
+                        case WeatherFile.Condition.Moderate:
                             switch (Viewer.Simulator.Season)
                             {
                                 case SeasonType.Spring:
@@ -356,7 +334,7 @@ namespace Orts.Viewer3D
                                     break;
                             }
                             break;
-                        case WeatherConstants.Condition.Moderate:
+                        case WeatherFile.Condition.Heavy:
                             switch (Viewer.Simulator.Season)
                             {
                                 case SeasonType.Spring:
@@ -393,7 +371,12 @@ namespace Orts.Viewer3D
                                     break;
                             }
                             break;
-                        case WeatherConstants.Condition.Heavy: // Foggy
+                    }
+                    break;
+                case WeatherFile.WeatherType.Fog:
+                    switch (Viewer.Simulator.WeatherCondition)
+                    {
+                        case WeatherFile.Condition.Heavy: // Foggy
                             switch (Viewer.Simulator.Season)
                             {
                                 case SeasonType.Spring:
@@ -432,10 +415,10 @@ namespace Orts.Viewer3D
                             break;
                     }
                     break;
-                case WeatherConstants.WeatherKind.Precipitation:
+                case WeatherFile.WeatherType.Precipitation:
                     switch (Viewer.Simulator.WeatherCondition)
                     {
-                        case WeatherConstants.Condition.Light:
+                        case WeatherFile.Condition.Light:
                             switch (Viewer.Simulator.Season)
                             {
                                 case SeasonType.Spring:
@@ -472,7 +455,7 @@ namespace Orts.Viewer3D
                                     break;
                             }
                             break;
-                        case WeatherConstants.Condition.Moderate:
+                        case WeatherFile.Condition.Moderate:
                             switch (Viewer.Simulator.Season)
                             {
                                 case SeasonType.Spring:
@@ -509,7 +492,7 @@ namespace Orts.Viewer3D
                                     break;
                             }
                             break;
-                        case WeatherConstants.Condition.Heavy: // Storm
+                        case WeatherFile.Condition.Heavy: // Storm
                             switch (Viewer.Simulator.Season)
                             {
                                 case SeasonType.Spring:
@@ -548,7 +531,7 @@ namespace Orts.Viewer3D
                             break;
                     }
                     break;
-                case WeatherConstants.WeatherKind.Dynamic:
+                case WeatherFile.WeatherType.Dynamic:
                     Viewer.Simulator.Settings.ActWeatherRandomizationLevel = 1;
                     break;
             }
@@ -854,6 +837,23 @@ namespace Orts.Viewer3D
             }
         }
 
+
+        void ReloadWeather()
+        {
+            if (Viewer.MaterialManager.Materials.ContainsKey("Sky::0:0:0"))
+            {
+                Material bdata;
+                // Get runtime SkyMaterial class
+                Viewer.MaterialManager.Materials.TryGetValue("Sky::0:0:0", out bdata);
+                // Load weather settings file or create new
+                SetInitialWeatherParameters();
+                var x = bdata as SkyMaterial;
+                // Reload weather textures
+                x.SetWeather();
+            }
+        }
+
+
         [CallOnThread("Updater")]
         public virtual void Update(ElapsedTime elapsedTime)
         {
@@ -915,31 +915,25 @@ namespace Orts.Viewer3D
             }
             else if (!MPManager.IsClient())
             {
+                if (Viewer.WeatherEditorWindow.Visible)
+                    GuiSelection();
+                
                 // The user is able to change the weather for debugging. This will cycle through clear, rain and snow.
                 if (UserInput.IsPressed(UserCommand.DebugWeatherChange))
                 {
-                    switch (Viewer.Simulator.WeatherType)
+                    switch (Viewer.Simulator.WeatherKind)
                     {
-                        case WeatherType.Clear:
-                            Viewer.Simulator.WeatherType = WeatherType.Rain;
-                            Weather.PrecipitationLiquidity = 1;
-                            Weather.PrecipitationIntensityPPSPM2 = 0.75f;
-                            Weather.CloudCoverFactor = 0.75f;
-                            Weather.VisibilityM = 5000;
+                        case WeatherFile.WeatherType.Clear:
+                            Viewer.Simulator.WeatherKind = WeatherFile.WeatherType.Precipitation;
+                            ReloadWeather();
                             break;
-                        case WeatherType.Rain:
-                            Viewer.Simulator.WeatherType = WeatherType.Snow;
-                            Weather.PrecipitationLiquidity = 0;
-                            Weather.PrecipitationIntensityPPSPM2 = 0.75f;
-                            Weather.CloudCoverFactor = 0.85f;
-                            Weather.VisibilityM = 7500;
+                        case WeatherFile.WeatherType.Precipitation:
+                            Viewer.Simulator.WeatherKind = WeatherFile.WeatherType.Fog;
+                            ReloadWeather();
                             break;
-                        case WeatherType.Snow:
-                            Viewer.Simulator.WeatherType = WeatherType.Clear;
-                            Weather.PrecipitationLiquidity = 1;
-                            Weather.PrecipitationIntensityPPSPM2 = 0;
-                            Weather.CloudCoverFactor = 0.0f;
-                            Weather.VisibilityM = 20000;
+                        case WeatherFile.WeatherType.Fog:
+                            Viewer.Simulator.WeatherKind = WeatherFile.WeatherType.Clear;
+                            ReloadWeather();
                             break;
                     }
 

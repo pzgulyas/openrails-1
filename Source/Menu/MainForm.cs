@@ -106,6 +106,7 @@ namespace Menu
         // Shared items
         public int SelectedStartSeason { get { return radioButtonModeActivity.Checked ? (comboBoxStartSeason.SelectedItem as KeyedComboBoxItem).Key : (comboBoxTimetableSeason.SelectedItem as KeyedComboBoxItem).Key; } }
         public int SelectedStartWeather { get { return radioButtonModeActivity.Checked ? (comboBoxStartWeather.SelectedItem as KeyedComboBoxItem).Key : (comboBoxTimetableWeather.SelectedItem as KeyedComboBoxItem).Key; } }
+        public int SelectedStartCondition { get { return radioButtonModeActivity.Checked ? (comboBoxStartCondition.SelectedItem as KeyedComboBoxItem).Key : (comboBoxTimetableCondition.SelectedItem as KeyedComboBoxItem).Key; } }
 
         public string SelectedSaveFile { get; set; }
         public UserAction SelectedAction { get; set; }
@@ -157,6 +158,8 @@ namespace Menu
             LoadOptions();
             LoadLanguage();
 
+            var commonCatalog = ORTS.Common.FormatStrings.Catalog;
+
             if (!Initialized)
             {
                 var Seasons = new[] {
@@ -166,9 +169,16 @@ namespace Menu
                     new KeyedComboBoxItem(3, catalog.GetString("Winter")),
                 };
                 var Weathers = new[] {
-                    new KeyedComboBoxItem(0, catalog.GetString("Clear")),
-                    new KeyedComboBoxItem(1, catalog.GetString("Snow")),
-                    new KeyedComboBoxItem(2, catalog.GetString("Rain")),
+                    new KeyedComboBoxItem((int)WeatherFile.WeatherType.Clear, commonCatalog.GetString(GetStringAttribute.GetPrettyName(WeatherFile.WeatherType.Clear))),
+                    new KeyedComboBoxItem((int)WeatherFile.WeatherType.Precipitation, commonCatalog.GetString(GetStringAttribute.GetPrettyName(WeatherFile.WeatherType.Precipitation))),
+                    new KeyedComboBoxItem((int)WeatherFile.WeatherType.Fog, commonCatalog.GetString(GetStringAttribute.GetPrettyName(WeatherFile.WeatherType.Fog))),
+                    new KeyedComboBoxItem((int)WeatherFile.WeatherType.Desert, commonCatalog.GetString(GetStringAttribute.GetPrettyName(WeatherFile.WeatherType.Desert))),
+                    new KeyedComboBoxItem((int)WeatherFile.WeatherType.Dynamic, commonCatalog.GetString(GetStringAttribute.GetPrettyName(WeatherFile.WeatherType.Dynamic))),
+                };
+                var Conditions = new[] {
+                    new KeyedComboBoxItem((int)WeatherFile.Condition.Light, commonCatalog.GetString(GetStringAttribute.GetPrettyName(WeatherFile.Condition.Light))),
+                    new KeyedComboBoxItem((int)WeatherFile.Condition.Moderate, commonCatalog.GetString(GetStringAttribute.GetPrettyName(WeatherFile.Condition.Moderate))),
+                    new KeyedComboBoxItem((int)WeatherFile.Condition.Heavy, commonCatalog.GetString(GetStringAttribute.GetPrettyName(WeatherFile.Condition.Heavy))),
                 };
                 var Difficulties = new[] {
                     catalog.GetString("Easy"),
@@ -188,6 +198,7 @@ namespace Menu
 
                 comboBoxStartSeason.Items.AddRange(Seasons);
                 comboBoxStartWeather.Items.AddRange(Weathers);
+                comboBoxStartCondition.Items.AddRange(Conditions);
                 comboBoxDifficulty.Items.AddRange(Difficulties);
 
                 comboBoxTimetableSeason.Items.AddRange(Seasons);
@@ -729,6 +740,9 @@ namespace Menu
                 radioButtonModeActivity.Checked ?
                     SelectedActivity is ExploreActivity ? SelectedStartWeather.ToString() : "" :
                     SelectedStartWeather.ToString(),
+                radioButtonModeActivity.Checked ?
+                    SelectedActivity is ExploreActivity ? SelectedStartCondition.ToString() : "" :
+                    SelectedStartCondition.ToString(),
             };
             Settings.Save();
         }
@@ -744,7 +758,7 @@ namespace Menu
             comboBoxConsist.Enabled = comboBoxConsist.Items.Count > 0 && SelectedActivity is ExploreActivity;
             comboBoxStartAt.Enabled = comboBoxStartAt.Items.Count > 0 && SelectedActivity is ExploreActivity;
             comboBoxHeadTo.Enabled = comboBoxHeadTo.Items.Count > 0 && SelectedActivity is ExploreActivity;
-            comboBoxStartTime.Enabled = comboBoxStartSeason.Enabled = comboBoxStartWeather.Enabled = SelectedActivity is ExploreActivity;
+            comboBoxStartTime.Enabled = comboBoxStartSeason.Enabled = comboBoxStartWeather.Enabled = comboBoxStartCondition.Enabled = SelectedActivity is ExploreActivity;
             comboBoxStartTime.DropDownStyle = SelectedActivity is ExploreActivity ? ComboBoxStyle.DropDown : ComboBoxStyle.DropDownList;
             comboBoxTimetable.Enabled = comboBoxTimetableSet.Items.Count > 0;
             comboBoxTimetableTrain.Enabled = comboBoxTimetable.Items.Count > 0;
@@ -882,7 +896,10 @@ namespace Menu
             exploreActivity.Path = SelectedPath;
             exploreActivity.StartTime = SelectedStartTime;
             exploreActivity.Season = (Orts.Formats.Msts.SeasonType)SelectedStartSeason;
-            exploreActivity.Weather = (Orts.Formats.Msts.WeatherType)SelectedStartWeather;
+            exploreActivity.WeatherAdv = (Orts.Formats.OR.WeatherFile.WeatherType)SelectedStartWeather;
+            exploreActivity.Condition = (Orts.Formats.OR.WeatherFile.Condition)SelectedStartCondition;
+            exploreActivity.Weather = exploreActivity.WeatherAdv == WeatherFile.WeatherType.Clear ? Orts.Formats.Msts.WeatherType.Clear
+                : exploreActivity.Season == Orts.Formats.Msts.SeasonType.Winter ? Orts.Formats.Msts.WeatherType.Snow : Orts.Formats.Msts.WeatherType.Rain;
         }
         #endregion
 
@@ -1022,6 +1039,7 @@ namespace Menu
                 UpdateFromMenuSelection<string>(comboBoxStartTime, UserSettings.Menu_SelectionIndex.Time, "12:00");
                 UpdateFromMenuSelection<KeyedComboBoxItem>(comboBoxStartSeason, UserSettings.Menu_SelectionIndex.Season, s => s.Key.ToString(), new KeyedComboBoxItem(1, ""));
                 UpdateFromMenuSelection<KeyedComboBoxItem>(comboBoxStartWeather, UserSettings.Menu_SelectionIndex.Weather, w => w.Key.ToString(), new KeyedComboBoxItem(0, ""));
+                UpdateFromMenuSelection<KeyedComboBoxItem>(comboBoxStartCondition, UserSettings.Menu_SelectionIndex.Condition, c => c.Key.ToString(), new KeyedComboBoxItem(0, ""));
                 comboBoxDifficulty.SelectedIndex = 3;
                 comboBoxDuration.Items.Clear();
                 comboBoxDuration.Items.Add("");
@@ -1083,7 +1101,11 @@ namespace Menu
             {
                 SelectedTimetableSet.Day = SelectedTimetableDay;
                 SelectedTimetableSet.Season = SelectedStartSeason;
-                SelectedTimetableSet.Weather = SelectedStartWeather;
+                SelectedTimetableSet.WeatherAdv = SelectedStartWeather;
+                SelectedTimetableSet.Condition = SelectedStartCondition;
+                SelectedTimetableSet.Weather = (WeatherFile.WeatherType)SelectedStartWeather == WeatherFile.WeatherType.Clear ? (int)Orts.Formats.Msts.WeatherType.Clear
+                    : (Orts.Formats.Msts.SeasonType)SelectedStartSeason == Orts.Formats.Msts.SeasonType.Winter ? (int)Orts.Formats.Msts.WeatherType.Snow
+                    : (int)Orts.Formats.Msts.WeatherType.Rain;
             }
         }
 
@@ -1140,6 +1162,7 @@ namespace Menu
             UpdateFromMenuSelection<KeyedComboBoxItem>(comboBoxTimetableDay, UserSettings.Menu_SelectionIndex.Day, d => d.Key.ToString(), new KeyedComboBoxItem(0, ""));
             UpdateFromMenuSelection<KeyedComboBoxItem>(comboBoxTimetableSeason, UserSettings.Menu_SelectionIndex.Season, s => s.Key.ToString(), new KeyedComboBoxItem(1, ""));
             UpdateFromMenuSelection<KeyedComboBoxItem>(comboBoxTimetableWeather, UserSettings.Menu_SelectionIndex.Weather, w => w.Key.ToString(), new KeyedComboBoxItem(0, ""));
+            UpdateFromMenuSelection<KeyedComboBoxItem>(comboBoxTimetableCondition, UserSettings.Menu_SelectionIndex.Condition, w => w.Key.ToString(), new KeyedComboBoxItem(0, ""));
         }
         #endregion
 
@@ -1417,6 +1440,9 @@ namespace Menu
                             break;
                         case UserSettings.Menu_SelectionIndex.Weather:
                             valueComboboxToSetTo = route.Start.Weather;
+                            break;
+                        case UserSettings.Menu_SelectionIndex.Condition:
+                            valueComboboxToSetTo = route.Start.Condition;
                             break;
                         default:
                             break;

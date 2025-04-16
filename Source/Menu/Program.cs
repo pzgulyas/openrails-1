@@ -16,6 +16,7 @@
 // along with Open Rails.  If not, see <http://www.gnu.org/licenses/>.
 
 using ORTS.Common;
+using ORTS.Menu;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -57,9 +58,11 @@ namespace Menu
                     switch (MainForm.SelectedAction)
                     {
                         case MainForm.UserAction.SingleplayerNewGame:
+                        case MainForm.UserAction.SinglePlayerTimetableGame:
                             parameters.Add("-start");
                             break;
                         case MainForm.UserAction.SingleplayerResumeSave:
+                        case MainForm.UserAction.SinglePlayerResumeTimetableGame:
                             parameters.Add("-resume");
                             break;
                         case MainForm.UserAction.SingleplayerReplaySave:
@@ -69,20 +72,10 @@ namespace Menu
                             parameters.Add("-replay_from_save");
                             break;
                         case MainForm.UserAction.MultiplayerClient:
-                            parameters.Add("-multiplayerclient");
-                            break;
-                        case MainForm.UserAction.MultiplayerServer:
-                            parameters.Add("-multiplayerserver");
-                            break;
-                        case MainForm.UserAction.SinglePlayerTimetableGame:
-                            parameters.Add("-start");
-                            break;
-                        case MainForm.UserAction.SinglePlayerResumeTimetableGame:
-                            parameters.Add("-resume");
-                            break;
                         case MainForm.UserAction.MultiplayerClientResumeSave:
                             parameters.Add("-multiplayerclient");
                             break;
+                        case MainForm.UserAction.MultiplayerServer:
                         case MainForm.UserAction.MultiplayerServerResumeSave:
                             parameters.Add("-multiplayerserver");
                             break;
@@ -92,25 +85,17 @@ namespace Menu
                         case MainForm.UserAction.SingleplayerNewGame:
                         case MainForm.UserAction.MultiplayerClient:
                         case MainForm.UserAction.MultiplayerServer:
-                            if (MainForm.SelectedActivity is ORTS.Menu.DefaultExploreActivity)
+                            if (MainForm.SelectedActivity is ExploreActivity exploreActivity)
                             {
-                                var exploreActivity = MainForm.SelectedActivity as ORTS.Menu.DefaultExploreActivity;
-                                parameters.Add(String.Format("-explorer \"{0}\" \"{1}\" {2} {3} {4}",
+                                parameters.Add(string.Format("-{0} \"{1}\" \"{2}\" {3} {4} {5} {6} {7}",
+                                    exploreActivity is DefaultExploreActivity ? "explorer" : "exploreactivity",
                                     exploreActivity.Path.FilePath,
                                     exploreActivity.Consist.FilePath,
                                     exploreActivity.StartTime,
                                     (int)exploreActivity.Season,
-                                    (int)exploreActivity.Weather));
-                            }
-                            else if (MainForm.SelectedActivity is ORTS.Menu.ExploreThroughActivity)
-                            {
-                                var exploreActivity = MainForm.SelectedActivity as ORTS.Menu.ExploreThroughActivity;
-                                parameters.Add(String.Format("-exploreactivity \"{0}\" \"{1}\" {2} {3} {4}",
-                                    exploreActivity.Path.FilePath,
-                                    exploreActivity.Consist.FilePath,
-                                    exploreActivity.StartTime,
-                                    (int)exploreActivity.Season,
-                                    (int)exploreActivity.Weather));
+                                    (int)exploreActivity.Weather,
+                                    (int)exploreActivity.WeatherAdv,
+                                    (int)exploreActivity.Condition));
                             }
                             else
                             {
@@ -118,6 +103,7 @@ namespace Menu
                             }
                             break;
                         case MainForm.UserAction.SingleplayerResumeSave:
+                        case MainForm.UserAction.SinglePlayerResumeTimetableGame:
                         case MainForm.UserAction.SingleplayerReplaySave:
                         case MainForm.UserAction.SingleplayerReplaySaveFromSave:
                         case MainForm.UserAction.MultiplayerClientResumeSave:
@@ -125,30 +111,16 @@ namespace Menu
                             parameters.Add("\"" + MainForm.SelectedSaveFile + "\"");
                             break;
                         case MainForm.UserAction.SinglePlayerTimetableGame:
-                            if (String.IsNullOrEmpty(MainForm.SelectedTimetableSet.WeatherFile))
-                            {
-                                parameters.Add(String.Format("-timetable \"{0}\" \"{1}:{2}\" {3} {4} {5}",
-                                    MainForm.SelectedTimetableSet.fileName,
-                                    MainForm.SelectedTimetable,
-                                    MainForm.SelectedTimetableTrain,
-                                    MainForm.SelectedTimetableSet.Day,
-                                    MainForm.SelectedTimetableSet.Season,
-                                    MainForm.SelectedTimetableSet.Weather));
-                            }
-                            else
-                            {
-                                parameters.Add(String.Format("-timetable \"{0}\" \"{1}:{2}\" {3} {4} {5} \"{6}\" ",
-                                    MainForm.SelectedTimetableSet.fileName,
-                                    MainForm.SelectedTimetable,
-                                    MainForm.SelectedTimetableTrain,
-                                    MainForm.SelectedTimetableSet.Day,
-                                    MainForm.SelectedTimetableSet.Season,
-                                    MainForm.SelectedTimetableSet.Weather,
-                                    MainForm.SelectedTimetableSet.WeatherFile));
-                            }
-                            break;
-                        case MainForm.UserAction.SinglePlayerResumeTimetableGame:
-                            parameters.Add("\"" + MainForm.SelectedSaveFile + "\"");
+                            parameters.Add(string.Format("-timetable \"{0}\" \"{1}:{2}\" {3} {4} {5} {6} ",
+                                MainForm.SelectedTimetableSet.fileName,
+                                MainForm.SelectedTimetable,
+                                MainForm.SelectedTimetableTrain,
+                                MainForm.SelectedTimetableSet.Day,
+                                MainForm.SelectedTimetableSet.Season,
+                                MainForm.SelectedTimetableSet.Weather,
+                                MainForm.SelectedTimetableSet.WeatherAdv,
+                                MainForm.SelectedTimetableSet.Condition,
+                                string.IsNullOrEmpty(MainForm.SelectedTimetableSet.WeatherFile) ? "" : $"\"{MainForm.SelectedTimetableSet.WeatherFile}\""));
                             break;
                     }
                     

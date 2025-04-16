@@ -473,6 +473,14 @@ namespace ORTS.Settings
             Commands[(int)UserCommand.ControlDPMore] = new UserCommandKeyInput(0x16, KeyModifiers.Control); //U
             Commands[(int)UserCommand.ControlDPLess] = new UserCommandKeyInput(0x16, KeyModifiers.Control | KeyModifiers.Shift); //U
 
+            Commands[(int)UserCommand.DisplayWeatherEditorWindow] = new UserCommandKeyInput(0x3D);
+            Commands[(int)UserCommand.Weather_Control_Insert] = new UserCommandKeyInput(0x52, KeyModifiers.Control); // Insert
+            Commands[(int)UserCommand.Weather_Control_Delete] = new UserCommandKeyInput(0x53, KeyModifiers.Control); // Del
+            Commands[(int)UserCommand.Weather_Control_Home] = new UserCommandKeyInput(0x47, KeyModifiers.Control); // Home
+            Commands[(int)UserCommand.Weather_Control_End] = new UserCommandKeyInput(0x4F, KeyModifiers.Control); // End
+            Commands[(int)UserCommand.Weather_Control_PgUp] = new UserCommandKeyInput(0x49, KeyModifiers.Control); // PgUp
+            Commands[(int)UserCommand.Weather_Control_PgDn] = new UserCommandKeyInput(0x51, KeyModifiers.Control); // PgDn
+
             Commands[(int)UserCommand.DebugClockBackwards] = new UserCommandKeyInput(0x0C);
             Commands[(int)UserCommand.DebugClockForwards] = new UserCommandKeyInput(0x0D);
             Commands[(int)UserCommand.DebugDumpKeymap] = new UserCommandKeyInput(0x3B, KeyModifiers.Alt);

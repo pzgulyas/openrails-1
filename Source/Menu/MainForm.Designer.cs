@@ -75,9 +75,11 @@ namespace Menu
             this.label9 = new System.Windows.Forms.Label();
             this.comboBoxStartTime = new System.Windows.Forms.ComboBox();
             this.comboBoxDuration = new System.Windows.Forms.ComboBox();
+            this.comboBoxStartCondition = new System.Windows.Forms.ComboBox();
             this.comboBoxStartWeather = new System.Windows.Forms.ComboBox();
             this.label12 = new System.Windows.Forms.Label();
             this.comboBoxStartSeason = new System.Windows.Forms.ComboBox();
+            this.label16 = new System.Windows.Forms.Label();
             this.label10 = new System.Windows.Forms.Label();
             this.comboBoxDifficulty = new System.Windows.Forms.ComboBox();
             this.label8 = new System.Windows.Forms.Label();
@@ -89,7 +91,9 @@ namespace Menu
             this.label23 = new System.Windows.Forms.Label();
             this.comboBoxTimetableDay = new System.Windows.Forms.ComboBox();
             this.label22 = new System.Windows.Forms.Label();
+            this.comboBoxTimetableCondition = new System.Windows.Forms.ComboBox();
             this.comboBoxTimetableWeather = new System.Windows.Forms.ComboBox();
+            this.label17 = new System.Windows.Forms.Label();
             this.label20 = new System.Windows.Forms.Label();
             this.comboBoxTimetableSeason = new System.Windows.Forms.ComboBox();
             this.label21 = new System.Windows.Forms.Label();
@@ -434,9 +438,11 @@ namespace Menu
             this.panelModeActivity.Controls.Add(this.label9);
             this.panelModeActivity.Controls.Add(this.comboBoxStartTime);
             this.panelModeActivity.Controls.Add(this.comboBoxDuration);
+            this.panelModeActivity.Controls.Add(this.comboBoxStartCondition);
             this.panelModeActivity.Controls.Add(this.comboBoxStartWeather);
             this.panelModeActivity.Controls.Add(this.label12);
             this.panelModeActivity.Controls.Add(this.comboBoxStartSeason);
+            this.panelModeActivity.Controls.Add(this.label16);
             this.panelModeActivity.Controls.Add(this.label10);
             this.panelModeActivity.Controls.Add(this.comboBoxDifficulty);
             this.panelModeActivity.Controls.Add(this.label8);
@@ -610,6 +616,19 @@ namespace Menu
             this.comboBoxDuration.Size = new System.Drawing.Size(73, 21);
             this.comboBoxDuration.TabIndex = 17;
             // 
+            // comboBoxStartCondition
+            // 
+            this.comboBoxStartCondition.AutoCompleteMode = System.Windows.Forms.AutoCompleteMode.Suggest;
+            this.comboBoxStartCondition.AutoCompleteSource = System.Windows.Forms.AutoCompleteSource.ListItems;
+            this.comboBoxStartCondition.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
+            this.comboBoxStartCondition.Enabled = false;
+            this.comboBoxStartCondition.FormattingEnabled = true;
+            this.comboBoxStartCondition.Location = new System.Drawing.Point(211, 286);
+            this.comboBoxStartCondition.Name = "comboBoxStartCondition";
+            this.comboBoxStartCondition.Size = new System.Drawing.Size(73, 21);
+            this.comboBoxStartCondition.TabIndex = 15;
+            this.comboBoxStartCondition.SelectedIndexChanged += new System.EventHandler(this.comboBoxStartWeather_SelectedIndexChanged);
+            // 
             // comboBoxStartWeather
             // 
             this.comboBoxStartWeather.AutoCompleteMode = System.Windows.Forms.AutoCompleteMode.Suggest;
@@ -645,6 +664,16 @@ namespace Menu
             this.comboBoxStartSeason.Size = new System.Drawing.Size(73, 21);
             this.comboBoxStartSeason.TabIndex = 13;
             this.comboBoxStartSeason.SelectedIndexChanged += new System.EventHandler(this.comboBoxStartSeason_SelectedIndexChanged);
+            // 
+            // label16
+            // 
+            this.label16.Location = new System.Drawing.Point(143, 289);
+            this.label16.Margin = new System.Windows.Forms.Padding(2);
+            this.label16.Name = "label16";
+            this.label16.Size = new System.Drawing.Size(67, 14);
+            this.label16.TabIndex = 18;
+            this.label16.Text = "Condition:";
+            this.label16.TextAlign = System.Drawing.ContentAlignment.MiddleLeft;
             // 
             // label10
             // 
@@ -687,7 +716,9 @@ namespace Menu
             this.panelModeTimetable.Controls.Add(this.label23);
             this.panelModeTimetable.Controls.Add(this.comboBoxTimetableDay);
             this.panelModeTimetable.Controls.Add(this.label22);
+            this.panelModeTimetable.Controls.Add(this.comboBoxTimetableCondition);
             this.panelModeTimetable.Controls.Add(this.comboBoxTimetableWeather);
+            this.panelModeTimetable.Controls.Add(this.label17);
             this.panelModeTimetable.Controls.Add(this.label20);
             this.panelModeTimetable.Controls.Add(this.comboBoxTimetableSeason);
             this.panelModeTimetable.Controls.Add(this.label21);
@@ -704,7 +735,7 @@ namespace Menu
             // labelTimetableWeatherFile
             // 
             this.labelTimetableWeatherFile.AutoSize = true;
-            this.labelTimetableWeatherFile.Location = new System.Drawing.Point(5, 212);
+            this.labelTimetableWeatherFile.Location = new System.Drawing.Point(5, 239);
             this.labelTimetableWeatherFile.Margin = new System.Windows.Forms.Padding(3);
             this.labelTimetableWeatherFile.Name = "labelTimetableWeatherFile";
             this.labelTimetableWeatherFile.Size = new System.Drawing.Size(70, 13);
@@ -716,7 +747,7 @@ namespace Menu
             // 
             this.comboBoxTimetableWeatherFile.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
             this.comboBoxTimetableWeatherFile.FormattingEnabled = true;
-            this.comboBoxTimetableWeatherFile.Location = new System.Drawing.Point(91, 209);
+            this.comboBoxTimetableWeatherFile.Location = new System.Drawing.Point(91, 236);
             this.comboBoxTimetableWeatherFile.Name = "comboBoxTimetableWeatherFile";
             this.comboBoxTimetableWeatherFile.Size = new System.Drawing.Size(193, 21);
             this.comboBoxTimetableWeatherFile.TabIndex = 13;
@@ -778,22 +809,45 @@ namespace Menu
             this.label22.TextAlign = System.Drawing.ContentAlignment.MiddleLeft;
             this.label22.Visible = false;
             // 
+            // comboBoxTimetableCondition
+            // 
+            this.comboBoxTimetableCondition.AutoCompleteMode = System.Windows.Forms.AutoCompleteMode.Suggest;
+            this.comboBoxTimetableCondition.AutoCompleteSource = System.Windows.Forms.AutoCompleteSource.ListItems;
+            this.comboBoxTimetableCondition.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
+            this.comboBoxTimetableCondition.FormattingEnabled = true;
+            this.comboBoxTimetableCondition.Location = new System.Drawing.Point(91, 205);
+            this.comboBoxTimetableCondition.Name = "comboBoxTimetableCondition";
+            this.comboBoxTimetableCondition.Size = new System.Drawing.Size(73, 21);
+            this.comboBoxTimetableCondition.TabIndex = 12;
+            this.comboBoxTimetableCondition.SelectedIndexChanged += new System.EventHandler(this.comboBoxTimetableWeather_SelectedIndexChanged);
+            // 
             // comboBoxTimetableWeather
             // 
             this.comboBoxTimetableWeather.AutoCompleteMode = System.Windows.Forms.AutoCompleteMode.Suggest;
             this.comboBoxTimetableWeather.AutoCompleteSource = System.Windows.Forms.AutoCompleteSource.ListItems;
             this.comboBoxTimetableWeather.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
             this.comboBoxTimetableWeather.FormattingEnabled = true;
-            this.comboBoxTimetableWeather.Location = new System.Drawing.Point(91, 176);
+            this.comboBoxTimetableWeather.Location = new System.Drawing.Point(91, 177);
             this.comboBoxTimetableWeather.Name = "comboBoxTimetableWeather";
             this.comboBoxTimetableWeather.Size = new System.Drawing.Size(73, 21);
             this.comboBoxTimetableWeather.TabIndex = 12;
             this.comboBoxTimetableWeather.SelectedIndexChanged += new System.EventHandler(this.comboBoxTimetableWeather_SelectedIndexChanged);
             // 
+            // label17
+            // 
+            this.label17.AutoSize = true;
+            this.label17.Location = new System.Drawing.Point(5, 208);
+            this.label17.Margin = new System.Windows.Forms.Padding(3);
+            this.label17.Name = "label17";
+            this.label17.Size = new System.Drawing.Size(54, 13);
+            this.label17.TabIndex = 11;
+            this.label17.Text = "Condition:";
+            this.label17.TextAlign = System.Drawing.ContentAlignment.MiddleLeft;
+            // 
             // label20
             // 
             this.label20.AutoSize = true;
-            this.label20.Location = new System.Drawing.Point(5, 179);
+            this.label20.Location = new System.Drawing.Point(5, 180);
             this.label20.Margin = new System.Windows.Forms.Padding(3);
             this.label20.Name = "label20";
             this.label20.Size = new System.Drawing.Size(51, 13);
@@ -1048,5 +1102,9 @@ namespace Menu
         private System.Windows.Forms.PictureBox pbNotificationsSome;
         private System.Windows.Forms.Label lblNotificationCount;
         private System.Windows.Forms.ToolTip ttNotifications;
+        public System.Windows.Forms.ComboBox comboBoxStartCondition;
+        private System.Windows.Forms.Label label16;
+        private System.Windows.Forms.ComboBox comboBoxTimetableCondition;
+        private System.Windows.Forms.Label label17;
     }
 }

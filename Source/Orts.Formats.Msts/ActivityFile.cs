@@ -315,6 +315,11 @@ namespace Orts.Formats.Msts
         }
 
         public void Read(string filenamewithpath, bool headerOnly) {
+            if (!File.Exists(filenamewithpath)) {
+                // Used for explore in activity mode
+                Tr_Activity = new Tr_Activity();
+                return;
+            }
             using (STFReader stf = new STFReader(filenamewithpath, false)) {
                 stf.ParseFile(() => headerOnly && (Tr_Activity != null) && (Tr_Activity.Tr_Activity_Header != null), new STFReader.TokenProcessor[] {
                     new STFReader.TokenProcessor("tr_activity", ()=>{ Tr_Activity = new Tr_Activity(stf, headerOnly); }),
@@ -335,12 +340,6 @@ namespace Orts.Formats.Msts
                 if (!tr_activityTokenPresent)
                     STFException.TraceWarning(stf, "Missing Tr_Activity statement");
             }
-        }
-
-        // Used for explore in activity mode
-        public ActivityFile()
-        {
-            Tr_Activity = new Tr_Activity();
         }
     }
 

@@ -68,21 +68,6 @@ namespace Orts.Simulation
         //   Moderate    >7.7 (15-25 knots)
         //   Heavy       >12.9 (>25 knots)
         public static readonly float[] WindSpeedGustMpS = new[] { 5.1f, 7.7f, 12.9f, 25.8f };
-
-        public enum Condition
-        {
-            Light,
-            Moderate,
-            Heavy,
-        }
-
-        public enum WeatherKind
-        {
-            Clear,
-            Overcast,
-            Precipitation,
-            Dynamic,
-        }
     }
 
     public class Weather

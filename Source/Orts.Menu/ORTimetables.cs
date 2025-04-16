@@ -34,6 +34,8 @@ namespace ORTS.Menu
         public int Day;
         public int Season;
         public int Weather;
+        public int WeatherAdv;
+        public int Condition;
         public String WeatherFile;
 
         // note : file is read preliminary only, extracting description and train information

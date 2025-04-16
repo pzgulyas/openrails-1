@@ -118,8 +118,8 @@ namespace Orts.Simulation
         public AI AI;
         public SeasonType Season;
         public WeatherType WeatherType;
-        public WeatherConstants.WeatherKind WeatherKind;
-        public WeatherConstants.Condition WeatherCondition;
+        public WeatherFile.WeatherType WeatherKind;
+        public WeatherFile.Condition WeatherCondition;
         public string UserWeatherFile = string.Empty;
         public SignalConfigurationFile SIGCFG;
         public string ExplorePathFile;
@@ -414,38 +414,28 @@ namespace Orts.Simulation
             }
             IsAutopilotMode = true;
         }
-        public void SetExplore(string path, string consist, string start, string season, string weather)
+        public void SetExplore(string path, string consist, string start, string season, string weather, string weatherAdv, string condition)
         {
             ExplorePathFile = path;
             ExploreConFile = consist;
             patFileName = Path.ChangeExtension(path, "PAT");
             conFileName = Path.ChangeExtension(consist, "CON");
-            var time = start.Split(':');
+            var time = string.IsNullOrEmpty(start) ? new[] { "10" } : start.Split(':');
             TimeSpan StartTime = new TimeSpan(int.Parse(time[0]), time.Length > 1 ? int.Parse(time[1]) : 0, time.Length > 2 ? int.Parse(time[2]) : 0);
             ClockTime = StartTime.TotalSeconds;
-            Season = (SeasonType)int.Parse(season);
-            WeatherType = (WeatherType)int.Parse(weather);
+            Season = int.TryParse(season, out int seasonInt) ? (SeasonType)seasonInt : SeasonType.Summer;
+            WeatherType = int.TryParse(weather, out int weatherInt) ? (WeatherType)weatherInt : WeatherType.Clear;
+            WeatherKind = int.TryParse(weatherAdv, out int weatherAdvInt) ? (WeatherFile.WeatherType)weatherAdvInt : WeatherFile.WeatherType.Dynamic;
+            WeatherCondition = int.TryParse(condition, out int conditionInt) ? (WeatherFile.Condition)conditionInt : WeatherFile.Condition.Light;
         }
 
-        public void SetExploreThroughActivity(string path, string consist, string start, string season, string weather)
+        public void SetExploreThroughActivity(string path, string consist, string start, string season, string weather, string weatherAdv, string condition)
         {
-            ActivityFileName = "ea$" + RoutePathName + "$" + DateTime.Today.Year.ToString() + DateTime.Today.Month.ToString() + DateTime.Today.Day.ToString() +
-                DateTime.Today.Hour.ToString() + DateTime.Today.Minute.ToString() + DateTime.Today.Second.ToString();
-            Activity = new ActivityFile();
-            ActivityRun = new Activity(Activity, this);
-            ExplorePathFile = path;
-            ExploreConFile = consist;
-            patFileName = Path.ChangeExtension(path, "PAT");
-            conFileName = Path.ChangeExtension(consist, "CON");
-            var time = start.Split(':');
-            TimeSpan StartTime = new TimeSpan(int.Parse(time[0]), time.Length > 1 ? int.Parse(time[1]) : 0, time.Length > 2 ? int.Parse(time[2]) : 0);
-            Activity.Tr_Activity.Tr_Activity_File.Player_Service_Definition.Player_Traffic_Definition.Time = StartTime.Hours + StartTime.Minutes * 60 +
-                StartTime.Seconds * 3600;
+            SetActivity($"ea${RoutePathName.Replace('.', '_')}${DateTime.Now:yyyyMMddHHmmss}");
+            SetExplore(path, consist, start, season, weather, weatherAdv, condition);
+
+            Activity.Tr_Activity.Tr_Activity_File.Player_Service_Definition.Player_Traffic_Definition.Time = (int)ClockTime;
             Activity.Tr_Activity.Tr_Activity_File.Player_Service_Definition.Name = Path.GetFileNameWithoutExtension(consist);
-            ClockTime = StartTime.TotalSeconds;
-            Season = (SeasonType)int.Parse(season);
-            WeatherType = (WeatherType)int.Parse(weather);
-            IsAutopilotMode = true;
         }
 
         public void Start(CancellationToken cancellation)

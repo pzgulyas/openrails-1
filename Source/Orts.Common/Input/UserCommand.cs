@@ -68,6 +68,13 @@ namespace ORTS.Common.Input
         [GetString("Display Train List Window")] DisplayTrainListWindow,
         [GetString("Display EOT List Window")] DisplayEOTListWindow,
         [GetString("Display Control Rectangles")] DisplayControlRectangle,
+        [GetString("Display Weather Window")] DisplayWeatherEditorWindow,
+        [GetString("Display Weather Control Insert")] Weather_Control_Insert,
+        [GetString("Display Weather Control Delete")] Weather_Control_Delete,
+        [GetString("Display Weather Control Home")] Weather_Control_Home,
+        [GetString("Display Weather Control End")] Weather_Control_End,
+        [GetString("Display Weather Control PgUp")] Weather_Control_PgUp,
+        [GetString("Display Weather Control PgDn")] Weather_Control_PgDn,
 
         [GetString("Debug Speed Up")] DebugSpeedUp,
         [GetString("Debug Speed Down")] DebugSpeedDown,

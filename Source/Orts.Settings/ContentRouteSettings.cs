@@ -45,6 +45,7 @@ namespace ORTS.Settings
             public string Time;
             public string Season;
             public string Weather;
+            public string Condition;
         }
 
         public class Route

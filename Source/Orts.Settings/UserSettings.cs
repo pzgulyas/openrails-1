@@ -72,6 +72,7 @@ namespace ORTS.Settings
             // Shared items
             Season = 7,
             Weather = 8,
+            Condition = 9,
         }
         #endregion
 

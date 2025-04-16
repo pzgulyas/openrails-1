@@ -23,6 +23,7 @@ using System.Text;
 using System.IO;
 using Microsoft.Xna.Framework;
 using Orts.Parsers.OR;
+using ORTS.Common;
 
 namespace Orts.Formats.OR
 {
@@ -36,6 +37,22 @@ namespace Orts.Formats.OR
         public List<WeatherSetting> Changes = new List<WeatherSetting>();
         public float TimeVariance;             // allowed max variation using random time setting
         public bool RandomSequence;            // set random sequence
+
+        public enum WeatherType
+        {
+            [GetString("Clear")] Clear,
+            [GetString("Precipitation")] Precipitation,
+            [GetString("Fog")] Fog,
+            [GetString("Desert")] Desert,
+            [GetString("Dynamic")] Dynamic,
+        }
+
+        public enum Condition
+        {
+            [GetString("Light")] Light,
+            [GetString("Moderate")] Moderate,
+            [GetString("Heavy")] Heavy,
+        }
 
         public WeatherFile(string fileName)
         {

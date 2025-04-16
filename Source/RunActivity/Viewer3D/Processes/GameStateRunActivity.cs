@@ -22,6 +22,7 @@ using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Orts.Common;
 using Orts.Formats.Msts;
+using Orts.Formats.OR;
 using Orts.MultiPlayer;
 using Orts.Simulation;
 using Orts.Viewer3D.Debugging;
@@ -1077,22 +1078,26 @@ namespace Orts.Viewer3D.Processes
 
                 case "explorer":
                 case "exploreactivity":
-                    if (args.Length < 5) throw new InvalidCommandLine("Mode 'explorer' needs 5 arguments: path file, consist file, time (hh[:mm[:ss]]), season (0-3), weather (0-2).");
+                    if (args.Length < 2) throw new InvalidCommandLine("Mode 'explorer' needs 2 arguments: path file, consist file, and optionally time (hh[:mm[:ss]]), season (0-3), weather (0-2).");
                     Console.WriteLine("Route      = {0}", GetRouteName(args[0]));
                     Console.WriteLine("Path       = {0} ({1})", GetPathName(args[0]), args[0]);
                     Console.WriteLine("Consist    = {0} ({1})", GetConsistName(args[1]), args[1]);
-                    Console.WriteLine("Time       = {0} ({1})", GetTime(args[2]), args[2]);
-                    Console.WriteLine("Season     = {0} ({1})", GetSeason(args[3]), args[3]);
-                    Console.WriteLine("Weather    = {0} ({1})", GetWeather(args[4]), args[4]);
+                    Console.WriteLine("Time       = {0} ({1})", GetTime(args.ElementAtOrDefault(2)), args.ElementAtOrDefault(2));
+                    Console.WriteLine("Season     = {0} ({1})", GetSeason(args.ElementAtOrDefault(3)), args.ElementAtOrDefault(3));
+                    Console.WriteLine("Weather    = {0} ({1})", GetWeather(args.ElementAtOrDefault(4)), args.ElementAtOrDefault(4));
+                    Console.WriteLine("WeatherAdv = {0} ({1})", GetWeatherAdv(args.ElementAtOrDefault(5)), args.ElementAtOrDefault(5));
+                    Console.WriteLine("Condition  = {0} ({1})", GetCondition(args.ElementAtOrDefault(6)), args.ElementAtOrDefault(6));
                     break;
 
                 case "timetable":
-                    if (args.Length < 5) throw new InvalidCommandLine("Mode 'timetable' needs 5 arguments: timetable file, train name, day (???), season (0-3), weather (0-2).");
+                    if (args.Length < 3) throw new InvalidCommandLine("Mode 'timetable' needs 3 arguments: timetable file, train name, day (???), and optionally season (0-3), weather (0-2).");
                     Console.WriteLine("File       = {0}", args[0]);
                     Console.WriteLine("Train      = {0}", args[1]);
                     Console.WriteLine("Day        = {0}", args[2]);
-                    Console.WriteLine("Season     = {0} ({1})", GetSeason(args[3]), args[3]);
-                    Console.WriteLine("Weather    = {0} ({1})", GetWeather(args[4]), args[4]);
+                    Console.WriteLine("Season     = {0} ({1})", GetSeason(args.ElementAtOrDefault(3)), args.ElementAtOrDefault(3));
+                    Console.WriteLine("Weather    = {0} ({1})", GetWeather(args.ElementAtOrDefault(4)), args.ElementAtOrDefault(4));
+                    Console.WriteLine("WeatherAdv = {0} ({1})", GetWeatherAdv(args.ElementAtOrDefault(5)), args.ElementAtOrDefault(5));
+                    Console.WriteLine("Condition  = {0} ({1})", GetCondition(args.ElementAtOrDefault(6)), args.ElementAtOrDefault(6));
                     break;
 
                 default:
@@ -1119,29 +1124,23 @@ namespace Orts.Viewer3D.Processes
             {
                 case "activity":
                     Simulator = new Simulator(settings, args[0], false);
-                    if (LoadingScreen == null)
-                        LoadingScreen = new LoadingScreenPrimitive(Game);
                     Simulator.SetActivity(args[0]);
                     break;
 
                 case "explorer":
                     Simulator = new Simulator(settings, args[0], false);
-                    if (LoadingScreen == null)
-                        LoadingScreen = new LoadingScreenPrimitive(Game);
-                    Simulator.SetExplore(args[0], args[1], args[2], args[3], args[4]);
+                    Simulator.SetExplore(args[0], args[1], args.ElementAtOrDefault(2),
+                        args.ElementAtOrDefault(3), args.ElementAtOrDefault(4), args.ElementAtOrDefault(5), args.ElementAtOrDefault(6));
                     break;
 
                 case "exploreactivity":
                     Simulator = new Simulator(settings, args[0], false);
-                    if (LoadingScreen == null)
-                        LoadingScreen = new LoadingScreenPrimitive(Game);
-                    Simulator.SetExploreThroughActivity(args[0], args[1], args[2], args[3], args[4]);
+                    Simulator.SetExploreThroughActivity(args[0], args[1], args.ElementAtOrDefault(2),
+                        args.ElementAtOrDefault(3), args.ElementAtOrDefault(4), args.ElementAtOrDefault(5), args.ElementAtOrDefault(6));
                     break;
 
                 case "timetable":
                     Simulator = new Simulator(settings, args[0], true);
-                    if (LoadingScreen == null)
-                        LoadingScreen = new LoadingScreenPrimitive(Game);
                     if (String.Compare(mode, "start", true) != 0) // no specific action for start, handled in start_timetable
                     {
                         // for resume and replay : set timetable file and selected train info
@@ -1151,6 +1150,9 @@ namespace Orts.Viewer3D.Processes
                     }
                     break;
             }
+
+            if (LoadingScreen == null)
+                LoadingScreen = new LoadingScreenPrimitive(Game);
 
             if (settings.MultiplayerServer)
             {
@@ -1251,7 +1253,7 @@ namespace Orts.Viewer3D.Processes
 
         string GetTime(string timeString)
         {
-            string[] time = timeString.Split(':');
+            string[] time = timeString?.Split(':') ?? new string[0];
             if (time.Length == 0)
                 return null;
 
@@ -1277,6 +1279,22 @@ namespace Orts.Viewer3D.Processes
         string GetWeather(string weather)
         {
             if (Enum.TryParse(weather, out WeatherType value))
+                return value.ToString();
+            else
+                return null;
+        }
+
+        string GetWeatherAdv(string weather)
+        {
+            if (Enum.TryParse(weather, out WeatherFile.WeatherType value))
+                return value.ToString();
+            else
+                return null;
+        }
+
+        string GetCondition(string weather)
+        {
+            if (Enum.TryParse(weather, out WeatherFile.Condition value))
                 return value.ToString();
             else
                 return null;

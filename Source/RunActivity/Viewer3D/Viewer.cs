@@ -103,6 +103,7 @@ namespace Orts.Viewer3D
         public TrainDpuWindow TrainDpuWindow { get; private set; } // Shift + F9 train distributed power window
         public NextStationWindow NextStationWindow { get; private set; } // F10 window
         public CompassWindow CompassWindow { get; private set; } // 0 window
+        public WeatherEditorWindow WeatherEditorWindow { get; private set; } // F3 window
         public TracksDebugWindow TracksDebugWindow { get; private set; } // Control-Alt-F6
         public SignallingDebugWindow SignallingDebugWindow { get; private set; } // Control-Alt-F11 window
         public ComposeMessage ComposeMessageWindow { get; private set; } // ??? window
@@ -511,6 +512,7 @@ namespace Orts.Viewer3D
             TrainDpuWindow = new TrainDpuWindow(WindowManager);
             NextStationWindow = new NextStationWindow(WindowManager);
             CompassWindow = new CompassWindow(WindowManager);
+            WeatherEditorWindow = new WeatherEditorWindow(WindowManager);
             TracksDebugWindow = new TracksDebugWindow(WindowManager);
             SignallingDebugWindow = new SignallingDebugWindow(WindowManager);
             ComposeMessageWindow = new ComposeMessage(WindowManager);
@@ -1070,6 +1072,17 @@ namespace Orts.Viewer3D
             if (UserInput.IsPressed(UserCommand.DisplayEOTListWindow)) EOTListWindow.Visible = !EOTListWindow.Visible;
             if (UserInput.IsPressed(UserCommand.DisplayControlRectangle)) ControlRectangle.Visible = !ControlRectangle.Visible;
 
+            if (UserInput.IsPressed(UserCommand.DisplayWeatherEditorWindow))
+            {
+                if (UserInput.IsDown(UserCommand.DisplayNextWindowTab)) WeatherEditorWindow.TabAction(); else WeatherEditorWindow.Visible = !WeatherEditorWindow.Visible;
+                // Update Weather Editor stats
+                World.WeatherControl.GuiUpdateStats();
+                if (!WeatherEditorWindow.Visible)
+                {
+                    WeatherEditorWindow.EnmSelect = WeatherEditorWindow.EnuSelection.Notselected;
+                    WeatherEditorWindow.ClearLabelColor();
+                }
+            }
 
             if (UserInput.IsPressed(UserCommand.GameChangeCab))
             {

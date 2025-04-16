@@ -19,6 +19,7 @@ using System.Collections.Generic;
 using System.IO;
 using GNU.Gettext;
 using Orts.Formats.Msts;
+using Orts.Formats.OR;
 using ORTS.Settings;
 
 namespace ORTS.Menu
@@ -32,6 +33,8 @@ namespace ORTS.Menu
         public readonly StartTime StartTime = new StartTime(10, 0, 0);
         public readonly SeasonType Season = SeasonType.Summer;
         public readonly WeatherType Weather = WeatherType.Clear;
+        public readonly WeatherFile.WeatherType WeatherAdv = WeatherFile.WeatherType.Clear;
+        public readonly WeatherFile.Condition Condition = WeatherFile.Condition.Light;
         public readonly Difficulty Difficulty = Difficulty.Easy;
         public readonly Duration Duration = new Duration(1, 0);
         public readonly Consist Consist = new Consist("unknown", null);
@@ -67,6 +70,7 @@ namespace ORTS.Menu
                         StartTime = actFile.Tr_Activity.Tr_Activity_Header.StartTime;
                         Season = actFile.Tr_Activity.Tr_Activity_Header.Season;
                         Weather = actFile.Tr_Activity.Tr_Activity_Header.Weather;
+                        WeatherAdv = Weather == WeatherType.Clear ? WeatherFile.WeatherType.Clear : WeatherFile.WeatherType.Precipitation;
                         Difficulty = actFile.Tr_Activity.Tr_Activity_Header.Difficulty;
                         Duration = actFile.Tr_Activity.Tr_Activity_Header.Duration;
                         Consist = new Consist(System.IO.Path.Combine(System.IO.Path.Combine(System.IO.Path.Combine(folder.Path, "TRAINS"), "CONSISTS"), srvFile.Train_Config + ".con"), folder);
@@ -130,6 +134,8 @@ namespace ORTS.Menu
         public new string StartTime;
         public new SeasonType Season = SeasonType.Summer;
         public new WeatherType Weather = WeatherType.Clear;
+        public new WeatherFile.WeatherType WeatherAdv = WeatherFile.WeatherType.Clear;
+        public new WeatherFile.Condition Condition = WeatherFile.Condition.Light;
         public new Consist Consist = new Consist("unknown", null);
         public new Path Path = new Path("unknown");
 
