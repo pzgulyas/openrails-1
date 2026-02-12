@@ -274,7 +274,7 @@ performance of the wheelset.
 ``NumberWheelsetAxles`` - number of axles in the wheelset.
 ``ORTSFlangeAngle`` - flange angle of the wheels in the wheelset.
 ``ORTSInertia`` - inertia of the wheels in the wheelset.
-``LocomotiveAxleRailTractionType`` - indicates the type of rail traction for the axle. 
+``AxleRailTractionType`` - indicates the type of rail traction for the axle. 
 Valid inputs are Rack, Rack_Adhesion or Adhesion.
 
 The first model -- simple adhesion model -- is a simple tractive force

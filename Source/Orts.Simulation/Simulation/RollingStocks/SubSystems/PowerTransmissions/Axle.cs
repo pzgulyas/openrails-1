@@ -374,12 +374,12 @@ namespace Orts.Simulation.RollingStocks.SubSystems.PowerTransmissions
                     }
 
                     // Set default type of axle rail traction selected
-                    if (axle.LocomotiveAxleRailTractionType == LocomotiveAxleRailTractionTypes.Unknown)
+                    if (axle.AxleRailTractionType == AxleRailTractionTypes.Unknown)
                     {
-                        axle.LocomotiveAxleRailTractionType = LocomotiveAxleRailTractionTypes.Adhesion;
+                        axle.AxleRailTractionType = AxleRailTractionTypes.Adhesion;
 
                         if ( locomotive.Simulator.Settings.VerboseConfigurationMessages)
-                            Trace.TraceInformation("LocomotiveAxleRailDriveType set to Default value of {0}", axle.LocomotiveAxleRailTractionType);
+                            Trace.TraceInformation("LocomotiveAxleRailDriveType set to Default value of {0}", axle.AxleRailTractionType);
                     }
 
                     // set the wheel slip threshold times for different types of locomotives
@@ -841,7 +841,7 @@ namespace Orts.Simulation.RollingStocks.SubSystems.PowerTransmissions
         /// Indicates the type of traction that the axle has with the track, which determines the method of calculating 
         /// the drive force and adhesion limit for the axle
         /// </summary>
-        public enum LocomotiveAxleRailTractionTypes
+        public enum AxleRailTractionTypes
         {
             Unknown,
             Rack,           // axle has may have a cog wheel, but is not necessarily running on a rack railway
@@ -849,7 +849,7 @@ namespace Orts.Simulation.RollingStocks.SubSystems.PowerTransmissions
             Adhesion       // defaults to adhesion
         }
 
-        public LocomotiveAxleRailTractionTypes LocomotiveAxleRailTractionType;
+        public AxleRailTractionTypes AxleRailTractionType;
 
 
         /// <summary>
@@ -1127,12 +1127,12 @@ namespace Orts.Simulation.RollingStocks.SubSystems.PowerTransmissions
                             if (part != "") AnimatedParts.Add(part);
                         }
                         break;
-                    case "locomotiveaxlerailtractiontype":
+                    case "axlerailtractiontype":
                      //   stf.MustMatch("(");
                         var locomotiveTractionType = stf.ReadStringBlock("");
                         try
                         {
-                            LocomotiveAxleRailTractionType = (LocomotiveAxleRailTractionTypes)Enum.Parse(typeof(LocomotiveAxleRailTractionTypes), locomotiveTractionType);
+                            AxleRailTractionType = (AxleRailTractionTypes)Enum.Parse(typeof(AxleRailTractionTypes), locomotiveTractionType);
                         }
                         catch
                         {
@@ -1155,7 +1155,7 @@ namespace Orts.Simulation.RollingStocks.SubSystems.PowerTransmissions
             InertiaKgm2 = other.InertiaKgm2;
             WheelWeightKg = other.WheelWeightKg;
             AxleWeightN = other.AxleWeightN;
-            LocomotiveAxleRailTractionType = other.LocomotiveAxleRailTractionType;
+            AxleRailTractionType = other.AxleRailTractionType;
             AnimatedParts.Clear();
             AnimatedParts.AddRange(other.AnimatedParts);
         }
@@ -1487,7 +1487,7 @@ namespace Orts.Simulation.RollingStocks.SubSystems.PowerTransmissions
             {
                 UpdateSimpleAdhesion(elapsedSeconds);
             }
-            if ((SlipPercent > (Car is MSTSLocomotive loco && loco.SlipControlSystem == MSTSLocomotive.SlipControlType.Full && Math.Abs(DriveForceN) > BrakeRetardForceN ? (200 - SlipWarningTresholdPercent) : 100)) && LocomotiveAxleRailTractionType != LocomotiveAxleRailTractionTypes.Rack)
+            if ((SlipPercent > (Car is MSTSLocomotive loco && loco.SlipControlSystem == MSTSLocomotive.SlipControlType.Full && Math.Abs(DriveForceN) > BrakeRetardForceN ? (200 - SlipWarningTresholdPercent) : 100)))
             {
                 // Wheel slip internally happens instantaneously, but may correct itself in a short period, so HuD indication has a small time delay to eliminate "false" indications
                 IsWheelSlip = IsWheelSlipWarning = true;
@@ -1499,7 +1499,7 @@ namespace Orts.Simulation.RollingStocks.SubSystems.PowerTransmissions
                 }
                 WheelSlipTimeS += elapsedSeconds;
             }
-            else if (SlipPercent > SlipWarningTresholdPercent && LocomotiveAxleRailTractionType != LocomotiveAxleRailTractionTypes.Rack)
+            else if (SlipPercent > SlipWarningTresholdPercent)
             {
                 // Wheel slip internally happens instantaneously, but may correct itself in a short period, so HuD indication has a small time delay to eliminate "false" indications
                 IsWheelSlipWarning = true;
@@ -1543,7 +1543,7 @@ namespace Orts.Simulation.RollingStocks.SubSystems.PowerTransmissions
             float adhesionForceN = AxleGradientForceN * AdhesionLimit;
             SlipPercent = Math.Abs(axleOutForceN) / adhesionForceN * 100;
 
-            if ((Car is MSTSSteamLocomotive steam && !steam.AdvancedAdhesionModel) || (IsRackRailway & ( LocomotiveAxleRailTractionType == LocomotiveAxleRailTractionTypes.Rack || LocomotiveAxleRailTractionType == LocomotiveAxleRailTractionTypes.Rack_Adhesion))) 
+            if ((Car is MSTSSteamLocomotive steam && !steam.AdvancedAdhesionModel) || (IsRackRailway & ( AxleRailTractionType == AxleRailTractionTypes.Rack || AxleRailTractionType == AxleRailTractionTypes.Rack_Adhesion))) 
             {
                 // Do not allow wheelslip on steam locomotives if simple adhesion is selected, or if it is a rack axle
                 SlipPercent = 0;
@@ -1557,7 +1557,7 @@ namespace Orts.Simulation.RollingStocks.SubSystems.PowerTransmissions
                     if (!locomotive.AntiSlip && locomotive.SlipControlSystem != MSTSLocomotive.SlipControlType.Full) axleOutForceN *= locomotive.Adhesion1;
                     else SlipPercent = 100;
                 }
-                else if (!Car.Simulator.UseAdvancedAdhesion || Car.Simulator.Settings.SimpleControlPhysics || !Car.Train.IsPlayerDriven || (IsRackRailway && BrakingCogWheelFitted))
+                else if (!Car.Simulator.UseAdvancedAdhesion || Car.Simulator.Settings.SimpleControlPhysics || !Car.Train.IsPlayerDriven)
                 {
                     // No wagon skid in simple adhesion
                     SlipPercent = 100;

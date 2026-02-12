@@ -1285,7 +1285,7 @@ namespace Orts.Simulation.RollingStocks
                 // Test if wheel forces are high enough to induce a slip. Set slip flag if slip occuring 
                 if (!BrakeSkid && AbsSpeedMpS > 0.01)  // Train must be moving forward to experience skid
                 {
-                    if (BrakeRetardForceN > WagonBrakeAdhesiveForceN)
+                    if (BrakeRetardForceN > WagonBrakeAdhesiveForceN && !(BrakeCogWheelFitted && IsRackRailway))
                     {
                         BrakeSkid = true; 	// wagon wheel is slipping
                         var message = "Car ID: " + CarID + " - experiencing braking force wheel skid.";

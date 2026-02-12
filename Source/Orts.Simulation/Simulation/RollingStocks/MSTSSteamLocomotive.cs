@@ -7019,7 +7019,7 @@ public readonly SmoothedData StackSteamVelocityMpS = new SmoothedData(2);
 
                     // Set rack axle TE to zero if not engaged with rack railway - this is to prevent unrealistic forces being generated if a rack
                     // locomotive is driven on a non-rack railway, or if the rack railway is not properly aligned with the track.
-                    if (SteamEngines[numberofengine].AttachedAxle.LocomotiveAxleRailTractionType == LocomotiveAxleRailTractionTypes.Rack && !IsRackRailway)
+                    if (SteamEngines[numberofengine].AttachedAxle.AxleRailTractionType == AxleRailTractionTypes.Rack && !IsRackRailway)
                     {
                         SteamEngines[numberofengine].RealTractiveForceN = 0;
                     }
@@ -7088,7 +7088,7 @@ public readonly SmoothedData StackSteamVelocityMpS = new SmoothedData(2);
 
                     SteamEngines[numberofengine].RealTractiveForceN = N.FromLbf((SteamEngines[numberofengine].NumberCylinders / 2.0f) * (Me.ToIn(SteamEngines[numberofengine].CylindersDiameterM) * Me.ToIn(SteamEngines[numberofengine].CylindersDiameterM) * Me.ToIn(SteamEngines[numberofengine].CylindersStrokeM) / (2.0f * Me.ToIn(SteamEngines[numberofengine].AttachedAxle.WheelRadiusM))) * (SteamEngines[numberofengine].MeanEffectivePressurePSI * CylinderEfficiencyRate) * MotiveForceGearRatio);
 
-                    if (IsRackRailway && SteamEngines[numberofengine].AttachedAxle.LocomotiveAxleRailTractionType == Axle.LocomotiveAxleRailTractionTypes.Rack_Adhesion)
+                    if (IsRackRailway && SteamEngines[numberofengine].AttachedAxle.AxleRailTractionType == Axle.AxleRailTractionTypes.Rack_Adhesion)
                     {
                         // In case of rack railway cog wheel drive, adjust tractive force by the cog wheel gearing factor
                         SteamEngines[numberofengine].RealTractiveForceN *= CogWheelGearingFactor;
@@ -7196,15 +7196,6 @@ public readonly SmoothedData StackSteamVelocityMpS = new SmoothedData(2);
                 engine.AttachedAxle.DriveForceN = engine.RealTractiveForceN;
                 engine.DisplayTractiveForceN = engine.AverageTractiveForceN;
                 DisplayTractiveForceN += engine.AverageTractiveForceN;
-
-                if ((engine.AttachedAxle.LocomotiveAxleRailTractionType == Axle.LocomotiveAxleRailTractionTypes.Rack || engine.AttachedAxle.LocomotiveAxleRailTractionType == Axle.LocomotiveAxleRailTractionTypes.Rack_Adhesion) && IsRackRailway)
-                {
-                    engine.AttachedAxle.IsRackRailwayOperational = true;
-                }
-                else
-                {
-                    engine.AttachedAxle.IsRackRailwayOperational = false;
-                }
 
                 // Set Max Power equal to max IHP
                 MaxPowerW += W.FromHp(engine.MaxIndicatedHorsePowerHP);
@@ -7343,6 +7334,16 @@ public readonly SmoothedData StackSteamVelocityMpS = new SmoothedData(2);
             foreach (var engine in SteamEngines)
             {
                 var axle = engine.AttachedAxle;
+
+                if ((engine.AttachedAxle.AxleRailTractionType == Axle.AxleRailTractionTypes.Rack || engine.AttachedAxle.AxleRailTractionType == Axle.AxleRailTractionTypes.Rack_Adhesion) && IsRackRailway)
+                {
+                    engine.AttachedAxle.IsRackRailwayOperational = true;
+                }
+                else
+                {
+                    engine.AttachedAxle.IsRackRailwayOperational = false;
+                }
+
                 if (SteamEngineType == SteamEngineTypes.Geared || engine.AuxiliarySteamEngineType == SteamEngine.AuxiliarySteamEngineTypes.Booster)
                 // geared locomotive or booster locomotive
                 {
@@ -7428,7 +7429,6 @@ public readonly SmoothedData StackSteamVelocityMpS = new SmoothedData(2);
             {
                 DriveWheelSpeedMpS = WheelSpeedMpS = (float)LocomotiveAxles[0].AxleSpeedMpS;
             }
-
         }
 
         private void UpdateAuxiliaries(float elapsedClockSeconds, float absSpeedMpS)

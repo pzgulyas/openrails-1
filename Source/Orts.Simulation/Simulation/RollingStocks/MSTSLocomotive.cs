@@ -1948,7 +1948,7 @@ namespace Orts.Simulation.RollingStocks
             {
                 var axle = LocomotiveAxles[i];
 
-                if (CogWheelGearingFactor == 0 && axle.LocomotiveAxleRailTractionType == LocomotiveAxleRailTractionTypes.Rack)
+                if (CogWheelGearingFactor == 0 && axle.AxleRailTractionType == AxleRailTractionTypes.Rack)
                 {
                     CogWheelGearingFactor = 1.0f; // Set default value of 1:1 ratio
 
@@ -3221,6 +3221,16 @@ namespace Orts.Simulation.RollingStocks
                 axle.IsRackRailway = IsRackRailway;
                 axle.CogWheelGearFactor = CogWheelGearingFactor;
                 axle.BogieRigidWheelBaseM = RigidWheelBaseM;
+
+                if ((axle.AxleRailTractionType == Axle.AxleRailTractionTypes.Rack || axle.AxleRailTractionType == Axle.AxleRailTractionTypes.Rack_Adhesion) && IsRackRailway)
+                {
+                    axle.IsRackRailwayOperational = true;
+                }
+                else
+                {
+                    axle.IsRackRailwayOperational = false;
+                }
+
             }
 
             LocomotiveAxles.Update(elapsedClockSeconds);
