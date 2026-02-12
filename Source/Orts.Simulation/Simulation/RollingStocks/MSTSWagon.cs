@@ -1673,7 +1673,7 @@ namespace Orts.Simulation.RollingStocks
                     Couplers[CouplerCountLocation].Rigid = stf.ReadBoolBlock(true);
                     break;
                
-                case "wagon(ortsbrakingcogwheelfitted":
+                case "wagon(brakingcogwheelfitted":
                     BrakeCogWheelFitted = stf.ReadBoolBlock(false);
                     break;
 
