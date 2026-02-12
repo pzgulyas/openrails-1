@@ -1101,7 +1101,7 @@ namespace Orts.Simulation.RollingStocks.SubSystems.PowerTransmissions
             {
                 switch (stf.ReadItem().ToLower())
                 {
-                    case "ortsbrakingcogwheelfitted":
+                    case "brakingcogwheelfitted":
                         BrakingCogWheelFitted = stf.ReadBoolBlock(false);
                         brakingCogRead = true;
                         break;

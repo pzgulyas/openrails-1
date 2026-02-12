@@ -440,7 +440,7 @@ ii) In the Rack locomotive ENG file it will be necessary to add one or more :ref
 
 iii) It will also be necessary to define which axles are Adhesion or Rack driven. This can be done by adjusting the :ref:`Axles <physics-adhesion:>` parameters.
 
-iv) In the WAG file (for wagons only) add the entry ``ORTSBrakingCogWheelFitted`` to indicate that the cog wheel is used for braking.
+iv) In the WAG file (for wagons only) add the entry ``BrakingCogWheelFitted`` to indicate that the cog wheel is used for braking.
 
 This configuration should eliminate all wheel slip and skids when the train is on a rack section of track.
 
