@@ -1180,9 +1180,14 @@ namespace Orts.Viewer3D.Popups
                             table.CurrentRow = row0;
                             var axle = mstsLocomotive.LocomotiveAxles[i];
 
-                            if (axle.LocomotiveAxleRailTractionType == Axle.LocomotiveAxleRailTractionTypes.Rack || axle.LocomotiveAxleRailTractionType == Axle.LocomotiveAxleRailTractionTypes.Rack_Adhesion)
-                            {                                
-                                TableSetCell(table, table.CurrentRow++, table.CurrentValueColumn + 2 * i, "Rack{0}", axle.HuDIsWheelSlip ? "!!!" : axle.HuDIsWheelSlipWarning ? "???" : "");
+                            if (axle.AxleRailTractionType == Axle.AxleRailTractionTypes.Rack || axle.AxleRailTractionType == Axle.AxleRailTractionTypes.Rack_Adhesion)
+                            {
+                                if (axle.AxleRailTractionType == Axle.AxleRailTractionTypes.Rack_Adhesion)
+                                { TableSetCell(table, table.CurrentRow++, table.CurrentValueColumn + 2 * i, "Rack / Adhesion{0}", axle.HuDIsWheelSlip ? "!!!" : axle.HuDIsWheelSlipWarning ? "???" : ""); }
+                                else
+                                {
+                                    TableSetCell(table, table.CurrentRow++, table.CurrentValueColumn + 2 * i, "Rack{0}", axle.HuDIsWheelSlip ? "!!!" : axle.HuDIsWheelSlipWarning ? "???" : "");
+                                }
                                 TableSetCell(table, table.CurrentRow++, table.CurrentValueColumn + 2 * i, " ");
                                 TableSetCell(table, table.CurrentRow++, table.CurrentValueColumn + 2 * i, " 100% ");
                                 TableSetCell(table, table.CurrentRow++, table.CurrentValueColumn + 2 * i, "{0} ({1})", FormatStrings.FormatForce(axle.DriveForceN, mstsLocomotive.IsMetric), FormatStrings.FormatPower(axle.DrivePowerW, mstsLocomotive.IsMetric, false, false));
