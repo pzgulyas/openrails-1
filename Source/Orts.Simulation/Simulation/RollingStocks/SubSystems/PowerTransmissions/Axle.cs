@@ -415,9 +415,11 @@ namespace Orts.Simulation.RollingStocks.SubSystems.PowerTransmissions
                 if (axle.DriveType != AxleDriveType.NotDriven) totalDriveWheelWeightKg += axle.WheelWeightKg;
                 totalWheelWeightKg += axle.WheelWeightKg;
 
-                // if values have not been configured in the ENG file, read from the locomotive/wagon
-                if (axle.brakingCogRead == false) axle.BrakingCogWheelFitted = Car.BrakeCogWheelFitted;
-
+                // if values have not been configured in the ENG axle block, read from the locomotive/wagon file
+                if (axle.brakingCogRead == false && (axle.AxleRailTractionType == AxleRailTractionTypes.Rack || axle.AxleRailTractionType == AxleRailTractionTypes.Rack ))
+                {
+                    axle.BrakingCogWheelFitted = Car.BrakeCogWheelFitted;
+                }
             }
             foreach (var axle in AxleList)
             {
