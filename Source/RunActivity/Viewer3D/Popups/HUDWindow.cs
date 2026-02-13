@@ -1242,24 +1242,24 @@ namespace Orts.Viewer3D.Popups
                             else
                             {
                                 TableSetCell(table, table.CurrentRow++, table.CurrentValueColumn + 2 * i, "Adhesion{0}", axle.HuDIsWheelSlip ? "!!!" : axle.HuDIsWheelSlipWarning ? "???" : "");
-                            TableSetCell(table, table.CurrentRow++, table.CurrentValueColumn + 2 * i, "{0:F0}% ({1})", axle.SlipSpeedPercent, FormatStrings.FormatVeryLowSpeedDisplay((float)axle.WheelSlipThresholdMpS, mstsLocomotive.IsMetric));
-                            TableSetCell(table, table.CurrentRow++, table.CurrentValueColumn + 2 * i, "{0:F0}%", mstsLocomotive.AdhesionConditions * 100.0f);
-                            TableSetCell(table, table.CurrentRow++, table.CurrentValueColumn + 2 * i, "{0} ({1})", FormatStrings.FormatForce(axle.DriveForceN, mstsLocomotive.IsMetric), FormatStrings.FormatPower(axle.DrivePowerW, mstsLocomotive.IsMetric, false, false));
-                            TableSetCell(table, table.CurrentRow++, table.CurrentValueColumn + 2 * i, "{0}", FormatStrings.FormatForce(axle.BrakeRetardForceN, mstsLocomotive.IsMetric));
-                            TableSetCell(table, table.CurrentRow++, table.CurrentValueColumn + 2 * i, "{0:F0}", axle.NumOfSubstepsPS);
-                            TableSetCell(table, table.CurrentRow++, table.CurrentValueColumn + 2 * i, "{0:F0}%  ({1:F0}%)", axle.WheelAdhesion * 100, axle.MaximumWheelAdhesion * 100);
-                            TableSetCell(table, table.CurrentRow++, table.CurrentValueColumn + 2 * i, "{0} ({1})", FormatStrings.FormatForce(axle.AxleForceN, mstsLocomotive.IsMetric),
-                            FormatStrings.FormatPower(axle.AxlePowerW, mstsLocomotive.IsMetric, false, false));
-                            TableSetCell(table, table.CurrentRow++, table.CurrentValueColumn + 2 * i, "{0} ({1})",
-                            FormatStrings.FormatForce(axle.AxleMotiveForceN, mstsLocomotive.IsMetric),
-                            FormatStrings.FormatPower(axle.AxleMotivePowerW, mstsLocomotive.IsMetric, false, false));
-                            TableSetCell(table, table.CurrentRow++, table.CurrentValueColumn + 2 * i, "{0} ({1})",
-                            FormatStrings.FormatForce(axle.AxleBrakeForceN, mstsLocomotive.IsMetric),
-                            FormatStrings.FormatPower(axle.AxleBrakePowerW, mstsLocomotive.IsMetric, false, false));
-                            TableSetCell(table, table.CurrentRow++, table.CurrentValueColumn + 2 * i, "{0} ({1})",
-                            FormatStrings.FormatForce(axle.AxleFrictionForceN, mstsLocomotive.IsMetric),
-                            FormatStrings.FormatPower(axle.AxleFrictionPowerW, mstsLocomotive.IsMetric, false, false));
-                            TableSetCell(table, table.CurrentRow++, table.CurrentValueColumn + 2 * i, "{0} ({1})", FormatStrings.FormatSpeedDisplay((float)axle.AxleSpeedMpS, mstsLocomotive.IsMetric), FormatStrings.FormatVeryLowSpeedDisplay(axle.SlipSpeedMpS, mstsLocomotive.IsMetric));
+                                TableSetCell(table, table.CurrentRow++, table.CurrentValueColumn + 2 * i, "{0:F0}% ({1})", axle.SlipSpeedPercent, FormatStrings.FormatVeryLowSpeedDisplay((float)axle.WheelSlipThresholdMpS, mstsLocomotive.IsMetric));
+                                TableSetCell(table, table.CurrentRow++, table.CurrentValueColumn + 2 * i, "{0:F0}%", mstsLocomotive.AdhesionConditions * 100.0f);
+                                TableSetCell(table, table.CurrentRow++, table.CurrentValueColumn + 2 * i, "{0} ({1})", FormatStrings.FormatForce(axle.DriveForceN, mstsLocomotive.IsMetric), FormatStrings.FormatPower(axle.DrivePowerW, mstsLocomotive.IsMetric, false, false));
+                                TableSetCell(table, table.CurrentRow++, table.CurrentValueColumn + 2 * i, "{0}", FormatStrings.FormatForce(axle.BrakeRetardForceN, mstsLocomotive.IsMetric));
+                                TableSetCell(table, table.CurrentRow++, table.CurrentValueColumn + 2 * i, "{0:F0}", axle.NumOfSubstepsPS);
+                                TableSetCell(table, table.CurrentRow++, table.CurrentValueColumn + 2 * i, "{0:F0}%  ({1:F0}%)", axle.WheelAdhesion * 100, axle.MaximumWheelAdhesion * 100);
+                                TableSetCell(table, table.CurrentRow++, table.CurrentValueColumn + 2 * i, "{0} ({1})", FormatStrings.FormatForce(axle.AxleForceN, mstsLocomotive.IsMetric),
+                                FormatStrings.FormatPower(axle.AxlePowerW, mstsLocomotive.IsMetric, false, false));
+                                TableSetCell(table, table.CurrentRow++, table.CurrentValueColumn + 2 * i, "{0} ({1})",
+                                FormatStrings.FormatForce(axle.AxleMotiveForceN, mstsLocomotive.IsMetric),
+                                FormatStrings.FormatPower(axle.AxleMotivePowerW, mstsLocomotive.IsMetric, false, false));
+                                TableSetCell(table, table.CurrentRow++, table.CurrentValueColumn + 2 * i, "{0} ({1})",
+                                FormatStrings.FormatForce(axle.AxleBrakeForceN, mstsLocomotive.IsMetric),
+                                FormatStrings.FormatPower(axle.AxleBrakePowerW, mstsLocomotive.IsMetric, false, false));
+                                TableSetCell(table, table.CurrentRow++, table.CurrentValueColumn + 2 * i, "{0} ({1})",
+                                FormatStrings.FormatForce(axle.AxleFrictionForceN, mstsLocomotive.IsMetric),
+                                FormatStrings.FormatPower(axle.AxleFrictionPowerW, mstsLocomotive.IsMetric, false, false));
+                                TableSetCell(table, table.CurrentRow++, table.CurrentValueColumn + 2 * i, "{0} ({1})", FormatStrings.FormatSpeedDisplay((float)axle.AxleSpeedMpS, mstsLocomotive.IsMetric), FormatStrings.FormatVeryLowSpeedDisplay(axle.SlipSpeedMpS, mstsLocomotive.IsMetric));
                             }
 
 
