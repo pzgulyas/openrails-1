@@ -1579,14 +1579,15 @@ namespace Orts.Simulation.RollingStocks
                     stf.SkipRestOfBlock();
                     break;
 
-
                 // Used for both coupler types
                 case "wagon(coupling(couplinghasrigidconnection":
                     Couplers[CouplerCountLocation].Rigid = false;
                     Couplers[CouplerCountLocation].Rigid = stf.ReadBoolBlock(true);
                     break;
-               
 
+                case "wagon(brakingcogwheelfitted":
+                    BrakeCogWheelFitted = stf.ReadBoolBlock(false);
+                    break;
 
                 case "wagon(adheasion":
                     stf.MustMatch("(");
@@ -1702,6 +1703,8 @@ namespace Orts.Simulation.RollingStocks
             CarWidthM = copy.CarWidthM;
             CarHeightM = copy.CarHeightM;
             CarLengthM = copy.CarLengthM;
+            FrontArticulation = copy.FrontArticulation;
+            RearArticulation = copy.RearArticulation;
             TrackGaugeM = copy.TrackGaugeM;
             CentreOfGravityM = copy.CentreOfGravityM;
             InitialCentreOfGravityM = copy.InitialCentreOfGravityM;
@@ -1736,6 +1739,7 @@ namespace Orts.Simulation.RollingStocks
             MaxBrakeForceN = copy.MaxBrakeForceN;
             MaxBrakeShoeForceN = copy.MaxBrakeShoeForceN;
             NumberCarBrakeShoes = copy.NumberCarBrakeShoes;
+            BrakeCogWheelFitted = copy.BrakeCogWheelFitted;
             MaxHandbrakeForceN = copy.MaxHandbrakeForceN;
             FrictionBrakeBlendingMaxForceN = copy.FrictionBrakeBlendingMaxForceN;
             WindowDeratingFactor = copy.WindowDeratingFactor;

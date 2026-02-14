@@ -274,6 +274,8 @@ performance of the wheelset.
 ``NumberWheelsetAxles`` - number of axles in the wheelset.
 ``ORTSFlangeAngle`` - flange angle of the wheels in the wheelset.
 ``ORTSInertia`` - inertia of the wheels in the wheelset.
+``AxleRailTractionType`` - indicates the type of rail traction for the axle. 
+Valid inputs are Rack, Rack_Adhesion or Adhesion.
 
 The first model -- simple adhesion model -- is a simple tractive force
 condition-based computation. If the tractive force reaches its actual
@@ -410,6 +412,37 @@ cylinder or sometimes it has two of the cranks separated by 45 deg instead. Thes
 Rad (default) or Deg. The separations should be described around the full 360 deg of rotation, so for example, 
 a 3 cylinder locomotive would be - ORTSWheelCrankAngleDifference ( 0deg, 120deg, 240deg ).
 
+.. _physics-rack_railway:
+
+Rack Railway Operation
+----------------------
+
+Whilst the steepest adhesion track gradient is 1 in 7.2 ( 13.8% ), this gradient will significantly reduce the load 
+that can be hauled up the gradient, so often railway designers elect to add a cog wheel to the train which engages 
+a rack rail in the track, and by this method the train is able to haul itself up the hill without any wheel slippage.
+
+In regards to steam rack locomotives there are potentially three different types, as follows:
+
+a) Pure Rack Locomotive - which has wheels supporting its weight, but is driven only by a Cog wheel.
+
+b) Combined Rack and Adhesion locomotive - this type has two different steam engines, with one driving the rack cog wheel, 
+and one driving the adhesion wheels.
+
+c) Rack locomotive with driven adhesion wheels - in this variation the Cog wheel is on the same drive axle as the adhesion wheels. 
+This type of locomotive could run on adhesion tracks as well as rack tracks.
+
+To configure a rack railway operation into OR, the following parameters need to be configured into the files indicated.
+
+i) In the TSECTION.DAT file add the entry ``ORTSRackShape ( )`` into all the track shapes that have rack rails included.
+
+ii) In the Rack locomotive ENG file it will be necessary to add one or more :ref:`Steam Engines <physics-multiple-steam-engines>`
+ depending upon the type of rack locomotive being crerated.
+
+iii) It will also be necessary to define which axles are Adhesion or Rack driven. This can be done by adjusting the :ref:`Axles <physics-adhesion:>` parameters.
+
+iv) In the WAG file (for wagons only) add the entry ``BrakingCogWheelFitted`` to indicate that the cog wheel is used for braking.
+
+This configuration should eliminate all wheel slip and skids when the train is on a rack section of track.
 
 Engine -- Classes of Motive Power
 =================================
@@ -1535,6 +1568,8 @@ cylinder also tended to reach finite limits as well. These factors
 typically combined to place limits on the power of a locomotive depending
 upon the design factors used.
 
+.. _physics-multiple-steam-engines:
+
 Steam Locomotives with Multiple Engines
 .......................................
 
@@ -1547,8 +1582,8 @@ engines need to be added to the engine section of the ENG file. These should hav
 following format::
 
     ORTSSteamEngines ( x
-        Wheelset (
-           
+        Steam (
+           ..............
         )
     )
 
@@ -1561,6 +1596,7 @@ The following parameters can be used to configure the steam engine::
 ``CylinderDiameter`` - diameter of steam cylinder.
 ``MaxIndicatedHorsepower`` - maximum indicated horsepower of steam engine.
 ``AttachedAxle`` - the axle wheelset that the steam engine is attached to.
+``ExcessRodBalance`` - the weeight of the excess balance on the connecting rods
 
 To specify the engine as a Booster engine, the following additional parameters 
 can be used::
@@ -1568,8 +1604,8 @@ can be used::
 ``BoosterCutoff`` - the cutoff point for the Booster steam cylinder.
 ``BoosterThrottleCutoff`` - the locomotive cutoff point where the Booster unlatches.
 ``BoosterGearRatio`` - the gear ratio of the Booster engine.
-``AuxiliarySteamEngineType`` - by inserting "Booster" into this parameter the 
-engine is defined as a Booster engine.
+``AuxiliarySteamEngineType`` - the purpose of the steam engine can be defined by entering 
+one of Adhesion, Rack or Booster.
 
 The following steam effects are defined for the 2nd multuple engine:
 
@@ -1594,6 +1630,65 @@ ii) Cylinder Cocks Exhaust - the exhaust out of the cylinder drainage cocks,
 
 The following CAB controls have been defined, ``STEAM_BOOSTER_AIR``, ``STEAM_BOOSTER_IDLE``,
  ``STEAM_BOOSTER_LATCH``, ``STEAM_BOOSTER_PRESSURE``.
+
+Boiler Water and Water Gauge
+............................
+
+The management of boiler water on a steam locomotive is important for maintaining steam productions as 
+well as ensuring that water levels do not drop far enough to expose the firebox crown and the fusible plugs.
+
+The Water Glass is the primary indication used by the fireman to manage boiler water levels, however as the 
+locomotive goes up and down grades, the water level will appear to significantly change. The amount of variation 
+will be determined by a number of factors, and principal amongst them are the following.
+
+``ORTSBoilerLength`` - length of the boiler (UoM distance)
+``ORTSWaterGaugeGlassHeight`` - length of the water gauge (UoM Distance)
+``ORTSBoilerDiameter`` - diameter of the boiler (UoM Distance)
+``ORTSBoilerCrownHeight`` - Height of boiler crown above centre line of the boiler (UoM Distance)
+``ORTSBoilerCrownCoverageHeight`` - Amount of water required to cover the crown (UoM Distance)
+``ORTSteamLocomotiveBoilerOrientation`` - indicates the boiler orientation, valid values are Horizontal, 
+CabForward, CabCentre, Vertical, Sloping. Default = Horizontal
+``ORTSBoilerAngle`` - Angle of boiler to horizontal, typically for Sloping boilers on steep inclines. (UoM Degree)
+
+To display the changing water level with gradient in the Cab, use ``BOILER_WATER_GRADE`` in place of 
+``BOILER_WATER`` in the CVF file. For example,
+
+"``Type ( BOILER_WATER_GRADE GAUGE )``"
+
+Steam Water Injectors
+.....................
+
+Water injectors are typically modelled by default, and sizes and injection rates will be calculated automatically by OR.
+
+If desired the user may customise some of the default values by using the following parameters:
+
+``ORTSInjectorTypes ( x, y )`` - will allow the user to set up a combination of exhaust or live steam injectors for the 
+locomotive. Use 0 = Live steam and 1 = Exhaust steam in either of the x or y positions. Note if ``ORTSInjectorTypes`` is not 
+present then InjectorTypes will be used if it is present in ENG file.
+
+``ORTSInjectorSize ( x, y )`` - the size of each injector can be indicated in this parameter. The values will be in 
+mm, and typically should not be greater then 19mm. (UoM Distance)
+
+
+Locomotive Back Pressure
+........................
+
+OR calculates a default back pressure value for the exhaust steam emitted from the cylinder.
+
+The user may customise the default value where appropriate values are known, ie from test reports, etc.
+
+To customise the backpressure curve use:
+
+``ORTSCylinderBackPressureVsSteamOutput ( x, y )`` - where x = series of cylinder steam usage rates in lb/h, and y = back 
+pressure in psig.
+
+Note: The older parameter ``ortscylinderbackpressure`` is inaccurate and no longer supported in OR. An error message will 
+display if OR detects the use of this parameter.
+
+To display the back pressure in the Cab, use ``BACK_PR``.
+
+Sound effects on the steam locomotive can be varied by using the volume control parameter ``BackPressureControlled``.
+
 
 Locomotive Types
 ................
@@ -2427,9 +2522,9 @@ OR supports the following special visual effects in a steam locomotive:
   turbo-generator is not fitted to the locomotive it is recommended that this
   effect is left out of the effects section which will ensure that it is not
   displayed in OR.
-- Safety valves (named ``SafetyValvesFX``) -- represents the discharge of the
-  steam valves if the maximum boiler pressure is exceeded. It will appear
-  whenever the safety valve operates.
+- Safety valves (named ``SafetyValvesFX, SafetyValves2FX, SafetyValves3FX, SafetyValves4FX``) 
+-- represents the discharge of the steam valves if the maximum boiler pressure is exceeded. 
+They will appear whenever the relevant safety valve operates.
 - Whistle (named ``WhistleFX``) -- represents the steam discharge from the
   whistle.
 - Injectors (named ``Injectors1FX`` and ``Injectors2FX``) -- represents the
