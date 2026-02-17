@@ -625,9 +625,9 @@ namespace Orts.Simulation.RollingStocks
                 for (int cabViewIndex = 0; cabViewIndex < CabViewList[cabIndex].CVFFile.CabViewControls.Count; cabViewIndex++)
                 {
                     var cvc = CabViewList[cabIndex].CVFFile.CabViewControls[cabViewIndex];
-                    if (cvc is CVCDiscrete cvcDiscrete)
+                    if (cvc is cvcDiscrete)
                     {
-                        cvcDiscreteList.Add(cvcDiscrete);
+                        cvcDiscreteList.Add((CVCDiscrete)cvcDiscrete);
                     }
                 }
 
