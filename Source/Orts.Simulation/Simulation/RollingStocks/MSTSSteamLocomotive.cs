@@ -3971,11 +3971,16 @@ public readonly SmoothedData StackSteamVelocityMpS = new SmoothedData(2);
             CylinderSteamExhaustSteamVelocityMpS = 100.0f;
             CylinderSteamExhaustParticleDurationS = 1.0f;
 
-            CounterPressureBrake1SteamVolumeM3pS = CounterPressureBrakeOn ? Math.Abs(cutoff * 5.0f * SteamEffectsFactor) : 0.0f;
+            float WatertoSteamVolumeLbstoM3 = 0.759f; // 1lb of water = 0.759M of water @ 100 degC
+            // Amount of water used has to be divieded between steam cylinders, and converted to steam volume
+            float CounterPressureBrakeWaterSteamExhaustM3pS = (CounterPressureBrakeWaterUsedLBpS / 2) * WatertoSteamVolumeLbstoM3;
+            var CPFudgeFactor = 15.0f; // Purely a factor to make the steam visible in the Sim
+
+            CounterPressureBrake1SteamVolumeM3pS = CounterPressureBrakeOn ? Math.Abs(CPFudgeFactor * CounterPressureBrakeWaterSteamExhaustM3pS) : 0.0f;
             CounterPressureBrake1SteamVelocityMpS = 100.0f;
             CounterPressureBrake1ParticleDurationS = 1.0f;
 
-            CounterPressureBrake2SteamVolumeM3pS = CounterPressureBrakeOn ? Math.Abs(cutoff * 5.0f * SteamEffectsFactor) : 0.0f;
+            CounterPressureBrake2SteamVolumeM3pS = CounterPressureBrakeOn ? Math.Abs(CPFudgeFactor * CounterPressureBrakeWaterSteamExhaustM3pS) : 0.0f;
             CounterPressureBrake2SteamVelocityMpS = 100.0f;
             CounterPressureBrake2ParticleDurationS = 1.0f;
 
