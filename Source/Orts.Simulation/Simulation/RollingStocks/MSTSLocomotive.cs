@@ -625,9 +625,52 @@ namespace Orts.Simulation.RollingStocks
                 CabView3D = BuildCab3DView();
                 if (CabViewList.Count == 0 & CabView3D == null)
                     Trace.TraceWarning("{0} locomotive's CabView references non-existent {1}", wagFilePath, CVFFileName);
+                SortCabViewList();
             }
 
             StaleCab = false;
+        }
+
+        //
+        // The CabViewList discrete controls are sorted by area size.
+        // That will make sure larger areas do not overlap the smaller ones.
+        // 
+        private void SortCabViewList()
+        {
+            for (int cabIndex = 0; cabIndex < CabViewList.Count; cabIndex++)
+            {
+                List<CVCDiscrete> cvcDiscreteList = new();
+
+                for (int cabViewIndex = 0; cabViewIndex < CabViewList[cabIndex].CVFFile.CabViewControls.Count; cabViewIndex++)
+                {
+                    var cvc = CabViewList[cabIndex].CVFFile.CabViewControls[cabViewIndex];
+                    if (cvc is CVCDiscrete cvcDiscrete)
+                    {
+                        cvcDiscreteList.Add(cvcDiscrete);
+                    }
+                }
+
+                for (int cabViewIndex = 0; cabViewIndex < CabViewList[cabIndex].CVFFile.CabViewControls.Count; cabViewIndex++)
+                {
+                    var cvc = CabViewList[cabIndex].CVFFile.CabViewControls[cabViewIndex];
+                    if (cvc is CVCDiscrete)
+                    {
+                        double smallestSize = double.MaxValue;
+                        CVCDiscrete cvcDiscreteSmallest = null;
+                        foreach (CVCDiscrete cvcDiscrete in cvcDiscreteList)
+                        {
+                            double size = cvcDiscrete.Height * cvcDiscrete.Width;
+                            if (size < smallestSize)
+                            {
+                                cvcDiscreteSmallest = cvcDiscrete;
+                                smallestSize = size;
+                            }
+                        }
+                        CabViewList[cabIndex].CVFFile.CabViewControls[cabViewIndex] = cvcDiscreteSmallest;
+                        cvcDiscreteList.Remove(cvcDiscreteSmallest);
+                    }
+                }
+            }
         }
 
         protected void CheckCoherence()
