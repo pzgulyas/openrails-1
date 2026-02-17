@@ -257,6 +257,8 @@ namespace Orts.Simulation.RollingStocks
 
         bool CounterPressureBrakingFitted = false;
         float CounterPressureMEP;
+        public float CounterPressureBrakeWaterUsedLBpS; // Water used per second
+        float ActualCounterPressureBrakeWaterUsedLB; // Actual water used by Counter pressure brake
 
         /// <summary>
         /// Grate limit of locomotive exceedeed?
@@ -3969,11 +3971,11 @@ public readonly SmoothedData StackSteamVelocityMpS = new SmoothedData(2);
             CylinderSteamExhaustSteamVelocityMpS = 100.0f;
             CylinderSteamExhaustParticleDurationS = 1.0f;
 
-            CounterPressureBrake1SteamVolumeM3pS = CounterPressureBrakeOn ? Math.Abs(cutoff * 10.0f * SteamEffectsFactor) : 0.0f;
+            CounterPressureBrake1SteamVolumeM3pS = CounterPressureBrakeOn ? Math.Abs(cutoff * 5.0f * SteamEffectsFactor) : 0.0f;
             CounterPressureBrake1SteamVelocityMpS = 100.0f;
             CounterPressureBrake1ParticleDurationS = 1.0f;
 
-            CounterPressureBrake2SteamVolumeM3pS = CounterPressureBrakeOn ? Math.Abs(cutoff * 10.0f * SteamEffectsFactor) : 0.0f;
+            CounterPressureBrake2SteamVolumeM3pS = CounterPressureBrakeOn ? Math.Abs(cutoff * 5.0f * SteamEffectsFactor) : 0.0f;
             CounterPressureBrake2SteamVelocityMpS = 100.0f;
             CounterPressureBrake2ParticleDurationS = 1.0f;
 
@@ -4508,6 +4510,7 @@ public readonly SmoothedData StackSteamVelocityMpS = new SmoothedData(2);
             if (HasTenderCoupled) // If a tender is coupled then water is available
             {
                 CombinedTenderWaterVolumeUKG -= BoilerWaterInputLB / WaterLBpUKG;  // Adjust water usage in tender
+                CombinedTenderWaterVolumeUKG -= ActualCounterPressureBrakeWaterUsedLB / WaterLBpUKG; // Adjust tender water supply for counter pressure brake
             }
             else // if no tender coupled then check whether a tender is required
             {
@@ -4517,7 +4520,8 @@ public readonly SmoothedData StackSteamVelocityMpS = new SmoothedData(2);
                 }
                 else  // Tender is not required (ie tank locomotive) - therefore water will be carried on the locomotive (and possibly on aux tender)
                 {
-                    CombinedTenderWaterVolumeUKG -= BoilerWaterInputLB / WaterLBpUKG;  // Adjust water usage in tender
+                    CombinedTenderWaterVolumeUKG -= BoilerWaterInputLB / WaterLBpUKG;  // Adjust water usage in locomotive
+                    CombinedTenderWaterVolumeUKG -= ActualCounterPressureBrakeWaterUsedLB / WaterLBpUKG; // Adjust tender water supply for counter pressure brake
                 }
             }
 
@@ -4526,9 +4530,9 @@ public readonly SmoothedData StackSteamVelocityMpS = new SmoothedData(2);
             CurrentLocoTenderWaterVolumeUKG = (Kg.ToLb(MaxLocoTenderWaterMassKG) / WaterLBpUKG) * TenderWaterPercent; // Adjust water level in locomotive tender
             PrevCombinedTenderWaterVolumeUKG = CombinedTenderWaterVolumeUKG;   // Store value for next iteration
             PreviousTenderWaterVolumeUKG = CombinedTenderWaterVolumeUKG;     // Store value for next iteration
-            WaterConsumptionLbpS = BoilerWaterInputLB / elapsedClockSeconds; // water consumption
+            WaterConsumptionLbpS = (BoilerWaterInputLB + ActualCounterPressureBrakeWaterUsedLB) / elapsedClockSeconds; // water consumption
             WaterConsumptionLbpS = MathHelper.Clamp(WaterConsumptionLbpS, 0, WaterConsumptionLbpS);
-            CumulativeWaterConsumptionLbs += BoilerWaterInputLB;
+            CumulativeWaterConsumptionLbs += BoilerWaterInputLB + ActualCounterPressureBrakeWaterUsedLB;
             if (CumulativeWaterConsumptionLbs > 0) DbfEvalCumulativeWaterConsumptionLbs = CumulativeWaterConsumptionLbs;//DebriefEval
 
 #if DEBUG_AUXTENDER
@@ -6712,7 +6716,7 @@ public readonly SmoothedData StackSteamVelocityMpS = new SmoothedData(2);
                 // Assume no impact of "return" stroke as air is being drawn into cylinder
                 float CounterBalanceWheelDiamM = 2 * SteamEngines[numberofengine].AttachedAxle.WheelRadiusM;
 
-                float CounterPressureReductionFactor = 0.6f; // To allow for losses due to flow and other factors - to be refined.
+                float CounterPressureReductionFactor = 0.62f; // To allow for losses due to flow and other factors - to be refined.
                                                               // Described in Koffman paper adjusted to approximate Fig 18. 
 
                 // Calculate tractive retarding force
@@ -6721,13 +6725,25 @@ public readonly SmoothedData StackSteamVelocityMpS = new SmoothedData(2);
                 // Adjust Brake Force to take into account losses due to flow and other factors, and the use of the number of cylinders
                 SteamEngines[numberofengine].CylinderCounterPressureBrakeForceN *= CounterPressureReductionFactor * (SteamEngines[numberofengine].NumberCylinders / 2.0f);
 
-  //              Trace.TraceInformation("CogRetardForce {0} lbf, Dynamic brake {1}, MEP {2} Ratio-Comp {3} Ratio-Rel {4} Pc {5} Pr {6} WheelDia {7} CylDia {8} CylStroke {9}", N.ToLbf(SteamEngines[numberofengine].CylinderCounterPressureBrakeForceN), currentDynamicBrakeFraction, SteamEngines[numberofengine].CounterPressureMEP, CylinderRatio_compression, CylinderRatio_release, CompMeanPressure_compressionAtmPSI, CompMeanPressure_releaseAtmPSI, Me.ToIn(CounterBalanceWheelDiamM), Me.ToIn(SteamEngines[numberofengine].CylindersDiameterM), Me.ToIn(SteamEngines[numberofengine].CylindersStrokeM));
+                //              Trace.TraceInformation("CogRetardForce {0} lbf, Dynamic brake {1}, MEP {2} Ratio-Comp {3} Ratio-Rel {4} Pc {5} Pr {6} WheelDia {7} CylDia {8} CylStroke {9}", N.ToLbf(SteamEngines[numberofengine].CylinderCounterPressureBrakeForceN), currentDynamicBrakeFraction, SteamEngines[numberofengine].CounterPressureMEP, CylinderRatio_compression, CylinderRatio_release, CompMeanPressure_compressionAtmPSI, CompMeanPressure_releaseAtmPSI, Me.ToIn(CounterBalanceWheelDiamM), Me.ToIn(SteamEngines[numberofengine].CylindersDiameterM), Me.ToIn(SteamEngines[numberofengine].CylindersStrokeM));
+
+                // Calculate water usage
+                var CylinderPistonAreaIn2 = Me2.ToIn2(MathHelper.Pi * SteamEngines[numberofengine].CylindersDiameterM * SteamEngines[numberofengine].CylindersDiameterM / 4.0f);
+                var PistonForceLbf = CylinderPistonAreaIn2 * SteamEngines[numberofengine].CounterPressureMEP;
+                var CylinderWorkperStrokeInLb = PistonForceLbf * Me.ToIn(SteamEngines[numberofengine].CylindersStrokeM);
+                var CylinderStrokespS = DrvWheelRevRpS * 4; // x 4 cylinder strokes per rev
+                var TotalWorkftLbpS = CylinderWorkperStrokeInLb * CylinderStrokespS;
+                var EquivalentHeatBTU = TotalWorkftLbpS / 9338.0318994166f; // 1 BTU = 9338 in-lb - https://www.convertunits.com/from/Btu/to/inch+pound
+
+                CounterPressureBrakeWaterUsedLBpS = EquivalentHeatBTU / 881.36f; // BTU required to convert 1lb of water @ BP = 881.36 BTU - To do add heat table?
+                 ActualCounterPressureBrakeWaterUsedLB = (float)CounterPressureBrakeWaterUsedLBpS * elapsedClockSeconds;
             }
             else
             {
                 SteamEngines[numberofengine].CylinderCounterPressureBrakeForceN = 0;
                 SteamEngines[numberofengine].CounterPressureMEP = 0;
                 CounterPressureBrakeOn = false;
+                CounterPressureBrakeWaterUsedLBpS = 0;
             }
 
         }
@@ -9549,7 +9565,7 @@ public readonly SmoothedData StackSteamVelocityMpS = new SmoothedData(2);
 
                 if (CounterPressureBrakingFitted)
                 {
-                    status.AppendFormat("{0}\t{1}\t{2}\t{3}\t{4}\t{5}\t{6}\t{7}\t{8}\t{9}\t{10}\t{11}\t{12}\t{13}\t{14:N0}{15}\t{16}\t{17}\t{18}\t{19}\t{20}\t{21}\n",
+                    status.AppendFormat("{0}\t{1}\t{2}\t{3}\t{4}\t{5}\t{6}\t{7}\t{8}\t{9}\t{10}\t{11}\t{12}\t{13}\t{14:N0}{15}\t{16}\t{17}\t{18}\t{19}\t{20}\t{21}\t{22}\t{23}\n",
                     Simulator.Catalog.GetString("ForceTot:"),
                     Simulator.Catalog.GetString("TheorTE"),
                     FormatStrings.FormatForce(N.FromLbf(MaxTractiveEffortLbf), IsMetric),
@@ -9571,8 +9587,9 @@ public readonly SmoothedData StackSteamVelocityMpS = new SmoothedData(2);
                     Simulator.Catalog.GetString("CtForce"),
                     FormatStrings.FormatForce(SteamEngines[0].CylinderCounterPressureBrakeForceN, IsMetric),
                     Simulator.Catalog.GetString("DyForce"),
-                    FormatStrings.FormatForce(DynamicBrakeForceN, IsMetric)
-
+                    FormatStrings.FormatForce(DynamicBrakeForceN, IsMetric),
+                    Simulator.Catalog.GetString("Water"),
+                    FormatStrings.FormatMass(pS.TopH(Kg.FromLb(CounterPressureBrakeWaterUsedLBpS)), IsMetric)
                     );
                 }
                 else
