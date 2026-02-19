@@ -238,6 +238,9 @@ namespace Orts.Viewer3D
 
             Vector3 mstsLocation = new Vector3(xnaDTileTranslation.Translation.X, xnaDTileTranslation.Translation.Y, -xnaDTileTranslation.Translation.Z);
 
+            if (trainCarShape.Hierarchy.Length == 0)
+                return;
+
             // Calculate XNA matrix for shape file objects by offsetting from car's location
             // The new List<int> is intentional, this allows the dictionary to be changed while iterating
             int maxDepth = trainCarShape.Hierarchy.Max();

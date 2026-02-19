@@ -55,7 +55,7 @@ namespace ORTS.Common
                 Lights ( 1
                     Light (
                         Type ( 1 )
-                        ShapeHierarchy ( Headlight )
+                        ShapeIndex ( 0 )
                         Conditions ( 
                             Headlight ( 3 )
                             Unit ( 2 )
@@ -133,6 +133,9 @@ namespace ORTS.Common
                 var uid = 0;
                 foreach (var model in models)
                 {
+                    if (model.Contains("NodePerformanceTest"))
+                        continue;
+
                     var dir = Path.Combine(model, SubDirectories[keyword]);
                     var file = (Directory.Exists(dir)
                         ? Directory.EnumerateFiles(dir).FirstOrDefault(f => f.EndsWith(GltfExtension(keyword)))

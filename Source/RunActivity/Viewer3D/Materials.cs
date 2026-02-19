@@ -1143,7 +1143,7 @@ namespace Orts.Viewer3D
             (TextureFilter, TextureAddressMode, TextureAddressMode) samplerStateClearcoat,
             (TextureFilter, TextureAddressMode, TextureAddressMode) samplerStateClearcoatRoughness,
             (TextureFilter, TextureAddressMode, TextureAddressMode) samplerStateClearcoatNormal)
-            : base(viewer, materialUniqueId, options, mipMapBias)
+            : base(viewer, null, options, mipMapBias)
         {
             Texture = baseColorTexture;
             BaseColorFactor = baseColorFactor;

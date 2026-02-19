@@ -659,6 +659,9 @@ namespace Orts.Viewer3D
 
                 foreach (var indexBufferView in indexBufferViews)
                 {
+                    // Trigger the loading of the binary buffer.
+                    GetBufferViewSpan(indexBufferView.Key, 0);
+                    
                     // Both uint and ushort type indices may exist in a single bufferView, so byteStride is not constant. (See: ToyCar)
                     // In MonoGame we cannot create a hybrid buffer, so creating the buffer on a per-accessor basis.
                     foreach (var p in indexBufferView)
