@@ -88,7 +88,7 @@ int		NumLights; // The number of the lights used
 float	LightTypes[MAX_LIGHTS]; // 0: directional, 1: point, 2: spot, 3: headlight
 float3	LightPositions[MAX_LIGHTS];
 float3	LightDirections[MAX_LIGHTS];
-float3	LightColors[MAX_LIGHTS]; // pre-multiplied by intensity
+float3	LightColorIntensities[MAX_LIGHTS]; // pre-multiplied by intensity
 float	LightRangesRcp[MAX_LIGHTS];
 float	LightInnerConeCos[MAX_LIGHTS];
 float	LightOuterConeCos[MAX_LIGHTS];
@@ -709,38 +709,6 @@ float3 _PSGetOvercastColor(in float4 Color, in VERTEX_OUTPUT In)
 	return lerp(intensity, Color.rgb, 0.8) * 0.5;
 }
 
-float3 _PSGetLightVector(in int i, in float3 pointAbsolutePosition, inout float3 intensity)
-{
-	float attenuation = 1;
-
-    float3 l = (float3)0;
-	if (LightTypes[i] != LightType_Directional)
-	{
-		float3 pointToLight = LightPositions[i] - pointAbsolutePosition;
-		float pointLightDistance = length(pointToLight);
-        l = pointToLight / pointLightDistance; // normalize(pointToLight)
-		if (LightTypes[i] == LightType_Headlight)
-		{
-			attenuation *= clamp(1 - pointLightDistance * LightRangesRcp[i], 0, 1); // The pre-PBR headlight used linear range attenuation.
-		}
-		else
-		{
-			attenuation /= pow(pointLightDistance, 2); // The realistic range attenuation is inverse-squared.
-			attenuation *= clamp(1 - pow(pointLightDistance * LightRangesRcp[i], 4), 0, 1);
-		}
-	}
-	else
-	{
-        l = normalize(-LightDirections[i]); // normalize(pointToLight)
-    }
-
-	if (LightTypes[i] == LightType_Spot || LightTypes[i] == LightType_Headlight)
-		attenuation *= smoothstep(LightOuterConeCos[i], LightInnerConeCos[i], dot(LightDirections[i], -l));
-	
-	intensity = LightColors[i] * attenuation;
-	return l;
-}
-
 float3 _PSApplyMstsLights(in float3 diffuseColor, in VERTEX_OUTPUT In, float shadowFactor)
 {
 	float diffuseShadowFactor = lerp(ShadowBrightness, FullBrightness, saturate(shadowFactor));
@@ -750,14 +718,38 @@ float3 _PSApplyMstsLights(in float3 diffuseColor, in VERTEX_OUTPUT In, float sha
 
 	float3 diffuseContrib = (float3)0;
 	float3 specContrib = (float3)0;
-	float3 intensity = (float3)0;
+	float attenuation = 1;
 
 	//[fastopt]
 	[unroll(MAX_LIGHTS)]
 	for (int i = 0; i < NumLights; i++)
 	{
-		// In.Shadow.xyz is the absolute world position of the point
-		float3 l = _PSGetLightVector(i, In.Shadow.xyz, intensity);
+        float3 l;
+        if (LightTypes[i] == LightType_Directional)
+        {
+            l = normalize(-LightDirections[i]); // normalize(pointToLight)
+            attenuation = 1;
+        }
+        else
+        {
+            float3 pointToLight = LightPositions[i] - In.Shadow.xyz; // In.Shadow.xyz is the absolute world position of the point
+            float pointLightDistance = length(pointToLight);
+            l = pointToLight / pointLightDistance; // normalize(pointToLight)
+            attenuation = 1;
+            if (LightTypes[i] == LightType_Headlight)
+            {
+                attenuation *= clamp(1 - pointLightDistance * LightRangesRcp[i], 0, 1); // The pre-PBR headlight used linear range attenuation.
+            }
+            else
+            {
+                attenuation /= pow(pointLightDistance, 2); // The realistic range attenuation is inverse-squared.
+                attenuation *= clamp(1 - pow(pointLightDistance * LightRangesRcp[i], 4), 0, 1);
+            }
+
+            if (LightTypes[i] == LightType_Spot || LightTypes[i] == LightType_Headlight)
+                attenuation *= smoothstep(LightOuterConeCos[i], LightInnerConeCos[i], dot(LightDirections[i], -l));
+        }
+
 		float3 h = normalize(l + v);
 
 		float NdotH = clamp(dot(n, h), 0.0, 1.0);
@@ -766,6 +758,8 @@ float3 _PSApplyMstsLights(in float3 diffuseColor, in VERTEX_OUTPUT In, float sha
 			NdotL = clamp(dot(n, l), 0.001, 1.0); // Non-headlight lights use realistic lighting.
 		else
 			NdotL = step(0, dot(n, l)); // Pre-PBR headlight used full lit pixels within the headlights range everywhere.
+ 
+        float3 intensity = LightColorIntensities[i] * attenuation;
 
 		diffuseContrib += intensity * NdotL * diffuseColor / M_PI * diffuseShadowFactor;
 		specContrib += intensity * NdotL * ZBias_Lighting.w * pow(NdotH, ZBias_Lighting.z) * shadowFactor;
@@ -1090,13 +1084,36 @@ float4 PSPbr(in VERTEX_OUTPUT_PBR In, bool isFrontFace : SV_IsFrontFace) : COLOR
 
         float3 diffuseContrib = (float3) 0;
         float3 specContrib = (float3) 0;
-        float3 intensity;
+        float attenuation = 1;
 
 	    [fastopt]
         for (int i = 0; i < NumLights; i++)
         {
-            // In.Shadow.xyz is the absolute world position of the point
-            float3 l = _PSGetLightVector(i, In.Shadow.xyz, intensity);
+            float3 l;
+            if (LightTypes[i] == LightType_Directional)
+            {
+                l = normalize(-LightDirections[i]); // normalize(pointToLight)
+                attenuation = 1;
+            }
+            else
+            {
+                float3 pointToLight = LightPositions[i] - In.Shadow.xyz; // In.Shadow.xyz is the absolute world position of the point
+                float pointLightDistance = length(pointToLight);
+                l = pointToLight / pointLightDistance; // normalize(pointToLight)
+                attenuation = 1;
+                if (LightTypes[i] == LightType_Headlight)
+                {
+                    attenuation *= clamp(1 - pointLightDistance * LightRangesRcp[i], 0, 1); // The pre-PBR headlight used linear range attenuation.
+                }
+                else
+                {
+                    attenuation /= pow(pointLightDistance, 2); // The realistic range attenuation is inverse-squared.
+                    attenuation *= clamp(1 - pow(pointLightDistance * LightRangesRcp[i], 4), 0, 1);
+                }
+
+                if (LightTypes[i] == LightType_Spot || LightTypes[i] == LightType_Headlight)
+                    attenuation *= smoothstep(LightOuterConeCos[i], LightInnerConeCos[i], dot(LightDirections[i], -l));
+            }
 
             float NdotL = clamp(dot(n, l), 0.001, 1.0);
 
@@ -1118,6 +1135,8 @@ float4 PSPbr(in VERTEX_OUTPUT_PBR In, bool isFrontFace : SV_IsFrontFace) : COLOR
                 float f = (NdotH * roughnessSq - NdotH) * NdotH + 1.0;
                 float D = roughnessSq / (M_PI * f * f);
 
+                float3 intensity = LightColorIntensities[i] * attenuation;
+                
                 diffuseContrib += intensity * NdotL * (1.0 - F) * diffuseColor / M_PI * diffuseShadowFactor;
                 specContrib += intensity * NdotL * F * G * D / (4.0 * NdotL * NdotV) * shadowFactor;
 

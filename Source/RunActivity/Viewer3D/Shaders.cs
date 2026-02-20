@@ -132,7 +132,7 @@ namespace Orts.Viewer3D
         readonly EffectParameter numLights;
         readonly EffectParameter lightPositions;
         readonly EffectParameter lightDirections;
-        readonly EffectParameter lightColors;
+        readonly EffectParameter lightColorIntensities;
         readonly EffectParameter lightRangesRcp;
         readonly EffectParameter lightInnerConeCos;
         readonly EffectParameter lightOuterConeCos;
@@ -313,7 +313,7 @@ namespace Orts.Viewer3D
         public int NumLights { set { numLights.SetValue(value); } }
         public Vector3[] LightPositions { set { lightPositions.SetValue(value); } }
         public Vector3[] LightDirections { set { lightDirections.SetValue(value); } }
-        public Vector3[] LightColors { set { lightColors.SetValue(value); } }
+        public Vector3[] LightColorIntensities { set { lightColorIntensities.SetValue(value); } }
         public float[] LightRangesRcp { set { lightRangesRcp.SetValue(value); } }
         public float[] LightInnerConeCos { set { lightInnerConeCos.SetValue(value); } }
         public float[] LightOuterConeCos { set { lightOuterConeCos.SetValue(value); } }
@@ -377,7 +377,7 @@ namespace Orts.Viewer3D
             numLights = Parameters["NumLights"];
             lightPositions = Parameters["LightPositions"];
             lightDirections = Parameters["LightDirections"];
-            lightColors = Parameters["LightColors"];
+            lightColorIntensities = Parameters["LightColorIntensities"];
             lightRangesRcp = Parameters["LightRangesRcp"];
             lightInnerConeCos = Parameters["LightInnerConeCos"];
             lightOuterConeCos = Parameters["LightOuterConeCos"];
