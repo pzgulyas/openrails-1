@@ -428,8 +428,7 @@ namespace Orts.Viewer3D
         readonly Vector3[] LightPositions = new Vector3[RenderProcess.MAX_LIGHTS];
         readonly Vector3[] LightDirections = new Vector3[RenderProcess.MAX_LIGHTS];
         readonly Vector3[] LightColors = new Vector3[RenderProcess.MAX_LIGHTS];
-        readonly float[] LightIntensities = new float[RenderProcess.MAX_LIGHTS];
-        readonly float[] LightRanges = new float[RenderProcess.MAX_LIGHTS];
+        readonly float[] LightRangesRcp = new float[RenderProcess.MAX_LIGHTS];
         readonly float[] LightInnerConeCos = new float[RenderProcess.MAX_LIGHTS];
         readonly float[] LightOuterConeCos = new float[RenderProcess.MAX_LIGHTS];
         readonly float[] LightTypes = new float[RenderProcess.MAX_LIGHTS];
@@ -1106,13 +1105,13 @@ namespace Orts.Viewer3D
             LightTypes[NumLights] = (float)type;
             LightPositions[NumLights] = position;
             LightDirections[NumLights] = direction;
-            LightColors[NumLights] = color;
-            LightIntensities[NumLights] = intensity
-                * (ignoreDayNight
-                    ? MathHelper.Clamp(fade, 0, 1)
-                    : MathHelper.Clamp(fade * LightDayNightMultiplier * LightDayNightClampTo, 0, LightDayNightClampTo))
-                * (type == LightMode.Directional ? LIGHT_INTENSITY_ADJUSTMENT_DIRECTIONAL : type == LightMode.Point ? LIGHT_INTENSITY_ADJUSTMENT_POINT : LIGHT_INTENSITY_ADJUSTMENT_SPOT);
-            LightRanges[NumLights] = range * (ignoreDayNight ? 1 : LightDayNightMultiplier);
+            intensity *= (ignoreDayNight
+                ? MathHelper.Clamp(fade, 0, 1)
+                : MathHelper.Clamp(fade * LightDayNightMultiplier * LightDayNightClampTo, 0, LightDayNightClampTo));
+            intensity *= (type == LightMode.Directional ? LIGHT_INTENSITY_ADJUSTMENT_DIRECTIONAL : type == LightMode.Point ? LIGHT_INTENSITY_ADJUSTMENT_POINT : LIGHT_INTENSITY_ADJUSTMENT_SPOT);
+            LightColors[NumLights] = color * intensity;
+            LightRangesRcp[NumLights] = range * (ignoreDayNight ? 1 : LightDayNightMultiplier);
+            LightRangesRcp[NumLights] = LightRangesRcp[NumLights] == 0 ? float.MaxValue : 1f / LightRangesRcp[NumLights];
             LightInnerConeCos[NumLights] = (float)Math.Cos(innerConeAngle / 2);
             LightOuterConeCos[NumLights] = (float)Math.Cos(outerConeAngle / 2);
             NumLights++;
@@ -1130,8 +1129,7 @@ namespace Orts.Viewer3D
                 SceneryShader.LightPositions = LightPositions.ToArray();
                 SceneryShader.LightDirections = LightDirections.ToArray();
                 SceneryShader.LightColors = LightColors.ToArray();
-                SceneryShader.LightIntensities = LightIntensities.ToArray();
-                SceneryShader.LightRanges = LightRanges.ToArray();
+                SceneryShader.LightRangesRcp = LightRangesRcp.ToArray();
                 SceneryShader.LightInnerConeCos = LightInnerConeCos.ToArray();
                 SceneryShader.LightOuterConeCos = LightOuterConeCos.ToArray();
             }

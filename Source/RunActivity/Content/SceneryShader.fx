@@ -88,9 +88,8 @@ int		NumLights; // The number of the lights used
 float	LightTypes[MAX_LIGHTS]; // 0: directional, 1: point, 2: spot, 3: headlight
 float3	LightPositions[MAX_LIGHTS];
 float3	LightDirections[MAX_LIGHTS];
-float3	LightColors[MAX_LIGHTS];
-float	LightIntensities[MAX_LIGHTS];
-float	LightRanges[MAX_LIGHTS];
+float3	LightColors[MAX_LIGHTS]; // pre-multiplied by intensity
+float	LightRangesRcp[MAX_LIGHTS];
 float	LightInnerConeCos[MAX_LIGHTS];
 float	LightOuterConeCos[MAX_LIGHTS];
 
@@ -712,38 +711,33 @@ float3 _PSGetOvercastColor(in float4 Color, in VERTEX_OUTPUT In)
 
 float3 _PSGetLightVector(in int i, in float3 pointAbsolutePosition, inout float3 intensity)
 {
-	float rangeAttenuation = 1;
-	float spotAttenuation = 1;
+	float attenuation = 1;
 
-	float3 pointToLight = (float3)0;
+    float3 l = (float3)0;
 	if (LightTypes[i] != LightType_Directional)
 	{
-		pointToLight = LightPositions[i] - pointAbsolutePosition;
-
+		float3 pointToLight = LightPositions[i] - pointAbsolutePosition;
 		float pointLightDistance = length(pointToLight);
+        l = pointToLight / pointLightDistance; // normalize(pointToLight)
 		if (LightTypes[i] == LightType_Headlight)
 		{
-			if (LightRanges[i] > 0)
-				rangeAttenuation *= clamp(1 - pointLightDistance / LightRanges[i], 0, 1); // The pre-PBR headlight used linear range attenuation.
+			attenuation *= clamp(1 - pointLightDistance * LightRangesRcp[i], 0, 1); // The pre-PBR headlight used linear range attenuation.
 		}
 		else
 		{
-			rangeAttenuation /= pow(pointLightDistance, 2); // The realistic range attenuation is inverse-squared.
-			if (LightRanges[i] > 0)
-				rangeAttenuation *= clamp(1 - pow(pointLightDistance / LightRanges[i], 4), 0, 1);
+			attenuation /= pow(pointLightDistance, 2); // The realistic range attenuation is inverse-squared.
+			attenuation *= clamp(1 - pow(pointLightDistance * LightRangesRcp[i], 4), 0, 1);
 		}
 	}
 	else
 	{
-		pointToLight = -LightDirections[i];
-	}
+        l = normalize(-LightDirections[i]); // normalize(pointToLight)
+    }
 
-	float3 l = normalize(pointToLight);
-	
 	if (LightTypes[i] == LightType_Spot || LightTypes[i] == LightType_Headlight)
-		spotAttenuation = smoothstep(LightOuterConeCos[i], LightInnerConeCos[i], dot(LightDirections[i], -l));
+		attenuation *= smoothstep(LightOuterConeCos[i], LightInnerConeCos[i], dot(LightDirections[i], -l));
 	
-	intensity = LightIntensities[i] * LightColors[i] * rangeAttenuation * spotAttenuation;
+	intensity = LightColors[i] * attenuation;
 	return l;
 }
 
