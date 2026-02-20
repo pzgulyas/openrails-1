@@ -102,7 +102,7 @@ static const float MinRoughness = 0.04;
 static const int LightType_Directional = 0;
 static const int LightType_Point = 1;
 static const int LightType_Spot = 2;
-static const int LightType_Headlight = 3; // Pre-PBR linear attenuated headlight. Kept for testing purposes.
+static const int LightType_Headlight = 3; // Pre-PBR linear attenuated headlight.
 
 static const float FullBrightness = 1.0;
 static const float ShadowBrightness = 0.5;
@@ -611,6 +611,25 @@ VERTEX_OUTPUT VSSignalLightGlow(in VERTEX_INPUT_SIGNAL In)
 
 ////////////////////    P I X E L   S H A D E R S    ///////////////////////////
 
+float pow5(float x)
+{
+    // x^5 = x * x^2 * x^2
+    float x2 = x * x;
+    float x4 = x2 * x2;
+    return x4 * x;
+}
+
+float pow50(float x)
+{
+    // x^50 = x^(32+16+2) = x32 * x16 * x2
+    float x2 = x * x;
+    float x4 = x2 * x2;
+    float x8 = x4 * x4;
+    float x16 = x8 * x8;
+    float x32 = x16 * x16;
+    return x32 * x16 * x2;
+}
+
 // Gets the ambient light effect.
 float _PSGetAmbientEffect(in VERTEX_OUTPUT In)
 {
@@ -675,7 +694,7 @@ float _PSGetShadowEffect(uniform bool NormalLighting, in VERTEX_OUTPUT In)
 	float Ex_2 = moments.x * moments.x;
 	float variance = clamp(E_x2 - Ex_2, 0.00005, 1.0);
 	float m_d = moments.z - moments.x;
-	float p = pow(variance / (variance + m_d * m_d), 50);
+	float p = pow50(variance / (variance + m_d * m_d));
 	if (NormalLighting)
 		return saturate(not_shadowed + p) * saturate(In.Normal_Light.w * 5 - 2);
 	return saturate(not_shadowed + p);
@@ -743,12 +762,6 @@ float3 _PSApplyMstsLights(in float3 diffuseColor, in VERTEX_OUTPUT In, float sha
 	[unroll(MAX_LIGHTS)]
 	for (int i = 0; i < NumLights; i++)
 	{
-		if (i > 0)
-		{
-			// Light 0 is the sun the shadow factors are calculated from. For other lights they do not apply.
-			shadowFactor = 1;
-			diffuseShadowFactor = 1;
-		}
 		// In.Shadow.xyz is the absolute world position of the point
 		float3 l = _PSGetLightVector(i, In.Shadow.xyz, intensity);
 		float3 h = normalize(l + v);
@@ -762,7 +775,11 @@ float3 _PSApplyMstsLights(in float3 diffuseColor, in VERTEX_OUTPUT In, float sha
 
 		diffuseContrib += intensity * NdotL * diffuseColor / M_PI * diffuseShadowFactor;
 		specContrib += intensity * NdotL * ZBias_Lighting.w * pow(NdotH, ZBias_Lighting.z) * shadowFactor;
-	}
+        
+        // Light 0 is the sun, the shadow factors are needed only for that one. For other lights they do not apply, they no longer needed.
+        shadowFactor = 1;
+        diffuseShadowFactor = 1;
+    }
 	return diffuseContrib + specContrib;
 }
 
@@ -955,189 +972,199 @@ float4 PSPbr(in VERTEX_OUTPUT_PBR In, bool isFrontFace : SV_IsFrontFace) : COLOR
 	
 	///////////////////////
 	// Contributions from the OpenRails environment:
-	float shadowFactor = _PSGetShadowEffect(true, InGeneral);
-	float diffuseShadowFactor = lerp(ShadowBrightness, FullBrightness, saturate(shadowFactor));
 	_PSSceneryFade(Color, InGeneral);
 	float fade = Color.a;
 	///////////////////////
 	
-	// Metallic-roughness
-	float occlusion = 1;
-	float metallic = 1;
-	float roughness = 1;
-	if (TexturePacking == 0)
-	{
-		if (OcclusionFactor.x > 0)
-			occlusion = _PSTex2D(Occlusion, In.TexCoords, TextureCoordinates2.w).r;
+    float3 litColor;
+    
+    if (!ZBias_Lighting.y)
+    {
+    	// Unlit material
+        litColor = Color.rgb;
+    }
+    else
+    {
+        // Diffuse material
 
-		if (OcclusionFactor.y > 0 || OcclusionFactor.z > 0)
-		{
-			float3 orm = _PSTex2D(MetallicRoughness, In.TexCoords, TextureCoordinates1.y).rgb;
-			roughness = orm.g;
-			metallic = orm.b;
-		}
-	}
-	else if (TexturePacking == 1 || TexturePacking == 3 || TexturePacking == 4 || TexturePacking == 5)
-	{
-		float3 orm = _PSTex2D(MetallicRoughness, In.TexCoords, TextureCoordinates1.y).rgb;
-		if (TexturePacking == 3 || TexturePacking == 5)
-		{
-			occlusion = orm.r;
-			roughness = orm.g;
-			metallic = orm.b;
-		}
-		else
-		{
-			roughness = orm.r;
-			metallic = orm.g;
-			occlusion = orm.b;
-		}
-	}
-	else if (TexturePacking == 2)
-	{
-		float4 nrm = _PSTex2D(Normal, In.TexCoords, TextureCoordinates1.z);
-		roughness = nrm.b;
-		metallic = nrm.a;
-		occlusion = _PSTex2D(Occlusion, In.TexCoords, TextureCoordinates2.w).r;
-	}
+        // Metallic-roughness
+        float occlusion = 1;
+        float metallic = 1;
+        float roughness = 1;
+        if (TexturePacking == 0)
+        {
+            if (OcclusionFactor.x > 0)
+                occlusion = _PSTex2D(Occlusion, In.TexCoords, TextureCoordinates2.w).r;
 
-	float perceptualRoughness = clamp(roughness * OcclusionFactor.y, MinRoughness, 1.0);
-	float alphaRoughness = perceptualRoughness * perceptualRoughness;
-	float roughnessSq = alphaRoughness * alphaRoughness;
-	
-	metallic = clamp(metallic * OcclusionFactor.z, 0.0, 1.0);
-	
-	float3 f0 = (float3)0.04;  // (float3)(pow((ior - 1) / (ior + 1), 2)) = (float3)0.04, if ior = 1.5
-	float3 f90 = (float3)1.0;
-	float3 diffuseColor = Color.rgb * (f90 - f0);
-	diffuseColor *= 1.0 - metallic;
-	
-	float3 specularColor = lerp(f0, Color.rgb, metallic);
-	float reflectance = max(max(specularColor.r, specularColor.g), specularColor.b);
-	float reflectance90 = clamp(reflectance * 25.0, 0.0, 1.0);
-    float3 specularEnvironmentR0 = specularColor.rgb;
-    float3 specularEnvironmentR90 = float3(1.0, 1.0, 1.0) * reflectance90;
-	
-	float3 n = _PSGetNormal(In, HasTangents, NormalScale, Normal, TextureCoordinates1.z, isFrontFace);
-	float3 v = normalize(-In.RelPosition.xyz);
+            if (OcclusionFactor.y > 0 || OcclusionFactor.z > 0)
+            {
+                float3 orm = _PSTex2D(MetallicRoughness, In.TexCoords, TextureCoordinates1.y).rgb;
+                roughness = orm.g;
+                metallic = orm.b;
+            }
+        }
+        else if (TexturePacking == 1 || TexturePacking == 3 || TexturePacking == 4 || TexturePacking == 5)
+        {
+            float3 orm = _PSTex2D(MetallicRoughness, In.TexCoords, TextureCoordinates1.y).rgb;
+            if (TexturePacking == 3 || TexturePacking == 5)
+            {
+                occlusion = orm.r;
+                roughness = orm.g;
+                metallic = orm.b;
+            }
+            else
+            {
+                roughness = orm.r;
+                metallic = orm.g;
+                occlusion = orm.b;
+            }
+        }
+        else if (TexturePacking == 2)
+        {
+            float4 nrm = _PSTex2D(Normal, In.TexCoords, TextureCoordinates1.z);
+            roughness = nrm.b;
+            metallic = nrm.a;
+            occlusion = _PSTex2D(Occlusion, In.TexCoords, TextureCoordinates2.w).r;
+        }
 
-	float NdotV = abs(dot(n, v)) + 0.001;
+        float perceptualRoughness = clamp(roughness * OcclusionFactor.y, MinRoughness, 1.0);
+        float alphaRoughness = perceptualRoughness * perceptualRoughness;
+        float roughnessSq = alphaRoughness * alphaRoughness;
+	
+        metallic = clamp(metallic * OcclusionFactor.z, 0.0, 1.0);
+	
+        float3 f0 = (float3) 0.04; // (float3)(pow((ior - 1) / (ior + 1), 2)) = (float3)0.04, if ior = 1.5
+        float3 f90 = (float3) 1.0;
+        float3 diffuseColor = Color.rgb * (f90 - f0);
+        diffuseColor *= 1.0 - metallic;
+	
+        float3 specularColor = lerp(f0, Color.rgb, metallic);
+        float reflectance = max(max(specularColor.r, specularColor.g), specularColor.b);
+        float reflectance90 = clamp(reflectance * 25.0, 0.0, 1.0);
+        float3 specularEnvironmentR0 = specularColor.rgb;
+        float3 specularEnvironmentR90 = float3(1.0, 1.0, 1.0) * reflectance90;
+	
+        float3 n = _PSGetNormal(In, HasTangents, NormalScale, Normal, TextureCoordinates1.z, isFrontFace);
+        float3 v = normalize(-In.RelPosition.xyz);
 
-	float3 reflection = normalize(reflect(-v, n));
-	float3 litColor = _PSGetIBLSpecular(specularColor, NdotV, perceptualRoughness, reflection);
-	litColor += _PSGetIBLDiffuse(diffuseColor, n);
-	// Occlusion doesn't apply to lights, so do it in advance
-	litColor = lerp(litColor, litColor * occlusion, OcclusionFactor.x);
+        float NdotV = abs(dot(n, v)) + 0.001;
+
+        float3 reflection = normalize(reflect(-v, n));
+        litColor = _PSGetIBLSpecular(specularColor, NdotV, perceptualRoughness, reflection);
+        litColor += _PSGetIBLDiffuse(diffuseColor, n);
+        // Occlusion doesn't apply to lights, so do it in advance
+        litColor = lerp(litColor, litColor * occlusion, OcclusionFactor.x);
 
 #ifdef CLEARCOAT
-	float3 clearcoat = (float3)0;
-	float clearcoatRoughnessSq = 0;
-	float3 clearcoatF0 = (float3)0.04; // (float3)(pow((ior - 1) / (ior + 1), 2)) = (float3)0.04, if ior = 1.5
-	float3 clearcoatNormal = n;
-	float clearcoatNdotV = NdotV;
-	float clearcoatFactor = ClearcoatFactor;
+        float3 clearcoat = (float3) 0;
+        float clearcoatRoughnessSq = 0;
+        float3 clearcoatF0 = (float3) 0.04; // (float3)(pow((ior - 1) / (ior + 1), 2)) = (float3)0.04, if ior = 1.5
+        float3 clearcoatNormal = n;
+        float clearcoatNdotV = NdotV;
+        float clearcoatFactor = ClearcoatFactor;
 
-	if (ClearcoatFactor > 0)
-	{
-		float clearcoatSample = _PSTex2D(Clearcoat, In.TexCoords, TextureCoordinates2.x).r;
-		clearcoatFactor *= clearcoatSample;
+        if (ClearcoatFactor > 0)
+        {
+            float clearcoatSample = _PSTex2D(Clearcoat, In.TexCoords, TextureCoordinates2.x).r;
+            clearcoatFactor *= clearcoatSample;
 
-		// TODO: implement clearcoat texturepacking for being able to check whether these two textures are the same
-		float clearcoatRoughness = _PSTex2D(ClearcoatRoughness, In.TexCoords, TextureCoordinates2.y).g;
-		clearcoatRoughness = clamp(clearcoatRoughness * ClearcoatRoughnessFactor, 0.0, 1.0);
+	        // TODO: implement clearcoat texturepacking for being able to check whether these two textures are the same
+            float clearcoatRoughness = _PSTex2D(ClearcoatRoughness, In.TexCoords, TextureCoordinates2.y).g;
+            clearcoatRoughness = clamp(clearcoatRoughness * ClearcoatRoughnessFactor, 0.0, 1.0);
 
-		float clearcoatAlphaRoughness = clearcoatRoughness * clearcoatRoughness;
-		clearcoatRoughnessSq = clearcoatAlphaRoughness * clearcoatAlphaRoughness;
+            float clearcoatAlphaRoughness = clearcoatRoughness * clearcoatRoughness;
+            clearcoatRoughnessSq = clearcoatAlphaRoughness * clearcoatAlphaRoughness;
 
 		// TODO: implement clearcoat texturepacking for being able to check whether the clearcoat normal is the same as the base normal
-		clearcoatNormal = _PSGetNormal(In, HasTangents, ClearcoatNormalScale, ClearcoatNormal, TextureCoordinates2.z, isFrontFace);
-		clearcoatNdotV = abs(dot(clearcoatNormal, v)) + 0.001;
+            clearcoatNormal = _PSGetNormal(In, HasTangents, ClearcoatNormalScale, ClearcoatNormal, TextureCoordinates2.z, isFrontFace);
+            clearcoatNdotV = abs(dot(clearcoatNormal, v)) + 0.001;
 
-		float3 Fr = max((float3)(1.0 - clearcoatRoughness), f0) - f0;
-		float3 k_S = f0 + Fr * pow(1.0 - clearcoatNdotV, 5.0);
+            float3 Fr = max((float3) (1.0 - clearcoatRoughness), f0) - f0;
+            float3 k_S = f0 + Fr * pow5(1.0 - clearcoatNdotV);
 
-		float3 clearcoatReflection = normalize(reflect(-v, clearcoatNormal));
-		clearcoat = _PSGetIBLSpecular(k_S, clearcoatNdotV, clearcoatRoughness, clearcoatReflection);
-		clearcoat = lerp(clearcoat, clearcoat * occlusion, OcclusionFactor.x);
-	}
+            float3 clearcoatReflection = normalize(reflect(-v, clearcoatNormal));
+            clearcoat = _PSGetIBLSpecular(k_S, clearcoatNdotV, clearcoatRoughness, clearcoatReflection);
+            clearcoat = lerp(clearcoat, clearcoat * occlusion, OcclusionFactor.x);
+        }
 #endif
 
-	float3 diffuseContrib = (float3)0;
-	float3 specContrib = (float3)0;
-	float3 intensity;
+        ///////////////////////
+        // Contributions from the OpenRails environment:
+        float shadowFactor = _PSGetShadowEffect(true, InGeneral);
+        float diffuseShadowFactor = lerp(ShadowBrightness, FullBrightness, saturate(shadowFactor));
+        ///////////////////////
 
-	[fastopt]
-	for (int i = 0; i < NumLights; i++)
-	{
-		if (i > 0)
-		{
-			// Light 0 is the sun the shadow factors are calculated from. For other lights they do not apply.
-			shadowFactor = 1;
-			diffuseShadowFactor = 1;
-		}
-		// In.Shadow.xyz is the absolute world position of the point
-		float3 l = _PSGetLightVector(i, In.Shadow.xyz, intensity);
+        float3 diffuseContrib = (float3) 0;
+        float3 specContrib = (float3) 0;
+        float3 intensity;
 
-		float NdotL = clamp(dot(n, l), 0.001, 1.0);
+	    [fastopt]
+        for (int i = 0; i < NumLights; i++)
+        {
+            // In.Shadow.xyz is the absolute world position of the point
+            float3 l = _PSGetLightVector(i, In.Shadow.xyz, intensity);
 
-		if (NdotL > 0.001 || NdotV > 0.001)
-		{
-			float3 h = normalize(l + v);
+            float NdotL = clamp(dot(n, l), 0.001, 1.0);
 
-			float NdotH = clamp(dot(n, h), 0.0, 1.0);
-			float LdotH = clamp(dot(l, h), 0.0, 1.0);
-			float VdotH = clamp(dot(v, h), 0.0, 1.0);
+            if (NdotL > 0.001 || NdotV > 0.001)
+            {
+                float3 h = normalize(l + v);
 
-			float fPow = pow(clamp(1.0 - VdotH, 0.0, 1.0), 5.0);
-			float3 F = specularEnvironmentR0 + (specularEnvironmentR90 - specularEnvironmentR0) * fPow;
+                float NdotH = clamp(dot(n, h), 0.0, 1.0);
+                float LdotH = clamp(dot(l, h), 0.0, 1.0);
+                float VdotH = clamp(dot(v, h), 0.0, 1.0);
 
-			float attenuationL = 2.0 * NdotL / (NdotL + sqrt(roughnessSq + (1.0 - roughnessSq) * (NdotL * NdotL)));
-			float attenuationV = 2.0 * NdotV / (NdotV + sqrt(roughnessSq + (1.0 - roughnessSq) * (NdotV * NdotV)));
-			float G = attenuationL * attenuationV;
+                float fPow = pow5(clamp(1.0 - VdotH, 0.0, 1.0));
+                float3 F = specularEnvironmentR0 + (specularEnvironmentR90 - specularEnvironmentR0) * fPow;
 
-			float f = (NdotH * roughnessSq - NdotH) * NdotH + 1.0;
-			float D = roughnessSq / (M_PI * f * f);
+                float attenuationL = 2.0 * NdotL / (NdotL + sqrt(roughnessSq + (1.0 - roughnessSq) * (NdotL * NdotL)));
+                float attenuationV = 2.0 * NdotV / (NdotV + sqrt(roughnessSq + (1.0 - roughnessSq) * (NdotV * NdotV)));
+                float G = attenuationL * attenuationV;
 
-			diffuseContrib += intensity * NdotL * (1.0 - F) * diffuseColor / M_PI * diffuseShadowFactor;
-			specContrib += intensity * NdotL * F * G * D / (4.0 * NdotL * NdotV) * shadowFactor;
+                float f = (NdotH * roughnessSq - NdotH) * NdotH + 1.0;
+                float D = roughnessSq / (M_PI * f * f);
+
+                diffuseContrib += intensity * NdotL * (1.0 - F) * diffuseColor / M_PI * diffuseShadowFactor;
+                specContrib += intensity * NdotL * F * G * D / (4.0 * NdotL * NdotV) * shadowFactor;
 
 #ifdef CLEARCOAT
-			if (ClearcoatFactor > 0)
-			{
-				float clearcoatNdotL = clamp(dot(clearcoatNormal, l), 0.001, 1.0);
-				float clearcoatNdotH = clamp(dot(clearcoatNormal, h), 0.0, 1.0);
+                if (ClearcoatFactor > 0)
+                {
+                    float clearcoatNdotL = clamp(dot(clearcoatNormal, l), 0.001, 1.0);
+                    float clearcoatNdotH = clamp(dot(clearcoatNormal, h), 0.0, 1.0);
 
-				F = clearcoatF0 + (f90 - clearcoatF0) * fPow;
+                    F = clearcoatF0 + (f90 - clearcoatF0) * fPow;
 
-				attenuationL = 2.0 * clearcoatNdotL / (clearcoatNdotL + sqrt(clearcoatRoughnessSq + (1.0 - clearcoatRoughnessSq) * (clearcoatNdotL * clearcoatNdotL)));
-				attenuationV = 2.0 * clearcoatNdotV / (clearcoatNdotV + sqrt(clearcoatRoughnessSq + (1.0 - clearcoatRoughnessSq) * (clearcoatNdotV * clearcoatNdotV)));
-				G = attenuationL * attenuationV;
+                    attenuationL = 2.0 * clearcoatNdotL / (clearcoatNdotL + sqrt(clearcoatRoughnessSq + (1.0 - clearcoatRoughnessSq) * (clearcoatNdotL * clearcoatNdotL)));
+                    attenuationV = 2.0 * clearcoatNdotV / (clearcoatNdotV + sqrt(clearcoatRoughnessSq + (1.0 - clearcoatRoughnessSq) * (clearcoatNdotV * clearcoatNdotV)));
+                    G = attenuationL * attenuationV;
 
-				f = (clearcoatNdotH * clearcoatRoughnessSq - clearcoatNdotH) * clearcoatNdotH + 1.0;
-				D = clearcoatRoughnessSq / (M_PI * f * f);
+                    f = (clearcoatNdotH * clearcoatRoughnessSq - clearcoatNdotH) * clearcoatNdotH + 1.0;
+                    D = clearcoatRoughnessSq / (M_PI * f * f);
 
-				clearcoat += intensity * clearcoatNdotL * F * G * D / (4.0 * clearcoatNdotL * clearcoatNdotV) * shadowFactor;
-			}
+                    clearcoat += intensity * clearcoatNdotL * F * G * D / (4.0 * clearcoatNdotL * clearcoatNdotV) * shadowFactor;
+                }
 #endif
-		}
-	}
-	litColor += diffuseContrib + specContrib;
+            }
+            // Light 0 is the sun, the shadow factors are needed only for that one. For other lights they do not apply, they no longer needed.
+            shadowFactor = 1;
+            diffuseShadowFactor = 1;
+        }
+        litColor += diffuseContrib + specContrib;
 
-	// Emissive color:
-	float3 emissive = _PSSrgbToLinear(_PSTex2D(Emissive, In.TexCoords, TextureCoordinates1.w).rgb) * EmissiveFactor;
-	litColor += emissive;
+	    // Emissive color:
+        float3 emissive = _PSSrgbToLinear(_PSTex2D(Emissive, In.TexCoords, TextureCoordinates1.w).rgb) * EmissiveFactor;
+        litColor += emissive;
 
 #ifdef CLEARCOAT
-	if (ClearcoatFactor > 0)
-	{
-		float3 clearcoatF = clearcoatF0 + (f90 - clearcoatF0) * pow(clamp(1.0 - clearcoatNdotV, 0.0, 1.0), 5.0);
-		litColor = litColor * (1.0 - clearcoatF * clearcoatFactor) + clearcoat * clearcoatFactor;
-	}
+        if (ClearcoatFactor > 0)
+        {
+            float3 clearcoatF = clearcoatF0 + (f90 - clearcoatF0) * pow5(clamp(1.0 - clearcoatNdotV, 0.0, 1.0));
+            litColor = litColor * (1.0 - clearcoatF * clearcoatFactor) + clearcoat * clearcoatFactor;
+        }
 #endif
 
-	// Unlit material
-	if (!ZBias_Lighting.y)
-		litColor = Color.rgb;
+    }
 
 	///////////////////////
 	// Contributions from the OpenRails environment:
