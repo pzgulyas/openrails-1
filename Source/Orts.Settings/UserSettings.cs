@@ -182,6 +182,10 @@ namespace ORTS.Settings
         public int DayAmbientLight { get; set; }
         [Default(AntiAliasingMethod.MSAA2x)]
         public int AntiAliasing { get; set; }
+        [Default(false)]
+        public bool GltfAnimations { get; set; }
+        [Default(true)]
+        public bool GltfTangentsAlwaysCalculatedPerPixel { get; set; }
 
         // Simulation settings:
         [Default(false)]
@@ -298,8 +302,6 @@ namespace ORTS.Settings
         public int ActRandomizationLevel { get; set; }
         [Default(0)]
         public int ActWeatherRandomizationLevel { get; set; }
-        [Default(false)]
-        public bool EnableHotReloading { get; set; }
 
         // Hidden settings:
         [Default(0)]

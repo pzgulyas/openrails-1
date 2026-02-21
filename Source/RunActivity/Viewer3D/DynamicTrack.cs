@@ -41,8 +41,6 @@ namespace Orts.Viewer3D
         public WorldPosition WorldPosition;
         public DynamicTrackPrimitive Primitive;
 
-        bool StaleData = false;
-
         public DynamicTrackViewer(Viewer viewer)
         {
             Viewer = viewer;
@@ -131,34 +129,6 @@ namespace Orts.Viewer3D
             }
         }
 
-        /// <summary>
-        /// Checks this dynamic track object for stale materials and sets the stale data flag if any materials are stale
-        /// </summary>
-        /// <returns>bool indicating if this dynamic track changed from fresh to stale</returns>
-        public bool CheckStale()
-        {
-            if (!StaleData)
-            {
-                foreach (LOD lod in Primitive.TrProfile.LODs)
-                {
-                    foreach (LODItem lodItem in lod.LODItems)
-                    {
-                        if (lodItem.LODMaterial.StaleData)
-                        {
-                            StaleData = true;
-                            break;
-                        }
-                    }
-                    if (StaleData)
-                        break;
-                }
-
-                return StaleData;
-            }
-            else
-                return false;
-        }
-
         [CallOnThread("Loader")]
         public void Mark()
         {
@@ -177,8 +147,6 @@ namespace Orts.Viewer3D
             int trpIndex;
             if (shapePath == "" && viewer.Simulator.TSectionDat.TrackShapes.ContainsKey(trSection.ShapeIndex))
                 shapePath = String.Concat(viewer.Simulator.BasePath, @"\Global\Shapes\", viewer.Simulator.TSectionDat.TrackShapes.Get(trSection.ShapeIndex).FileName);
-
-            shapePath = shapePath.ToLowerInvariant();
 
             if (viewer.TrackProfileIndicies.ContainsKey(shapePath))
                 viewer.TrackProfileIndicies.TryGetValue(shapePath, out trpIndex);
@@ -206,8 +174,6 @@ namespace Orts.Viewer3D
         public static int GetBestTrackProfile(Viewer viewer, string shapePath)
         {
             int trpIndex;
-
-            shapePath = shapePath.ToLowerInvariant();
 
             if (viewer.TrackProfileIndicies.ContainsKey(shapePath))
                 viewer.TrackProfileIndicies.TryGetValue(shapePath, out trpIndex);
@@ -249,7 +215,7 @@ namespace Orts.Viewer3D
                     }
                     foreach (string image in viewer.TRPs[i].TrackProfile.Images)
                     {
-                        if (shape.ImageNames.Contains(image))
+                        if (shape.ImageNames.Contains(image, StringComparer.InvariantCultureIgnoreCase))
                             score++;
                         else // Slight bias against track profiles with extra textures defined
                             score -= 0.05f;
@@ -259,7 +225,7 @@ namespace Orts.Viewer3D
                         foreach (string image in shape.ImageNames)
                         {
                             // Strong bias against track profiles that are missing textures
-                            if (!viewer.TRPs[i].TrackProfile.Images.Contains(image))
+                            if (!viewer.TRPs[i].TrackProfile.Images.Contains(image, StringComparer.InvariantCultureIgnoreCase))
                                 score -= 0.25f;
                         }
                     }
@@ -773,7 +739,7 @@ namespace Orts.Viewer3D
             {
                 foreach (LODItem item in level.LODItems)
                 {
-                    string texFileName = Path.GetFileNameWithoutExtension(item.TexName).ToLowerInvariant();
+                    string texFileName = Path.GetFileNameWithoutExtension(item.TexName);
                     if (!Images.Contains(texFileName))
                         Images.Add(texFileName);
                 }

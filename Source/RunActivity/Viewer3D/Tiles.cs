@@ -37,8 +37,8 @@ namespace Orts.Viewer3D
     {
         const int MaximumCachedTiles = 8 * 8;
 
-        public readonly string FilePath;
-        public readonly TileName.Zoom Zoom;
+        readonly string FilePath;
+        readonly TileName.Zoom Zoom;
 
         // THREAD SAFETY:
         //   All accesses must be done in local variables. No modifications to the objects are allowed except by
@@ -79,10 +79,7 @@ namespace Orts.Viewer3D
             // Check for 1x1 (or 8x8) tiles.
             TileName.Snap(ref tileX, ref tileZ, Zoom);
             if (tiles.ByXZ.ContainsKey(((uint)tileX << 16) + (uint)tileZ))
-                if (!tiles.ByXZ[((uint)tileX << 16) + (uint)tileZ].StaleData)
-                    return;
-                else // Remove stale tile from the list so it gets reloaded
-                    tileList.Remove(tiles.ByXZ[((uint)tileX << 16) + (uint)tileZ]);
+                return;
 
             var newTile = new Tile(FilePath, tileX, tileZ, Zoom, visible);
             if (newTile.Loaded)
@@ -95,10 +92,7 @@ namespace Orts.Viewer3D
             // Check for 2x2 (or 16x16) tiles.
             TileName.Snap(ref tileX, ref tileZ, Zoom - 1);
             if (tiles.ByXZ.ContainsKey(((uint)tileX << 16) + (uint)tileZ))
-                if (!tiles.ByXZ[((uint)tileX << 16) + (uint)tileZ].StaleData)
-                    return;
-                else // Remove stale tile from the list so it gets reloaded
-                    tileList.Remove(tiles.ByXZ[((uint)tileX << 16) + (uint)tileZ]);
+                return;
 
             newTile = new Tile(FilePath, tileX, tileZ, Zoom - 1, visible);
             if (newTile.Loaded)
@@ -326,7 +320,6 @@ namespace Orts.Viewer3D
         public readonly int TileX, TileZ, Size;
 
         public bool Loaded { get { return TFile != null && YFile != null; } }
-        public bool StaleData = false;
         public float Floor { get { return TFile.terrain.terrain_samples.terrain_sample_floor; } }  // in meters
         public float Resolution { get { return TFile.terrain.terrain_samples.terrain_sample_scale; } }  // in meters per( number in Y-file )
         public int SampleCount { get { return TFile.terrain.terrain_samples.terrain_nsamples; } }

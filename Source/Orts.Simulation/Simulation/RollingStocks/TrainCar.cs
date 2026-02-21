@@ -99,11 +99,6 @@ namespace Orts.Simulation.RollingStocks
         public readonly string WagFilePath;
         public string RealWagFilePath; //we are substituting missing remote cars in MP, so need to remember this
 
-        public bool StaleData = true; // Hot reloading: Indicates this train car has gone stale and needs to be reloaded
-        public bool StaleViewer = true; // Hot reloading: Indicates the VIEWER for this train car has gone stale and needs to be reloaded
-        public bool StaleCab = true; // Hot reloading: Indicates a cabview for this train car (as a locomotive) has gone stale and needs to be reloaded
-        public HashSet<string> FilesReferenced = new HashSet<string>(); // Hot reloading: List of .inc file paths (in lowercase) referenced by this car
-
         public static int DbfEvalTravellingTooFast;//Debrief eval
         public static int DbfEvalTravellingTooFastSnappedBrakeHose;//Debrief eval
         public bool dbfEvalsnappedbrakehose = false;//Debrief eval
@@ -224,7 +219,10 @@ namespace Orts.Simulation.RollingStocks
 
         public float MaxHandbrakeForceN;
         public float MaxBrakeForceN = 89e3f;
+        public float MaxBrakeShoeForceN; // This is the force applied to the brake shoe, hence it will be decreased by CoF to give force applied to the wheel
         public int NumberCarBrakeShoes;
+        public float InitialMaxHandbrakeForceN;  // Initial force when agon initialised
+        public float InitialMaxBrakeForceN = 89e3f;   // Initial force when wagon initialised, this is the force on the wheel, ie after the brake shoe.
 
         // Coupler Animation
         public AnimatedCoupler FrontCoupler = new AnimatedCoupler();
@@ -589,15 +587,7 @@ namespace Orts.Simulation.RollingStocks
                 Train.MUDirection = Flipped ^ loco.UsingRearCab ? DirectionControl.Flip(value) : value;
             }
         }
-
-        /// <summary>The actually used brake system. When mode is changed, this one is updated from the values of <see cref="BrakeSystems"/> and used directly</summary>
         public BrakeSystem BrakeSystem;
-        /// <summary>Alternative for dual vacuum/air vehicles, to be swapped with <see cref="BrakeSystem"/> and used directly</summary>
-        protected BrakeSystem BrakeSystemAlt;
-        /// <summary>Store for the various loades within modes. Never used directly, only the non-zero values get copied into <see cref="BrakeSystem"/></summary>
-        public readonly Dictionary<(BrakeModes BrakeMode, float MinMass), BrakeSystem> BrakeSystems = new Dictionary<(BrakeModes, float), BrakeSystem>();
-        /// <summary>Filter for the <see cref="BrakeSystems"/>, in case that comes from an include file</summary>
-        public string[] BrakeModeNames { get; protected set; }
 
         public float PreviousSteamBrakeCylinderPressurePSI;
 
@@ -820,23 +810,20 @@ namespace Orts.Simulation.RollingStocks
 
         public CarTunnelInfoData CarTunnelData;
 
-        public virtual void Initialize(bool reinitialize = false)
+        public virtual void Initialize()
         {
             BrakeSystem.Initialize();
-            // If car has been initialized previously, brake system needs additional initialization steps
-            if (reinitialize)
-                Train?.UnconditionalInitializeBrakes(false);
             CurveSpeedDependent = Simulator.Settings.CurveSpeedDependent;
 
             // Check Brake Shoe Friction parameters
             if (BrakeShoeType == BrakeShoeTypes.Cast_Iron_P10 || BrakeShoeType == BrakeShoeTypes.Cast_Iron_P6 || BrakeShoeType == BrakeShoeTypes.High_Friction_Composite || BrakeShoeType == BrakeShoeTypes.Disc_Pads)
             {
                 float NewtonsTokNewtons = 0.001f;
-                float maxBrakeShoeForcekN = NewtonsTokNewtons * BrakeSystem.MaxBrakeShoeForceN / NumberCarBrakeShoes;
+                float maxBrakeShoeForcekN = NewtonsTokNewtons * MaxBrakeShoeForceN / NumberCarBrakeShoes;
 
                 if (maxBrakeShoeForcekN > 20 && Simulator.Settings.VerboseConfigurationMessages)
                 {
-                    Trace.TraceInformation("Maximum force per brakeshoe is {0} and has exceeded {1}, check MaxBrakeShoeForceN {2} or NumberCarBrakeShoes {3}",  FormatStrings.FormatForce(maxBrakeShoeForcekN * 1000, IsMetric), FormatStrings.FormatForce(20 * 1000, IsMetric), FormatStrings.FormatForce(BrakeSystem.MaxBrakeShoeForceN, IsMetric), NumberCarBrakeShoes);
+                    Trace.TraceInformation("Maximum force per brakeshoe is {0} and has exceeded {1}, check MaxBrakeShoeForceN {2} or NumberCarBrakeShoes {3}", FormatStrings.FormatForce(maxBrakeShoeForcekN * 1000, IsMetric), FormatStrings.FormatForce(20 * 1000, IsMetric), FormatStrings.FormatForce(MaxBrakeShoeForceN, IsMetric), NumberCarBrakeShoes);
                 }
             }
 
@@ -2395,8 +2382,8 @@ public string GetCurveDirection()
         public TrainCar(Simulator simulator, string wagFile)
         {
             Simulator = simulator;
-            WagFilePath = Path.GetFullPath(wagFile).ToLowerInvariant();
-            RealWagFilePath = Path.GetFullPath(wagFile).ToLowerInvariant();
+            WagFilePath = wagFile;
+            RealWagFilePath = wagFile;
         }
 
         // Game save
@@ -2406,7 +2393,6 @@ public string GetCurveDirection()
             outf.Write(UiD);
             outf.Write(CarID);
             BrakeSystem.Save(outf);
-            BrakeSystemAlt.Save(outf);
             outf.Write(TractionForceN);
             outf.Write(DynamicBrakeForceN);
             outf.Write(MotiveForceN);
@@ -2432,7 +2418,6 @@ public string GetCurveDirection()
             UiD = inf.ReadInt32();
             CarID = inf.ReadString();
             BrakeSystem.Restore(inf);
-            BrakeSystemAlt.Restore(inf);
             TractionForceN = inf.ReadSingle();
             DynamicBrakeForceN = inf.ReadSingle();
             MotiveForceN = inf.ReadSingle();

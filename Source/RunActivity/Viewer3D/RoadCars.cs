@@ -193,7 +193,6 @@ namespace Orts.Viewer3D
         public float Travelled;
         public readonly bool IgnoreXRotation;
         public bool CarriesCamera;
-        public bool StaleData = false;
 
         public int TileX { get { return FrontTraveller.TileX; } }
         public int TileZ { get { return FrontTraveller.TileZ; } }
@@ -334,7 +333,7 @@ namespace Orts.Viewer3D
                 {
                     if (cancellation.IsCancellationRequested)
                         break;
-                    if (cars.ContainsKey(car) && !car.StaleData)
+                    if (cars.ContainsKey(car))
                         newCars.Add(car, cars[car]);
                     else
                         newCars.Add(car, LoadCar(car));
@@ -350,7 +349,7 @@ namespace Orts.Viewer3D
             var visibleCars = VisibleCars;
             var newVisibleCars = new List<RoadCar>(visibleCars.Count);
             foreach (var tile in Viewer.World.Scenery.WorldFiles)
-                foreach (var spawner in tile.CarSpawners)
+                foreach (var spawner in tile.carSpawners)
                     newVisibleCars.AddRange(spawner.Cars);
             VisibleCars = newVisibleCars;
         }
@@ -368,29 +367,6 @@ namespace Orts.Viewer3D
             return new RoadCarPrimitive(Viewer, car);
         }
 
-        /// <summary>
-        /// Checks all road cars for stale shapes and sets the stale data flag for any cars that are stale
-        /// </summary>
-        /// <returns>bool indicating if any road car changed from fresh to stale</returns>
-        public bool CheckStale()
-        {
-            bool found = false;
-
-            foreach (RoadCarPrimitive car in Cars.Values)
-            {
-                if (!car.Car.StaleData)
-                {
-                    if (car.CarShape.SharedShape.StaleData)
-                    {
-                        car.Car.StaleData = true;
-                        found = true;
-                    }
-                }
-            }
-
-            return found;
-        }
-
         [CallOnThread("Loader")]
         internal void Mark()
         {
@@ -402,8 +378,8 @@ namespace Orts.Viewer3D
 
     public class RoadCarPrimitive
     {
-        public readonly RoadCar Car;
-        public readonly RoadCarShape CarShape;
+        readonly RoadCar Car;
+        readonly RoadCarShape CarShape;
 
         public RoadCarPrimitive(Viewer viewer, RoadCar car)
         {

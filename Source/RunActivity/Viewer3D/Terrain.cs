@@ -27,7 +27,6 @@ using ORTS.Common;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.IO;
 using System.Linq;
 
 namespace Orts.Viewer3D
@@ -41,12 +40,11 @@ namespace Orts.Viewer3D
         // THREAD SAFETY:
         //   All accesses must be done in local variables. No modifications to the objects are allowed except by
         //   assignment of a new instance (possibly cloned and then modified).
-        public List<TerrainTile> TerrainTiles = new List<TerrainTile>();
+        List<TerrainTile> TerrainTiles = new List<TerrainTile>();
         int TileX;
         int TileZ;
         int VisibleTileX;
         int VisibleTileZ;
-        bool StaleData = true;
 
         [CallOnThread("Render")]
         public TerrainViewer(Viewer viewer)
@@ -58,7 +56,7 @@ namespace Orts.Viewer3D
         {
             var cancellation = Viewer.LoaderProcess.CancellationToken;
 
-            if (TileX != VisibleTileX || TileZ != VisibleTileZ || StaleData)
+            if (TileX != VisibleTileX || TileZ != VisibleTileZ)
             {
                 TileX = VisibleTileX;
                 TileZ = VisibleTileZ;
@@ -91,14 +89,13 @@ namespace Orts.Viewer3D
                 // Now we turn each unique (distinct) loaded tile in to a terrain tile.
                 newTerrainTiles = tiles
                     .Where(t => t != null).Distinct()
-                    .Select(tile => terrainTiles.FirstOrDefault(tt => !tt.Tile.StaleData && tt.Tile == tile) ?? new TerrainTile(Viewer, Viewer.Tiles, tile))
+                    .Select(tile => terrainTiles.FirstOrDefault(tt => tt.TileX == tile.TileX && tt.TileZ == tile.TileZ && tt.Size == tile.Size) ?? new TerrainTile(Viewer, Viewer.Tiles, tile))
                     .Union(loTiles
                         .Where(t => t != null).Distinct()
-                        .Select(tile => terrainTiles.FirstOrDefault(tt => !tt.Tile.StaleData && tt.Tile == tile) ?? new TerrainTile(Viewer, Viewer.LoTiles, tile))
+                        .Select(tile => terrainTiles.FirstOrDefault(tt => tt.TileX == tile.TileX && tt.TileZ == tile.TileZ && tt.Size == tile.Size) ?? new TerrainTile(Viewer, Viewer.LoTiles, tile))
                     ).ToList();
 
                 TerrainTiles = newTerrainTiles;
-                StaleData = false;
             }
         }
 
@@ -115,56 +112,6 @@ namespace Orts.Viewer3D
             var tiles = TerrainTiles;
             foreach (var tile in tiles)
                 tile.PrepareFrame(frame, elapsedTime);
-        }
-
-        /// <summary>
-        /// Sets the stale data flag for ALL loaded terrain tiles to the given bool
-        /// (default true)
-        /// </summary>
-        public void SetAllStale(bool stale = true)
-        {
-            foreach (TerrainTile terrain in TerrainTiles)
-                terrain.Tile.StaleData = stale;
-
-            StaleData = stale;
-        }
-
-        /// <summary>
-        /// Sets the stale data flag for terrain tiles using a tile file from the given set of paths
-        /// </summary>
-        /// <returns>bool indicating if any terrain tile changed from fresh to stale</returns>
-        public bool MarkStale(HashSet<string> tPaths)
-        {
-            bool found = false;
-
-            foreach (string tPath in tPaths)
-            {
-                foreach (TerrainTile terrain in TerrainTiles)
-                {
-                    string fileName = terrain.TileManager.FilePath + TileName.FromTileXZ(terrain.TileX, terrain.TileZ, terrain.TileManager.Zoom);
-
-                    // Need to look for changes to the terrain file, terrain altitude file, and the terrain flags file
-                    string tFile = Path.GetFullPath(fileName + ".t").ToLowerInvariant();
-                    string yFile = Path.GetFullPath(fileName + "_y.raw").ToLowerInvariant();
-                    string fFile = Path.GetFullPath(fileName + "_f.raw").ToLowerInvariant();
-
-                    if (tPath == tFile || tPath == yFile || tPath == fFile)
-                    {
-                        terrain.Tile.StaleData = true;
-                        found = true;
-
-                        Trace.TraceInformation("Terrain file {0} was updated on disk and will be reloaded.", tPath);
-
-                        // Move on to the next updated file
-                        break;
-                    }
-                }
-            }
-
-            if (found)
-                StaleData = true; // Tells the terrain viewer to reload terrain
-
-            return found;
         }
 
         internal void Mark()
@@ -186,34 +133,30 @@ namespace Orts.Viewer3D
     public class TerrainTile
     {
         public readonly int TileX, TileZ, Size, PatchCount;
-        public readonly Tile Tile;
-        public readonly TileManager TileManager;
 
         readonly TerrainPrimitive[,] TerrainPatches;
         readonly WaterPrimitive WaterTile;
 
         public TerrainTile(Viewer viewer, TileManager tileManager, Tile tile)
         {
-            Tile = tile;
-            TileManager = tileManager;
-            TileX = Tile.TileX;
-            TileZ = Tile.TileZ;
-            Size = Tile.Size;
-            PatchCount = Tile.PatchCount;
+            TileX = tile.TileX;
+            TileZ = tile.TileZ;
+            Size = tile.Size;
+            PatchCount = tile.PatchCount;
 
             // Terrain needs the next tiles over from its east (X+) and south (Z-) edges.
-            viewer.Tiles.Load(TileX + Tile.Size, TileZ, false);
-            viewer.Tiles.Load(TileX + Tile.Size, TileZ - 1, false);
+            viewer.Tiles.Load(TileX + tile.Size, TileZ, false);
+            viewer.Tiles.Load(TileX + tile.Size, TileZ - 1, false);
             viewer.Tiles.Load(TileX, TileZ - 1, false);
 
             TerrainPatches = new TerrainPrimitive[PatchCount, PatchCount];
             for (var x = 0; x < PatchCount; ++x)
                 for (var z = 0; z < PatchCount; ++z)
-                    if (Tile.GetPatch(x, z).DrawingEnabled)
-                        TerrainPatches[x, z] = new TerrainPrimitive(viewer, TileManager, Tile, x, z);
+                    if (tile.GetPatch(x, z).DrawingEnabled)
+                        TerrainPatches[x, z] = new TerrainPrimitive(viewer, tileManager, tile, x, z);
 
-            if (Tile.ContainsWater)
-                WaterTile = new WaterPrimitive(viewer, Tile);
+            if (tile.ContainsWater)
+                WaterTile = new WaterPrimitive(viewer, tile);
         }
 
         [CallOnThread("Updater")]
@@ -226,42 +169,6 @@ namespace Orts.Viewer3D
                 for (var z = 0; z < PatchCount; ++z)
                     if (TerrainPatches[x, z] != null)
                         TerrainPatches[x, z].PrepareFrame(frame);
-        }
-
-        /// <summary>
-        /// Checks this terrain tile for stale textures and sets the stale data flag if any textures are stale
-        /// </summary>
-        /// <returns>bool indicating if this terrain tile changed from fresh to stale</returns>
-        public bool CheckStaleTextures()
-        {
-            if (!Tile.StaleData)
-            {
-                if (WaterTile != null && WaterTile.GetStale())
-                {
-                    Tile.StaleData = true;
-                }
-                else
-                {
-                    for (int x = 0; x < PatchCount; ++x)
-                    {
-                        for (int z = 0; z < PatchCount; ++z)
-                        {
-                            if (TerrainPatches[x, z] != null && TerrainPatches[x, z].GetStale())
-                            {
-                                Tile.StaleData = true;
-                                break;
-                            }
-
-                        }
-                        if (Tile.StaleData)
-                            break;
-                    }
-                }
-
-                return Tile.StaleData;
-            }
-            else
-                return false;
         }
 
         [CallOnThread("Loader")]
@@ -541,15 +448,6 @@ namespace Orts.Viewer3D
             return patchVertexBuffer;
         }
 
-        /// <summary>
-        /// Determines if the material associated with this terrain primitive is stale
-        /// </summary>
-        /// <returns>bool indicating if any data used by this terrain primitive is stale</returns>
-        public bool GetStale()
-        {
-            return PatchMaterial.StaleData;
-        }
-
         [CallOnThread("Loader")]
         internal void Mark()
         {
@@ -599,12 +497,12 @@ namespace Orts.Viewer3D
 
     public class TerrainMaterial : Material
     {
-        readonly SharedTexture PatchTexture;
-        readonly SharedTexture PatchTextureOverlay;
+        readonly Texture2D PatchTexture;
+        readonly Texture2D PatchTextureOverlay;
         readonly float OverlayScale;
         IEnumerator<EffectPass> ShaderPasses;
 
-        public TerrainMaterial(Viewer viewer, string terrainTexture, SharedTexture defaultTexture)
+        public TerrainMaterial(Viewer viewer, string terrainTexture, Texture2D defaultTexture)
             : base(viewer, terrainTexture)
         {
             var textures = terrainTexture.Split('\0');
@@ -618,14 +516,14 @@ namespace Orts.Viewer3D
         public override void SetState(GraphicsDevice graphicsDevice, Material previousMaterial)
         {
             var shader = Viewer.MaterialManager.SceneryShader;
-            var level9_3 = Viewer.Settings.IsDirectXFeatureLevelIncluded(ORTS.Settings.UserSettings.DirectXFeature.Level9_3);
-            shader.CurrentTechnique = shader.Techniques[level9_3 ? "TerrainLevel9_3" : "TerrainLevel9_1"];
-            if (ShaderPasses == null) ShaderPasses = shader.Techniques[level9_3 ? "TerrainLevel9_3" : "TerrainLevel9_1"].Passes.GetEnumerator();
+            shader.CurrentTechnique = shader.Techniques["Terrain"];
+            if (ShaderPasses == null) ShaderPasses = shader.CurrentTechnique.Passes.GetEnumerator();
             shader.ImageTexture = PatchTexture;
             shader.OverlayTexture = PatchTextureOverlay;
             shader.OverlayScale = OverlayScale;
 
             graphicsDevice.BlendState = BlendState.NonPremultiplied;
+            graphicsDevice.RasterizerState = RasterizerState.CullCounterClockwise;
         }
 
         public override void Render(GraphicsDevice graphicsDevice, IEnumerable<RenderItem> renderItems, ref Matrix XNAViewMatrix, ref Matrix XNAProjectionMatrix)
@@ -650,21 +548,6 @@ namespace Orts.Viewer3D
         public override void ResetState(GraphicsDevice graphicsDevice)
         {
             graphicsDevice.BlendState = BlendState.Opaque;
-        }
-
-        /// <summary>
-        /// Checks this material for stale textures and sets the stale data flag if any textures are stale
-        /// </summary>
-        /// <returns>bool indicating if this material changed from fresh to stale</returns>
-        public override bool CheckStale()
-        {
-            if (!StaleData)
-            {
-                StaleData = PatchTexture.StaleData || PatchTextureOverlay.StaleData;
-                return StaleData;
-            }
-            else
-                return false;
         }
 
         public override void Mark()

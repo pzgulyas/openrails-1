@@ -1,4 +1,4 @@
-﻿// COPYRIGHT 2012, 2013, 2014 by the Open Rails project.
+// COPYRIGHT 2012, 2013, 2014 by the Open Rails project.
 // 
 // This file is part of Open Rails.
 // 
@@ -146,7 +146,7 @@ namespace Orts.Viewer3D
 
     public class TransferMaterial : Material
     {
-        readonly SharedTexture Texture;
+        readonly Texture2D Texture;
         IEnumerator<EffectPass> ShaderPasses;
         readonly SamplerState TransferSamplerState;
 
@@ -165,8 +165,7 @@ namespace Orts.Viewer3D
         public override void SetState(GraphicsDevice graphicsDevice, Material previousMaterial)
         {
             var shader = Viewer.MaterialManager.SceneryShader;
-            var level9_3 = Viewer.Settings.IsDirectXFeatureLevelIncluded(ORTS.Settings.UserSettings.DirectXFeature.Level9_3);
-            shader.CurrentTechnique = shader.Techniques[level9_3 ? "TransferLevel9_3" : "TransferLevel9_1"];
+            shader.CurrentTechnique = shader.Techniques["Transfer"];
             if (ShaderPasses == null) ShaderPasses = shader.CurrentTechnique.Passes.GetEnumerator();
             shader.ImageTexture = Texture;
             shader.ReferenceAlpha = 10;
@@ -207,21 +206,6 @@ namespace Orts.Viewer3D
         public override bool GetBlending()
         {
             return true;
-        }
-
-        /// <summary>
-        /// Checks this material for stale textures and sets the stale data flag if any textures are stale
-        /// </summary>
-        /// <returns>bool indicating if this material changed from fresh to stale</returns>
-        public override bool CheckStale()
-        {
-            if (!StaleData)
-            {
-                StaleData = Texture.StaleData;
-                return StaleData;
-            }
-            else
-                return false;
         }
 
         public override void Mark()

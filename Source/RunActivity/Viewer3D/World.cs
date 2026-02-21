@@ -24,7 +24,6 @@ using Orts.Common;
 using ORTS.Common;
 using Orts.Viewer3D.RollingStock.SubSystems;
 using System.Collections.Generic;
-using Orts.Simulation;
 
 namespace Orts.Viewer3D
 {
@@ -95,9 +94,6 @@ namespace Orts.Viewer3D
         [CallOnThread("Loader")]
         public void Load()
         {
-            if (Viewer.ManualReloadQueued)
-                Viewer.Simulator.Confirmer.Message(ConfirmLevel.Information, Simulator.Catalog.GetString("Forced asset reload started."));
-
             Terrain.Load();
             Scenery.Load();
             Trains.Load();
@@ -136,12 +132,6 @@ namespace Orts.Viewer3D
                     if (!MarkSweepError) Trace.WriteLine(error);
                     MarkSweepError = true;
                 }
-            }
-
-            if (Viewer.ManualReloadQueued)
-            {
-                Viewer.Simulator.Confirmer.Message(ConfirmLevel.Information, Simulator.Catalog.GetString("Forced asset reload complete."));
-                Viewer.ManualReloadQueued = false;
             }
         }
 
@@ -226,19 +216,6 @@ namespace Orts.Viewer3D
             Trains.PrepareFrame(frame, elapsedTime);
             Containers.PrepareFrame(frame, elapsedTime);
             RoadCars.PrepareFrame(frame, elapsedTime);
-        }
-
-        /// <summary>
-        /// Sets the stale data flag for ALL assets managed by the world to the given bool
-        /// (default true)
-        /// </summary>
-        public void SetAllStale(bool stale = true)
-        {
-            Trains.SetAllStale(stale);
-
-            Scenery.SetAllStale(stale);
-
-            Terrain.SetAllStale(stale);
         }
     }
 }

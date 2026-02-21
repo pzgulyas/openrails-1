@@ -150,26 +150,6 @@ namespace Orts.Viewer3D
             vertexBuffer.SetData(vertexData.ToArray());
         }
 
-        /// <summary>
-        /// Determines if the materials associated with this water primitive are stale
-        /// </summary>
-        /// <returns>bool indicating if any data used by this water primitive is stale</returns>
-        public bool GetStale()
-        {
-            bool found = false;
-
-            foreach (Material waterMaterial in WaterLayers.Select(kvp => kvp.Value))
-            {
-                if (waterMaterial.StaleData)
-                {
-                    found = true;
-                    break;
-                }
-            }
-
-            return found;
-        }
-
         [CallOnThread("Loader")]
         internal static void Mark()
         {
@@ -181,7 +161,7 @@ namespace Orts.Viewer3D
 
     public class WaterMaterial : Material
     {
-        readonly SharedTexture WaterTexture;
+        readonly Texture2D WaterTexture;
         IEnumerator<EffectPass> ShaderPasses;
 
         public WaterMaterial(Viewer viewer, string waterTexturePath)
@@ -193,9 +173,8 @@ namespace Orts.Viewer3D
         public override void SetState(GraphicsDevice graphicsDevice, Material previousMaterial)
         {
             var shader = Viewer.MaterialManager.SceneryShader;
-            var level9_3 = Viewer.Settings.IsDirectXFeatureLevelIncluded(ORTS.Settings.UserSettings.DirectXFeature.Level9_3);
-            shader.CurrentTechnique = shader.Techniques[level9_3 ? "ImageLevel9_3" : "ImageLevel9_1"];
-            if (ShaderPasses == null) ShaderPasses = shader.Techniques[level9_3 ? "ImageLevel9_3" : "ImageLevel9_1"].Passes.GetEnumerator();
+            shader.CurrentTechnique = shader.Techniques["Image"];
+            if (ShaderPasses == null) ShaderPasses = shader.CurrentTechnique.Passes.GetEnumerator();
             shader.ImageTexture = WaterTexture;
             shader.ReferenceAlpha = 10;
 
@@ -232,21 +211,6 @@ namespace Orts.Viewer3D
         public override bool GetBlending()
         {
             return true;
-        }
-
-        /// <summary>
-        /// Checks this material for stale textures and sets the stale data flag if any textures are stale
-        /// </summary>
-        /// <returns>bool indicating if this material changed from fresh to stale</returns>
-        public override bool CheckStale()
-        {
-            if (!StaleData)
-            {
-                StaleData = WaterTexture.StaleData;
-                return StaleData;
-            }
-            else
-                return false;
         }
 
         public override void Mark()

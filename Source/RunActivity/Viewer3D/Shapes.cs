@@ -51,7 +51,7 @@ namespace Orts.Viewer3D
         readonly Viewer Viewer;
 
         Dictionary<string, SharedShape> Shapes = new Dictionary<string, SharedShape>();
-        HashSet<SharedShape> MarkedShapes = new HashSet<SharedShape>();
+        Dictionary<string, bool> ShapeMarks = new Dictionary<string, bool>();
         SharedShape EmptyShape;
 
         [CallOnThread("Render")]
@@ -70,16 +70,17 @@ namespace Orts.Viewer3D
                 return EmptyShape;
 
             path = path.ToLowerInvariant();
-            if (!Shapes.ContainsKey(path) || Shapes[path].StaleData)
+            if (!Shapes.ContainsKey(path))
             {
                 try
                 {
-                    Shapes[path] = new SharedShape(Viewer, path);
+                    var extension = Path.GetExtension(path.Split('\0')[0]).ToLower();
+                    Shapes.Add(path, extension == ".gltf" || extension == ".glb" ? new GltfShape(Viewer, path) : new SharedShape(Viewer, path));
                 }
                 catch (Exception error)
                 {
                     Trace.WriteLine(new FileLoadException(path, error));
-                    Shapes[path] = EmptyShape;
+                    Shapes.Add(path, EmptyShape);
                 }
             }
             return Shapes[path];
@@ -87,99 +88,30 @@ namespace Orts.Viewer3D
 
         public void Mark()
         {
-            MarkedShapes.Clear();
+            ShapeMarks.Clear();
+            foreach (var path in Shapes.Keys)
+                ShapeMarks.Add(path, false);
         }
 
         public void Mark(SharedShape shape)
         {
-            if (shape != null)
-                MarkedShapes.Add(shape);
+            foreach (var key in Shapes.Keys)
+            {
+                if (Shapes[key] == shape)
+                {
+                    ShapeMarks[key] = true;
+                    break;
+                }
+            }
         }
 
         public void Sweep()
         {
-            // If a shape isn't in the list of marked shapes, it is no longer in use
-            List<string> shapeKeys = Shapes.Keys.ToList();
-            foreach (string key in shapeKeys)
-                if (!MarkedShapes.Contains(Shapes[key]))
-                {
-                    Shapes[key].Dispose();
-                    Shapes.Remove(key);
-                }
-        }
-
-        /// <summary>
-        /// Sets the stale data flag for ALL shared shapes to the given bool
-        /// (default true)
-        /// </summary>
-        public void SetAllStale(bool stale = true)
-        {
-            foreach (SharedShape shape in Shapes.Values)
-                shape.StaleData = stale;
-        }
-
-        /// <summary>
-        /// Sets the stale data flag for shapes using a shape file from the given set of paths
-        /// </summary>
-        /// <returns>bool indicating if any shape changed from fresh to stale</returns>
-        public bool MarkStale(HashSet<string> sPaths)
-        {
-            // The same shape file may be used by multiple shared shapes, need to iterate to check each shared shape
-            bool found = false;
-
-            foreach (string shapeKey in Shapes.Keys)
+            foreach (var path in ShapeMarks.Where(kvp => !kvp.Value).Select(kvp => kvp.Key))
             {
-                string shapeFile = shapeKey;
-
-                // Shapes specify a shape location and a texture location, only check against the shape location
-                if (shapeKey.Contains('\0'))
-                    shapeFile = shapeKey.Split('\0')[0];
-
-                if (!Shapes[shapeKey].StaleData && (sPaths.Contains(Shapes[shapeKey].FilePath) || sPaths.Contains(shapeFile)))
-                {
-                    // Mark shape as stale so it gets reloaded
-                    Shapes[shapeKey].StaleData = true;
-                    found = true;
-
-                    Trace.TraceInformation("Shape file {0} was updated on disk and will be reloaded.", shapeFile);
-                }
-                // Continue scanning, there may be multiple matching shapes
+                Shapes[path].Dispose();
+                Shapes.Remove(path);
             }
-
-            return found;
-        }
-
-        /// <summary>
-        /// Checks all shapes for stale materials and sets the stale data flag if any materials are stale
-        /// </summary>
-        /// <returns>bool indicating if any shape changed from fresh to stale</returns>
-        public bool CheckStale()
-        {
-            // The same materials may be used by multiple shared shapes, need to iterate to check each shared shape
-            bool found = false;
-
-            foreach (SharedShape shape in Shapes.Values)
-            {
-                if (!shape.StaleData)
-                {
-                    foreach (Material material in shape.Materials)
-                    {
-                        if (material.StaleData)
-                        {
-                            // Found a match to an affected material; mark shape as stale so it gets reloaded
-                            shape.StaleData = true;
-                            found = true;
-
-                            Trace.TraceInformation("Texture used by shape file {0} was updated on disk, shape will be reloaded.", shape.FilePath);
-
-                            break;
-                        }
-                    }
-                }
-                // Continue scanning, there may be multiple shapes with stale materials
-            }
-
-            return found;
         }
 
         [CallOnThread("Updater")]
@@ -218,19 +150,6 @@ namespace Orts.Viewer3D
             Viewer = viewer;
             Location = position;
             Flags = flags;
-
-            if (path != null)
-            {
-                // Use resolved path, without any 'up one level' ("..\\") calls
-                if (path.Contains('\0'))
-                {
-                    string[] dualPath = path.Split('\0');
-                    path = Path.GetFullPath(dualPath[0]) + '\0' + Path.GetFullPath(dualPath[1]);
-                }
-                else
-                    path = Path.GetFullPath(path);
-            }
-
             SharedShape = Viewer.ShapeManager.Get(path);
         }
 
@@ -406,6 +325,23 @@ namespace Orts.Viewer3D
         /// </summary>
         public void AnimateMatrix(int iMatrix, float key)
         {
+            if (SharedShape is GltfShape gltfShape)
+            {
+                if (!gltfShape.HasAnimation(iMatrix))
+                {
+                    if (!SeenShapeAnimationError.ContainsKey(SharedShape.FilePath))
+                        Trace.TraceInformation("No animation number {1} in shape {0}", SharedShape.FilePath, iMatrix);
+                    SeenShapeAnimationError[SharedShape.FilePath] = true;
+                }
+                else
+                {
+                    // iMatrix is the number of the animation, not the number of the node,
+                    // key is the time, not the number of the frame.
+                    gltfShape.Animate(iMatrix, key, XNAMatrices);
+                }
+                return;
+            }
+
             // Animate the given matrix.
             AnimateOneMatrix(iMatrix, key);
 
@@ -1003,7 +939,6 @@ namespace Orts.Viewer3D
         readonly HazardObj HazardObj;
         readonly Hazzard Hazzard;
 
-        readonly int AnimationFrames;
         float Moved = 0f;
         float AnimationKey;
         float DelayHazAnimation;
@@ -1021,7 +956,6 @@ namespace Orts.Viewer3D
         {
             HazardObj = hObj;
             Hazzard = h;
-            AnimationFrames = SharedShape.Animations[0].FrameCount;
         }
 
         public override void Unload()
@@ -1852,14 +1786,17 @@ namespace Orts.Viewer3D
         protected internal VertexBuffer VertexBuffer;
         protected internal IndexBuffer IndexBuffer;
         protected internal int PrimitiveCount;
+        protected internal int PrimitiveOffset;
+        protected internal PrimitiveType PrimitiveType;
 
-        readonly VertexBufferBinding[] VertexBufferBindings;
+        protected internal readonly VertexBufferBinding[] VertexBufferBindings;
 
-        public ShapePrimitive()
-        {
-        }
+        public ShapePrimitive() { }
+        
+        public ShapePrimitive(VertexBufferBinding[] vertexBufferBindings) => VertexBufferBindings = vertexBufferBindings;
 
         public ShapePrimitive(Material material, SharedShape.VertexBufferSet vertexBufferSet, IndexBuffer indexBuffer, int primitiveCount, int[] hierarchy, int hierarchyIndex)
+            : this(new[] { new VertexBufferBinding(vertexBufferSet.Buffer), new VertexBufferBinding(GetDummyVertexBuffer(material.Viewer.GraphicsDevice)) })
         {
             Material = material;
             VertexBuffer = vertexBufferSet.Buffer;
@@ -1867,8 +1804,7 @@ namespace Orts.Viewer3D
             PrimitiveCount = primitiveCount;
             Hierarchy = hierarchy;
             HierarchyIndex = hierarchyIndex;
-
-            VertexBufferBindings = new[] { new VertexBufferBinding(VertexBuffer), new VertexBufferBinding(GetDummyVertexBuffer(material.Viewer.GraphicsDevice)) };
+            PrimitiveType = PrimitiveType.TriangleList;
         }
 
         public ShapePrimitive(Material material, SharedShape.VertexBufferSet vertexBufferSet, IList<ushort> indexData, GraphicsDevice graphicsDevice, int[] hierarchy, int hierarchyIndex)
@@ -1884,8 +1820,15 @@ namespace Orts.Viewer3D
             {
                 // TODO consider sorting by Vertex set so we can reduce the number of SetSources required.
                 graphicsDevice.SetVertexBuffers(VertexBufferBindings);
-                graphicsDevice.Indices = IndexBuffer;
-                graphicsDevice.DrawIndexedPrimitives(PrimitiveType.TriangleList, baseVertex: 0, startIndex: 0, primitiveCount: PrimitiveCount);
+                if (IndexBuffer != null)
+                {
+                    graphicsDevice.Indices = IndexBuffer;
+                    graphicsDevice.DrawIndexedPrimitives(PrimitiveType, baseVertex: 0, startIndex: PrimitiveOffset, primitiveCount: PrimitiveCount);
+                }
+                else
+                {
+                    graphicsDevice.DrawPrimitives(PrimitiveType, 0, PrimitiveCount);
+                }
             }
         }
 
@@ -1897,13 +1840,13 @@ namespace Orts.Viewer3D
         [CallOnThread("Loader")]
         public virtual void Mark()
         {
-            Material.Mark();
+            Material?.Mark();
         }
 
         public void Dispose()
         {
-            VertexBuffer.Dispose();
-            IndexBuffer.Dispose();
+            VertexBuffer?.Dispose();
+            IndexBuffer?.Dispose();
             PrimitiveCount = 0;
         }
     }
@@ -1962,10 +1905,10 @@ namespace Orts.Viewer3D
         public int SubObjectIndex { get; protected set; }
 
         protected VertexBuffer VertexBuffer;
-        protected VertexDeclaration VertexDeclaration;
         protected int VertexBufferStride;
         protected IndexBuffer IndexBuffer;
         protected int PrimitiveCount;
+        protected internal int PrimitiveOffset;
 
         protected VertexBuffer InstanceBuffer;
         protected VertexDeclaration InstanceDeclaration;
@@ -1981,23 +1924,41 @@ namespace Orts.Viewer3D
             HierarchyIndex = shapePrimitive.HierarchyIndex;
             SubObjectIndex = subObjectIndex;
             VertexBuffer = shapePrimitive.VertexBuffer;
-            VertexDeclaration = shapePrimitive.VertexBuffer.VertexDeclaration;
             IndexBuffer = shapePrimitive.IndexBuffer;
             PrimitiveCount = shapePrimitive.PrimitiveCount;
+            PrimitiveOffset = shapePrimitive.PrimitiveOffset;
 
             InstanceDeclaration = new VertexDeclaration(ShapeInstanceData.SizeInBytes, ShapeInstanceData.VertexElements);
             InstanceBuffer = new VertexBuffer(graphicsDevice, InstanceDeclaration, positions.Length, BufferUsage.WriteOnly);
             InstanceBuffer.SetData(positions);
             InstanceCount = positions.Length;
 
-            VertexBufferBindings = new[] { new VertexBufferBinding(VertexBuffer), new VertexBufferBinding(InstanceBuffer, 0, 1) };
+            var instanceBufferBinding = new VertexBufferBinding(InstanceBuffer, 0, 1);
+
+            if (VertexBuffer != null)
+            {
+                VertexBufferBindings = new[] { new VertexBufferBinding(VertexBuffer), instanceBufferBinding };
+            }
+            else
+            {
+                VertexBufferBindings = shapePrimitive.VertexBufferBindings.ToArray();
+                var dummyInstanceBuffer = RenderPrimitive.GetDummyVertexBuffer(graphicsDevice);
+                var position = -1;
+                for (var i = 0; i < VertexBufferBindings.Length; i++)
+                    if (VertexBufferBindings[i].VertexBuffer == dummyInstanceBuffer)
+                        position = i;
+                if (position == -1)
+                    VertexBufferBindings.Append(instanceBufferBinding);
+                else
+                    VertexBufferBindings[position] = instanceBufferBinding;
+            }
         }
 
         public override void Draw(GraphicsDevice graphicsDevice)
         {
             graphicsDevice.Indices = IndexBuffer;
             graphicsDevice.SetVertexBuffers(VertexBufferBindings);
-            graphicsDevice.DrawInstancedPrimitives(PrimitiveType.TriangleList, baseVertex: 0, startIndex: 0, PrimitiveCount, InstanceCount);
+            graphicsDevice.DrawInstancedPrimitives(PrimitiveType.TriangleList, baseVertex: 0, startIndex: PrimitiveOffset, PrimitiveCount, InstanceCount);
         }
     }
 
@@ -2048,13 +2009,11 @@ namespace Orts.Viewer3D
 
         // This data is common to all instances of the shape
         public List<string> MatrixNames = new List<string>();
-        public List<Material> Materials = new List<Material>();
         public List<string> ImageNames; // Names of textures without paths or file extensions
         public Matrix[] Matrices = new Matrix[0];  // the original natural pose for this shape - shared by all instances
         public animations Animations;
         public LodControl[] LodControls;
         public bool HasNightSubObj;
-        public bool StaleData = false;
         public int RootSubObjectIndex = 0;
         //public bool negativeBogie = false;
         public string SoundFileName = "";
@@ -2066,7 +2025,7 @@ namespace Orts.Viewer3D
         public readonly Dictionary<int, Matrix> StoredResultMatrixes = new Dictionary<int, Matrix>();
 
 
-        readonly Viewer Viewer;
+        readonly protected Viewer Viewer;
         public readonly string FilePath;
         public readonly string ReferencePath;
 
@@ -2102,7 +2061,7 @@ namespace Orts.Viewer3D
         /// <summary>
         /// Only one copy of the model is loaded regardless of how many copies are placed in the scene.
         /// </summary>
-        void LoadContent()
+        protected virtual void LoadContent()
         {
             var filePath = FilePath;
             // commented lines allow reading the animation block from an additional file in an Openrails subfolder
@@ -2139,7 +2098,7 @@ namespace Orts.Viewer3D
             }
             Animations = sFile.shape.animations;
 
-            ImageNames = new List<string>(sFile.shape.images.ConvertAll(img => Path.GetFileNameWithoutExtension(img).ToLowerInvariant()));
+            ImageNames = new List<string>(sFile.shape.images.ConvertAll(img => Path.GetFileNameWithoutExtension(img)));
 
 #if DEBUG_SHAPE_HIERARCHY
             var debugShapeHierarchy = new StringBuilder();
@@ -2188,6 +2147,8 @@ namespace Orts.Viewer3D
         {
             public DistanceLevel[] DistanceLevels;
 
+            public LodControl() { }
+
             public LodControl(lod_control MSTSlod_control, Helpers.TextureFlags textureFlags, ShapeFile sFile, SharedShape sharedShape)
             {
 #if DEBUG_SHAPE_HIERARCHY
@@ -2222,6 +2183,8 @@ namespace Orts.Viewer3D
             public float ViewingDistance;
             public float ViewSphereRadius;
             public SubObject[] SubObjects;
+
+            public DistanceLevel() { }
 
             public DistanceLevel(distance_level MSTSdistance_level, Helpers.TextureFlags textureFlags, ShapeFile sFile, SharedShape sharedShape)
             {
@@ -2296,6 +2259,8 @@ namespace Orts.Viewer3D
             };
 
             public ShapePrimitive[] ShapePrimitives;
+
+            public SubObject() { }
 
 #if DEBUG_SHAPE_HIERARCHY
             public SubObject(sub_object sub_object, ref int totalPrimitiveIndex, int[] hierarchy, Helpers.TextureFlags textureFlags, int subObjectIndex, SFile sFile, SharedShape sharedShape)
@@ -2397,8 +2362,6 @@ namespace Orts.Viewer3D
                     {
                         material = sharedShape.Viewer.MaterialManager.Load("Scenery", null, (int)options);
                     }
-
-                    sharedShape.Materials.Add(material);
 
 #if DEBUG_SHAPE_HIERARCHY
                     debugShapeHierarchy.AppendFormat("        Primitive {0,-2}: pstate={1,-2} vstate={2,-2} lstate={3,-2} matrix={4,-2}", primitiveIndex, primitive.prim_state_idx, primitiveState.ivtx_state, vertexState.LightCfgIdx, vertexState.imatrix);
@@ -2513,6 +2476,7 @@ namespace Orts.Viewer3D
             public int DebugNormalsVertexCount;
             public const int DebugNormalsVertexPerVertex = 3 * 4;
 #endif
+            public VertexBufferSet() { }
 
             public VertexBufferSet(VertexPositionNormalTexture[] vertexData, GraphicsDevice graphicsDevice)
             {
@@ -2664,9 +2628,23 @@ namespace Orts.Viewer3D
                     // Maximum detail!
                     displayDetailLevel = 0;
                 else if (Viewer.Settings.LODBias > -100)
+                {
                     // Not minimum detail, so find the correct level (with scaling by LODBias)
-                    while ((displayDetailLevel > 0) && Viewer.Camera.InRange(mstsLocation, lodControl.DistanceLevels[displayDetailLevel - 1].ViewSphereRadius, lodControl.DistanceLevels[displayDetailLevel - 1].ViewingDistance * lodBias))
-                        displayDetailLevel--;
+                    if (this is GltfShape gltfShape)
+                    {
+                        // glTF lod-ding is based on minimum screen coverage.
+                        // Checking from level 0 to less detailed
+                        while (displayDetailLevel > 0 && Viewer.Camera.BiggerThan(xnaDTileTranslation, gltfShape.BoundingBoxNodes, gltfShape.MinimumScreenCoverages[displayDetailLevel - 1]))
+                            displayDetailLevel--;
+                        gltfShape.SetLod(displayDetailLevel);
+                    }
+                    else
+                    {
+                        // .s lod-ding is based on distance levels
+                        while ((displayDetailLevel > 0) && Viewer.Camera.InRange(mstsLocation, lodControl.DistanceLevels[displayDetailLevel - 1].ViewSphereRadius, lodControl.DistanceLevels[displayDetailLevel - 1].ViewingDistance * lodBias))
+                            displayDetailLevel--;
+                    }
+                }
 
                 var displayDetail = lodControl.DistanceLevels[displayDetailLevel];
                 var distanceDetail = Viewer.Settings.LODBias == 100
@@ -2691,15 +2669,10 @@ namespace Orts.Viewer3D
 
                     foreach (var shapePrimitive in subObject.ShapePrimitives)
                     {
-                        var xnaMatrix = Matrix.Identity;
                         var hi = shapePrimitive.HierarchyIndex;
                         if (matrixVisible != null && !matrixVisible[hi]) continue;
-                        while (hi >= 0 && hi < shapePrimitive.Hierarchy.Length)
-                        {
-                            Matrix.Multiply(ref xnaMatrix, ref animatedXNAMatrices[hi], out xnaMatrix);
-                            hi = shapePrimitive.Hierarchy[hi];
-                        }
-                        Matrix.Multiply(ref xnaMatrix, ref xnaDTileTranslation, out xnaMatrix);
+
+                        var xnaMatrix = SetRenderMatrices(shapePrimitive, animatedXNAMatrices, ref xnaDTileTranslation, out var bones);
 
                         if (StoredResultMatrixes.ContainsKey(shapePrimitive.HierarchyIndex))
                             StoredResultMatrixes[shapePrimitive.HierarchyIndex] = xnaMatrix;
@@ -2707,28 +2680,71 @@ namespace Orts.Viewer3D
                         // TODO make shadows depend on shape overrides
 
                         var interior = (flags & ShapeFlags.Interior) != 0;
-                        frame.AddAutoPrimitive(mstsLocation, distanceDetail.ViewSphereRadius, distanceDetail.ViewingDistance * lodBias, shapePrimitive.Material, shapePrimitive, interior ? RenderPrimitiveGroup.Interior : RenderPrimitiveGroup.World, ref xnaMatrix, flags);
+                        frame.AddAutoPrimitive(mstsLocation, distanceDetail.ViewSphereRadius, distanceDetail.ViewingDistance * lodBias, shapePrimitive.Material, shapePrimitive, interior ? RenderPrimitiveGroup.Interior : RenderPrimitiveGroup.World, ref xnaMatrix, flags, bones);
                     }
                 }
             }
         }
 
-        public Matrix GetMatrixProduct(int iNode)
+        public virtual Matrix SetRenderMatrices(ShapePrimitive shapePrimitive, Matrix[] animatedXNAMatrices, ref Matrix xnaDTileTranslation, out Matrix[] bones)
         {
-            int[] h = LodControls[0].DistanceLevels[0].SubObjects[0].ShapePrimitives[0].Hierarchy;
-            Matrix matrix = Matrix.Identity;
-            while (iNode != -1)
+            bones = null; // standard scenery material has no skin and bones
+            var xnaMatrix = Matrix.Identity;
+            var hi = shapePrimitive.HierarchyIndex;
+            while (hi >= 0 && hi < shapePrimitive.Hierarchy.Length)
             {
-                matrix *= Matrices[iNode];
-                iNode = h[iNode];
+                Matrix.Multiply(ref xnaMatrix, ref animatedXNAMatrices[hi], out xnaMatrix);
+                hi = shapePrimitive.Hierarchy[hi];
+            }
+            Matrix.Multiply(ref xnaMatrix, ref xnaDTileTranslation, out xnaMatrix);
+            return xnaMatrix;
+        }
+
+        public virtual Matrix GetMatrixProduct(int iNode)
+        {
+            var h = GetModelHierarchy();
+            Matrix matrix = Matrix.Identity;
+            if (h != null && h.Length > iNode)
+            {
+                while (iNode != -1)
+                {
+                    matrix *= Matrices[iNode];
+                    iNode = h[iNode];
+                }
             }
             return matrix;
         }
 
-        public int GetParentMatrix(int iNode)
-        {
-            return LodControls[0].DistanceLevels[0].SubObjects[0].ShapePrimitives[0].Hierarchy[iNode];
-        }
+        public int[] GetModelHierarchy() => LodControls?.FirstOrDefault()?.DistanceLevels?.FirstOrDefault()?.SubObjects?.FirstOrDefault()?.ShapePrimitives?.FirstOrDefault()?.Hierarchy;
+
+        /// <summary>
+        /// This method is part of the animation handling. Gets the parent that will be animated, for finding a bogie for wheels.
+        /// </summary>
+        public int GetParentMatrix(int iNode) => GetModelHierarchy()?.ElementAtOrDefault(iNode) ?? -1;
+
+        /// <summary>
+        /// Searches for the parent animation.
+        /// </summary>
+        /// <param name="animationId">For stf files it is the node id, for gltf files it is the animation id.</param>
+        /// <returns>The parent animation id.</returns>
+        public virtual int GetAnimationParent(int animationId) => GetParentMatrix(animationId);
+
+        /// <summary>
+        /// Tells whether the animation is an internal sequence defined within the shape, or is just a tag that needs external animation.
+        /// </summary>
+        /// <param name="animationId">For stf files it is the node id, for gltf files it is the animation id.</param>
+        /// <returns>true if there is no internal seqence defined in the shape.</returns>
+        public virtual bool IsAnimationArticulation(int animationId) =>
+            !(Animations?.FirstOrDefault()?.anim_nodes is anim_nodes a && a.Count > animationId && a.ElementAtOrDefault(animationId)?.controllers is controllers c && c.Count > 0);
+
+        /// <summary>
+        /// Returns the parent animation id.
+        /// </summary>
+        /// <param name="animationId">For stf files it is the node id, for gltf files it is the animation id.</param>
+        /// <returns>Returns for stf files the node id itself, for gltf files the target node id of the animation.</returns>
+        public virtual int GetAnimationTargetNode(int animationId) => animationId;
+
+        public virtual int GetAnimationNamesCount() => LodControls?.FirstOrDefault()?.DistanceLevels?.FirstOrDefault()?.SubObjects?.FirstOrDefault().ShapePrimitives?.FirstOrDefault()?.Hierarchy?.Length ?? 0;
 
         [CallOnThread("Loader")]
         internal void Mark()
