@@ -1125,13 +1125,13 @@ namespace Orts.Viewer3D
             SceneryShader.NumLights = NumLights;
             if (NumLights > 0)
             {
-                SceneryShader.LightTypes = LightTypes.ToArray();
-                SceneryShader.LightPositions = LightPositions.ToArray();
-                SceneryShader.LightDirections = LightDirections.ToArray();
-                SceneryShader.LightColorIntensities = LightColorIntensities.ToArray();
-                SceneryShader.LightRangesRcp = LightRangesRcp.ToArray();
-                SceneryShader.LightInnerConeCos = LightInnerConeCos.ToArray();
-                SceneryShader.LightOuterConeCos = LightOuterConeCos.ToArray();
+                SceneryShader.LightTypes = LightTypes.Take(NumLights).ToArray();
+                SceneryShader.LightPositions = LightPositions.Take(NumLights).ToArray();
+                SceneryShader.LightDirections = LightDirections.Take(NumLights).ToArray();
+                SceneryShader.LightColorIntensities = LightColorIntensities.Take(NumLights).ToArray();
+                SceneryShader.LightRangesRcp = LightRangesRcp.Take(NumLights).ToArray();
+                SceneryShader.LightInnerConeCos = LightInnerConeCos.Take(NumLights).ToArray();
+                SceneryShader.LightOuterConeCos = LightOuterConeCos.Take(NumLights).ToArray();
             }
         }
 
