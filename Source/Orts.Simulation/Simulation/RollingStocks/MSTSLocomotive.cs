@@ -591,6 +591,7 @@ namespace Orts.Simulation.RollingStocks
                 CabView3D = BuildCab3DView();
                 if (CabViewList.Count == 0 & CabView3D == null)
                     Trace.TraceWarning("{0} locomotive's CabView references non-existent {1}", wagFilePath, CVFFileName);
+                SortCabViewList();
             }
 
             DrvWheelWeightKg = InitialDrvWheelWeightKg;
@@ -609,6 +610,58 @@ namespace Orts.Simulation.RollingStocks
             IsDriveable = true;
 
             MoveParamsToAxle();
+        }
+
+        //
+        // The CabViewList discrete controls are sorted by area size.
+        // That will make sure larger areas do not overlap the smaller ones.
+        // 
+        private void SortCabViewList()
+        {
+            // Loop through each cab view (mostly front and back cabin)
+            for (int cabIndex = 0; cabIndex < CabViewList.Count; cabIndex++)
+            {
+                // Get list of discrete controls with mouse control
+                List<CVCDiscrete> cvcDiscreteList = new List<CVCDiscrete>();
+
+                for (int cabViewIndex = 0; cabViewIndex < CabViewList[cabIndex].CVFFile.CabViewControls.Count; cabViewIndex++)
+                {
+                    var cvc = CabViewList[cabIndex].CVFFile.CabViewControls[cabViewIndex];
+                    if (cvc is CVCDiscrete cvcDiscrete)
+                    {
+                        if (cvcDiscrete.MouseControl)
+                        {
+                            cvcDiscreteList.Add(cvcDiscrete);
+                        }
+                    }
+                }
+
+                // Loop through CabViewList list and replace discrete items with mouse control with the item with the smallest area.
+                // As the smallest is removed from the list the next smallest will be used for the next discrete control.
+                for (int cabViewIndex = 0; cabViewIndex < CabViewList[cabIndex].CVFFile.CabViewControls.Count; cabViewIndex++)
+                {
+                    var cvc = CabViewList[cabIndex].CVFFile.CabViewControls[cabViewIndex];
+                    if (cvc is CVCDiscrete cvcDiscrete)
+                    {
+                        if (cvcDiscrete.MouseControl)
+                        {
+                            double smallestSize = double.MaxValue;
+                            CVCDiscrete cvcDiscreteSmallest = null;
+                            foreach (CVCDiscrete cvcDiscreteListItem in cvcDiscreteList)
+                            {
+                                double size = cvcDiscreteListItem.Height * cvcDiscreteListItem.Width;
+                                if (size < smallestSize)
+                                {
+                                    cvcDiscreteSmallest = cvcDiscreteListItem;
+                                    smallestSize = size;
+                                }
+                            }
+                            CabViewList[cabIndex].CVFFile.CabViewControls[cabViewIndex] = cvcDiscreteSmallest;
+                            cvcDiscreteList.Remove(cvcDiscreteSmallest);
+                        }
+                    }
+                }
+            }
         }
 
         protected void CheckCoherence()
