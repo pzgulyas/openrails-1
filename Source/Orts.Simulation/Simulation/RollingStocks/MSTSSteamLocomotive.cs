@@ -1559,9 +1559,10 @@ public readonly SmoothedData StackSteamVelocityMpS = new SmoothedData(2);
             if (ZeroError(BoilerVolumeFT3, "BoilerVolume"))
                 BoilerVolumeFT3 = 1;
 
-            // Only set counter pressure braking fitted to the steam engine if it is specified in the ENG file and there is at
-            // least one steam engine block.  Otherwise, leave it as false (not fitted) which is the default value.
-            if (CounterPressureBrakingFitted && SteamEngines.Count < 1)
+            // Only set counter pressure braking fitted to the steam engine if it is specified in the ENG file and there is 
+            // only one steam engine block.  Otherwise, leave it as false (not fitted) which is the default value. 
+            // For multiple steam engines the counter pressure braking should be set in each engine code block
+            if (CounterPressureBrakingFitted && SteamEngines.Count <= 1)
             {
                 SteamEngines[0].CounterPressureBrakingFitted = true;
             }
