@@ -117,12 +117,13 @@ namespace Orts.Viewer3D
         readonly EffectParameter clearcoatNormalTexture;
         readonly EffectParameter clearcoatNormalScale;
         readonly EffectParameter referenceAlpha;
-        readonly EffectParameter bones;
         readonly EffectParameter textureCoordinates1;
         readonly EffectParameter textureCoordinates2;
         readonly EffectParameter texturePacking;
         readonly EffectParameter hasNormals;
         readonly EffectParameter hasTangents;
+        readonly EffectParameter bonesTexture;
+        readonly EffectParameter bonesCount;
         readonly EffectParameter morphConfig;
         readonly EffectParameter morphWeights;
         // Per-frame PBR uniforms:
@@ -294,8 +295,6 @@ namespace Orts.Viewer3D
 
         public Texture2D BrdfLutTexture { set { brdfLutTexture.SetValue(value); } }
 
-        public Matrix[] Bones { set { bones.SetValue(value); } }
-        
         public Vector4 TextureCoordinates1 { set { textureCoordinates1.SetValue(value); } }
         
         public Vector4 TextureCoordinates2 { set { textureCoordinates2.SetValue(value); } }
@@ -305,6 +304,10 @@ namespace Orts.Viewer3D
         public bool HasNormals { set { hasNormals.SetValue(value); } }
 
         public bool HasTangents { set { hasTangents.SetValue(value); } }
+
+        public Texture2D BonesTexture { set { bonesTexture.SetValue(value); } }
+
+        public float BonesCount { set { bonesCount.SetValue(value); } }
 
         public int[] MorphConfig { set { morphConfig.SetValue(value); } }
         
@@ -363,12 +366,13 @@ namespace Orts.Viewer3D
             clearcoatFactor = Parameters["ClearcoatFactor"];
             clearcoatRoughnessFactor = Parameters["ClearcoatRoughnessFactor"];
             clearcoatNormalScale = Parameters["ClearcoatNormalScale"];
-            bones = Parameters["Bones"];
             textureCoordinates1 = Parameters["TextureCoordinates1"];
             textureCoordinates2 = Parameters["TextureCoordinates2"];
             texturePacking = Parameters["TexturePacking"];
             hasNormals = Parameters["HasNormals"];
             hasTangents = Parameters["HasTangents"];
+            bonesTexture = Parameters["BonesTexture"];
+            bonesCount = Parameters["BonesCount"];
             morphConfig = Parameters["MorphConfig"];
             morphWeights = Parameters["MorphWeights"];
             environmentMapSpecularTexture = Parameters["EnvironmentMapSpecularTexture"];
@@ -392,7 +396,8 @@ namespace Orts.Viewer3D
         readonly EffectParameter sideVector;
         readonly EffectParameter imageBlurStep;
         readonly EffectParameter imageTexture;
-        readonly EffectParameter bones;
+        readonly EffectParameter bonesTexture;
+        readonly EffectParameter bonesCount;
         readonly EffectParameter morphConfig;
         readonly EffectParameter morphWeights;
 
@@ -419,7 +424,8 @@ namespace Orts.Viewer3D
             imageBlurStep.SetValue(texture != null ? 1f / texture.Width : 0);
         }
 
-        public Matrix[] Bones { set { bones.SetValue(value); } }
+        public Texture2D BonesTexture { set { bonesTexture.SetValue(value); } }
+        public float BonesCount { set { bonesCount.SetValue(value); } }
         public int[] MorphConfig { set { morphConfig.SetValue(value); } }
         public float[] MorphWeights { set { morphWeights.SetValue(value); } }
 
@@ -430,7 +436,8 @@ namespace Orts.Viewer3D
             sideVector = Parameters["SideVector"];
             imageBlurStep = Parameters["ImageBlurStep"];
             imageTexture = Parameters["ImageTexture"];
-            bones = Parameters["Bones"];
+            bonesTexture = Parameters["BonesTexture"];
+            bonesCount = Parameters["BonesCount"];
             morphConfig = Parameters["MorphConfig"];
             morphWeights = Parameters["MorphWeights"];
         }

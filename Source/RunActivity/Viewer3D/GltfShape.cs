@@ -1288,6 +1288,7 @@ namespace Orts.Viewer3D
                 var clearcoatFactor = clearcoat?.ClearcoatFactor ?? 0;
                 var clearcoatRoughnessFactor = clearcoat?.ClearcoatRoughnessFactor ?? 0;
                 var clearcoatNormalScale = flipNormals * (clearcoat?.ClearcoatNormalTexture?.Scale ?? 2f); // 2 indicates the textureInfo is missing, otherwise it gets the default 1
+                var bonesCount = skin?.Joints?.Length ?? 0;
 
                 switch (baseColorSamplerState.Item2)
                 {
@@ -1488,7 +1489,7 @@ namespace Orts.Viewer3D
                     clearcoatTexture, clearcoatFactor,
                     clearcoatRoughnessTexture, clearcoatRoughnessFactor,
                     clearcoatNormalTexture, clearcoatNormalScale,
-                    referenceAlpha, doubleSided,
+                    referenceAlpha, doubleSided, bonesCount,
                     baseColorSamplerState,
                     metallicRoughnessSamplerState,
                     normalSamplerState,
@@ -1591,8 +1592,8 @@ namespace Orts.Viewer3D
                 {
                     // Skinned model
                     Joints = skin.Joints;
-                    RenderBonesCurrent = Enumerable.Repeat(Matrix.Identity, Math.Min(RenderProcess.MAX_BONES, Joints.Length)).ToArray();
-                    RenderBonesNext = Enumerable.Repeat(Matrix.Identity, Math.Min(RenderProcess.MAX_BONES, Joints.Length)).ToArray();
+                    RenderBonesCurrent = Enumerable.Repeat(Matrix.Identity, Joints.Length).ToArray();
+                    RenderBonesNext = Enumerable.Repeat(Matrix.Identity, Joints.Length).ToArray();
 
                     if (!distanceLevel.InverseBindMatrices.TryGetValue((int)skin.InverseBindMatrices, out InverseBindMatrices))
                     {

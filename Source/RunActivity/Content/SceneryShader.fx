@@ -53,15 +53,14 @@ texture  ImageTexture; // .s: linear RGBA, glTF (PBR): 8 bit sRGB + linear A
 texture  OverlayTexture;
 float	 OverlayScale;
 
+texture  BonesTexture; // 4 channels of 32 bit float, containing the 4x4 matrix palette for skinned models
+float    BonesCount;
+
 // Keep these in sync with the values defined in RenderProcess.cs
-// MAX_LIGHTS must not be less than 2
-// MAX_BONES must not be less than 1
-#define MAX_LIGHTS 20
-#define MAX_BONES 128
+#define MAX_LIGHTS 20 // must not be less than 2
 #define CLEARCOAT
 #define MAX_MORPH_TARGETS 8
 
-float4x4 Bones[MAX_BONES]; // model -> world [max number of bones]
 float4   BaseColorFactor; // glTF linear color multiplier
 texture  NormalTexture; // linear RGB
 float    NormalScale;
@@ -210,6 +209,17 @@ sampler BrdfLut = sampler_state
 	MagFilter = Linear;
 	MinFilter = Linear;
 	MipFilter = Linear;
+    AddressU = Clamp;
+    AddressV = Clamp;
+    AddressW = Clamp;
+};
+
+sampler BoneSampler = sampler_state
+{
+    Texture = (BonesTexture);
+    MagFilter = Point; // No interpolation between bone matrices, otherwise the skinning will be wrong.
+    MinFilter = Point;
+    MipFilter = Point;
     AddressU = Clamp;
     AddressV = Clamp;
     AddressW = Clamp;
@@ -396,15 +406,27 @@ void _VSLightsAndShadows(in float4 InPosition, in float4x4 WorldTransform, in fl
 	shadow = mul(InPosition, WorldTransform);
 }
 
-float4x4 _VSSkinTransform(in float4 Joints, in float4 Weights)
+float4x4 GetBoneMatrix(min16uint index)
+{
+    float v = (index + 0.5) / BonesCount;
+
+    float4 row1 = tex2Dlod(BoneSampler, float4(0.125, v, 0, 0)); // 0.5 / 4
+    float4 row2 = tex2Dlod(BoneSampler, float4(0.375, v, 0, 0)); // 1.5 / 4
+    float4 row3 = tex2Dlod(BoneSampler, float4(0.625, v, 0, 0)); // 2.5 / 4
+    float4 row4 = tex2Dlod(BoneSampler, float4(0.875, v, 0, 0)); // 3.5 / 4
+
+    return float4x4(row1, row2, row3, row4);
+}
+
+float4x4 _VSSkinTransform(in min16uint4 Joints, in float4 Weights)
 {
 	float4x4 skinTransform = 0;
 
-	skinTransform += Bones[Joints.x] * Weights.x;
-	skinTransform += Bones[Joints.y] * Weights.y;
-	skinTransform += Bones[Joints.z] * Weights.z;
-	skinTransform += Bones[Joints.w] * Weights.w;
-    
+    skinTransform += GetBoneMatrix(Joints.x) * (float)Weights.x;
+    skinTransform += GetBoneMatrix(Joints.y) * (float)Weights.y;
+    skinTransform += GetBoneMatrix(Joints.z) * (float)Weights.z;
+    skinTransform += GetBoneMatrix(Joints.w) * (float)Weights.w;
+
     return skinTransform;
 }
 
