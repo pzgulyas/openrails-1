@@ -1288,7 +1288,6 @@ namespace Orts.Viewer3D
                 var clearcoatFactor = clearcoat?.ClearcoatFactor ?? 0;
                 var clearcoatRoughnessFactor = clearcoat?.ClearcoatRoughnessFactor ?? 0;
                 var clearcoatNormalScale = flipNormals * (clearcoat?.ClearcoatNormalTexture?.Scale ?? 2f); // 2 indicates the textureInfo is missing, otherwise it gets the default 1
-                var bonesCount = skin?.Joints?.Length ?? 0;
 
                 switch (baseColorSamplerState.Item2)
                 {
@@ -1489,7 +1488,7 @@ namespace Orts.Viewer3D
                     clearcoatTexture, clearcoatFactor,
                     clearcoatRoughnessTexture, clearcoatRoughnessFactor,
                     clearcoatNormalTexture, clearcoatNormalScale,
-                    referenceAlpha, doubleSided, bonesCount,
+                    referenceAlpha, doubleSided,
                     baseColorSamplerState,
                     metallicRoughnessSamplerState,
                     normalSamplerState,
@@ -1523,6 +1522,12 @@ namespace Orts.Viewer3D
             /// </summary>
             public Matrix[] RenderBonesCurrent;
             public Matrix[] RenderBonesNext;
+
+            /// <summary>
+            /// When the primitive has a skin, this texture is used to upload the current bones matrices to GPU.
+            /// Each row of the texture contains one bone matrix in 4 RGBA32F pixels.
+            /// </summary>
+            public readonly Texture2D BonesTexture;
             
             /// <summary>
             /// Indicates what position in the target a specific vertex attribute is located at. Element [6] is set to 1 if the primitive has a skin.
@@ -1594,6 +1599,7 @@ namespace Orts.Viewer3D
                     Joints = skin.Joints;
                     RenderBonesCurrent = Enumerable.Repeat(Matrix.Identity, Joints.Length).ToArray();
                     RenderBonesNext = Enumerable.Repeat(Matrix.Identity, Joints.Length).ToArray();
+                    BonesTexture = Joints.Length > 0 ? new Texture2D(material.Viewer.GraphicsDevice, 4, Joints.Length, false, SurfaceFormat.Vector4) : null;
 
                     if (!distanceLevel.InverseBindMatrices.TryGetValue((int)skin.InverseBindMatrices, out InverseBindMatrices))
                     {

@@ -426,7 +426,7 @@ namespace Orts.Viewer3D
             Texture2D clearcoatTexture, float clearcoatFactor,
             Texture2D clearcoatRoughnessTexture, float clearcoatRoughnessFactor,
             Texture2D clearcoatNormalTexture, float clearcoatNormalScale,
-            float referenceAlpha, bool doubleSided, int bonesCount,
+            float referenceAlpha, bool doubleSided,
             (TextureFilter, TextureAddressMode, TextureAddressMode) samplerStateBaseColor,
             (TextureFilter, TextureAddressMode, TextureAddressMode) samplerStateMetallicRoughness,
             (TextureFilter, TextureAddressMode, TextureAddressMode) samplerStateNormal,
@@ -452,7 +452,7 @@ namespace Orts.Viewer3D
                             clearcoatTexture, clearcoatFactor,
                             clearcoatRoughnessTexture, clearcoatRoughnessFactor,
                             clearcoatNormalTexture, clearcoatNormalScale,
-                            referenceAlpha, doubleSided, bonesCount,
+                            referenceAlpha, doubleSided,
                             samplerStateBaseColor,
                             samplerStateMetallicRoughness,
                             samplerStateNormal,
@@ -1089,9 +1089,6 @@ namespace Orts.Viewer3D
         protected readonly Texture2D ClearcoatRoughnessTexture;
         protected readonly Texture2D ClearcoatNormalTexture;
 
-        public readonly Texture2D BonesTexture;
-        public readonly int BonesCount;
-
         // Animatable attributes
         protected Vector4 BaseColorFactor;
         protected float MetallicFactor;
@@ -1138,7 +1135,7 @@ namespace Orts.Viewer3D
             Texture2D clearcoatTexture, float clearcoatFactor,
             Texture2D clearcoatRoughnessTexture, float clearcoatRoughnessFactor,
             Texture2D clearcoatNormalTexture, float clearcoatNormalScale,
-            float referenceAlpha, bool doubleSided, int bonesCount,
+            float referenceAlpha, bool doubleSided,
             (TextureFilter, TextureAddressMode, TextureAddressMode) samplerStateBaseColor,
             (TextureFilter, TextureAddressMode, TextureAddressMode) samplerStateMetallicRoughness,
             (TextureFilter, TextureAddressMode, TextureAddressMode) samplerStateNormal,
@@ -1169,8 +1166,6 @@ namespace Orts.Viewer3D
 
             DefaultAlphaCutOff = (int)(referenceAlpha * 255f);
             DoubleSided = doubleSided;
-            BonesCount = bonesCount;
-            BonesTexture = bonesCount > 0 ? new Texture2D(viewer.RenderProcess.GraphicsDevice, 4, bonesCount, false, SurfaceFormat.Vector4) : null;
 
             samplerStateBaseColor.Item1 = ChangeToAnisitropic(samplerStateBaseColor.Item1);
 
@@ -1227,8 +1222,6 @@ namespace Orts.Viewer3D
             shader.HasNormals = (Options & SceneryMaterialOptions.PbrHasNormals) != 0;
             shader.HasTangents = (Options & SceneryMaterialOptions.PbrHasTangents) != 0;
             shader.ClearcoatFactor = ClearcoatFactor;
-            shader.BonesTexture = BonesTexture;
-            shader.BonesCount = BonesCount;
             if (ClearcoatFactor > 0 && RenderProcess.CLEARCOAT)
             {
                 shader.ClearcoatTexture = ClearcoatTexture;
@@ -1271,12 +1264,16 @@ namespace Orts.Viewer3D
                         shader.TextureCoordinates2 = gltfPrimitive.TexCoords2;
                         shader.TexturePacking = gltfPrimitive.TexturePacking;
 
+                        if (gltfPrimitive.BonesTexture != null)
+                        {
+                            gltfPrimitive.BonesTexture?.SetData(MemoryMarshal.Cast<Matrix, Vector4>(gltfPrimitive.RenderBonesCurrent).ToArray());
+                            shader.BonesTexture = gltfPrimitive.BonesTexture;
+                            shader.BonesCount = gltfPrimitive.Joints.Length;
+                        }
+
                         if (gltfPrimitive.HasMorphTargets())
                             (shader.MorphConfig, shader.MorphWeights) = gltfPrimitive.GetMorphingData();
                     }
-
-                    if (item.ItemData is Matrix[] bones)
-                        BonesTexture.SetData(MemoryMarshal.Cast<Matrix, Vector4>(bones).ToArray());
 
                     ShaderPasses.Current.Apply();
 
@@ -1384,14 +1381,16 @@ namespace Orts.Viewer3D
 
                     if (item.RenderPrimitive is GltfShape.GltfPrimitive gltfPrimitive)
                     {
+                        if (gltfPrimitive.BonesTexture != null)
+                        {
+                            shader.BonesTexture = gltfPrimitive.BonesTexture;
+                            shader.BonesCount = gltfPrimitive.Joints.Length;
+                        }
+
                         if (gltfPrimitive.HasMorphTargets())
                             (shader.MorphConfig, shader.MorphWeights) = gltfPrimitive.GetMorphingData();
                     }
-                    if (item.Material is PbrMaterial pbrMaterial)
-                    {
-                        shader.BonesTexture = pbrMaterial.BonesTexture;
-                        shader.BonesCount = pbrMaterial.BonesCount;
-                    }
+
                     ShaderPasses.Current.Apply();
                     // SamplerStates can only be set after the ShaderPasses.Current.Apply().
                     graphicsDevice.SamplerStates[0] = item.Material.GetShadowTextureAddressMode();
