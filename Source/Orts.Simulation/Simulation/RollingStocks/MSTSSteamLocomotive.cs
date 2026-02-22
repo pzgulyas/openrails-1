@@ -69,6 +69,7 @@
 using System;
 using System.Diagnostics;
 using System.IO;
+using System.Security.Cryptography;
 using System.Text;
 using Microsoft.Xna.Framework;
 using Orts.Common;
@@ -870,8 +871,6 @@ public readonly SmoothedData StackSteamVelocityMpS = new SmoothedData(2);
         public float CounterPressureBrake2SteamVelocityMpS;
         public float CounterPressureBrake2SteamVolumeM3pS;
         public float CounterPressureBrake2ParticleDurationS;
-
-        public bool CounterPressureBrakeOn = false;
 
         float SteamExhaustDebugTimerS;
 
@@ -3973,7 +3972,7 @@ public readonly SmoothedData StackSteamVelocityMpS = new SmoothedData(2);
             CylinderSteamExhaustParticleDurationS = 1.0f;
 
             float WatertoSteamVolumeLbstoM3 = 0.759f; // 1lb of water = 0.759M of water @ 100 degC
-            // Amount of water used has to be divieded between steam cylinders, and converted to steam volume
+            // Amount of water used has to be divided between steam cylinders, and converted to steam volume
             float CounterPressureBrakeWaterSteamExhaustM3pS = (CounterPressureBrakeWaterUsedLBpS / 2) * WatertoSteamVolumeLbstoM3;
             var CPFudgeFactor = 15.0f; // Purely a factor to make the steam visible in the Sim
 
@@ -6743,6 +6742,7 @@ public readonly SmoothedData StackSteamVelocityMpS = new SmoothedData(2);
 
                 CounterPressureBrakeWaterUsedLBpS = EquivalentHeatBTU / 881.36f; // BTU required to convert 1lb of water @ BP = 881.36 BTU - To do add heat table?
                  ActualCounterPressureBrakeWaterUsedLB = (float)CounterPressureBrakeWaterUsedLBpS * elapsedClockSeconds;
+                               
             }
             else
             {
