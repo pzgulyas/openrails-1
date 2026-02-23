@@ -25,6 +25,7 @@ using Microsoft.Xna.Framework.Content.Pipeline;
 using Microsoft.Xna.Framework.Graphics;
 using ORTS.Common;
 using Orts.Viewer3D.Processes;
+using System.Linq;
 
 namespace Orts.Viewer3D
 {
@@ -96,6 +97,7 @@ namespace Orts.Viewer3D
         readonly EffectParameter signalLightIntensity;
         readonly EffectParameter eyeVector;
         readonly EffectParameter sideVector;
+        readonly EffectParameter lightDirection0;
 
         readonly EffectParameter imageTexture;
         readonly EffectParameter overlayTexture;
@@ -161,33 +163,33 @@ namespace Orts.Viewer3D
             ClearcoatNormal,
         }
 
-        public void SetViewMatrix(ref Matrix v)
+        public void SetMatrix(Matrix w)
         {
+            world.SetValue(w);
+        }
+
+        public void SetPerFrame(ref Matrix v, ref Matrix p)
+        {
+            view.SetValue(v);
+            projection.SetValue(p);
+
             _eyeVector = Vector3.Normalize(new Vector3(v.M13, v.M23, v.M33));
 
             eyeVector.SetValue(new Vector4(_eyeVector, Vector3.Dot(_eyeVector, _sunDirection) * 0.5f + 0.5f));
             sideVector.SetValue(Vector3.Normalize(Vector3.Cross(_eyeVector, Vector3.Down)));
-        }
-
-        public void SetMatrix(Matrix w, ref Matrix v, ref Matrix p)
-        {
-            world.SetValue(w);
-            view.SetValue(v);
-            projection.SetValue(p);
 
             int vIn = Program.Simulator.Settings.DayAmbientLight;
             
             float FullBrightness = (float)vIn / 20.0f ;
             //const float HalfShadowBrightness = 0.75;
             const float HalfNightBrightness = 0.6f;
-            const float ShadowBrightness = 0.5f;
+            //const float ShadowBrightness = 0.5f;
             const float NightBrightness = 0.2f;
 
             if (_imageTextureIsNight)
             {
                 nightColorModifier.SetValue(FullBrightness);
                 halfNightColorModifier.SetValue(FullBrightness);
-                vegetationAmbientModifier.SetValue(FullBrightness);
             }
             else
             {
@@ -200,8 +202,19 @@ namespace Orts.Viewer3D
 
                 nightColorModifier.SetValue(MathHelper.Lerp(NightBrightness, FullBrightness, nightEffect));
                 halfNightColorModifier.SetValue(MathHelper.Lerp(HalfNightBrightness, FullBrightness, nightEffect));
-                vegetationAmbientModifier.SetValue(MathHelper.Lerp(ShadowBrightness, FullBrightness, _zBias_Lighting.Y));
             }
+        }
+
+        public void SetVegetationMaterial()
+        {
+            int vIn = Program.Simulator.Settings.DayAmbientLight;
+
+            float FullBrightness = (float)vIn / 20.0f ;
+            const float ShadowBrightness = 0.5f;
+
+            vegetationAmbientModifier.SetValue(_imageTextureIsNight
+                ? FullBrightness
+                : MathHelper.Lerp(ShadowBrightness, FullBrightness, _zBias_Lighting.Y));
         }
 
         public void SetShadowMap(Matrix[] shadowProjections, Texture2D[] textures, float[] limits)
@@ -313,9 +326,9 @@ namespace Orts.Viewer3D
         
         public float[] MorphWeights { set { morphWeights.SetValue(value); } }
 
-        public int NumLights { set { numLights.SetValue(value); } }
+        public float NumLights { set { numLights.SetValue(value); } }
         public Vector3[] LightPositions { set { lightPositions.SetValue(value); } }
-        public Vector3[] LightDirections { set { lightDirections.SetValue(value); } }
+        public Vector3[] LightDirections { set { lightDirections.SetValue(value); lightDirection0.SetValue(value.FirstOrDefault()); } }
         public Vector3[] LightColorIntensities { set { lightColorIntensities.SetValue(value); } }
         public float[] LightRangesRcp { set { lightRangesRcp.SetValue(value); } }
         public float[] LightInnerConeCos { set { lightInnerConeCos.SetValue(value); } }
@@ -348,6 +361,7 @@ namespace Orts.Viewer3D
             signalLightIntensity = Parameters["SignalLightIntensity"];
             eyeVector = Parameters["EyeVector"];
             sideVector = Parameters["SideVector"];
+            lightDirection0 = Parameters["LightDirection0"];
             imageTexture = Parameters["ImageTexture"];
             overlayTexture = Parameters["OverlayTexture"];
             emissiveTexture = Parameters["EmissiveTexture"];

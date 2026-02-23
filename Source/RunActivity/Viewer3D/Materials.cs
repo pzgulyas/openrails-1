@@ -983,7 +983,7 @@ namespace Orts.Viewer3D
             {
                 foreach (var item in renderItems)
                 {
-                    shader.SetMatrix(item.XNAMatrix, ref XNAViewMatrix, ref XNAProjectionMatrix);
+                    shader.SetMatrix(item.XNAMatrix);
                     shader.ZBias = item.RenderPrimitive.ZBias;
                     ShaderPasses.Current.Apply();
 
@@ -1255,7 +1255,7 @@ namespace Orts.Viewer3D
             {
                 foreach (var item in renderItems)
                 {
-                    shader.SetMatrix(item.XNAMatrix, ref XNAViewMatrix, ref XNAProjectionMatrix);
+                    shader.SetMatrix(item.XNAMatrix);
                     shader.ZBias = item.RenderPrimitive.ZBias;
 
                     if (item.RenderPrimitive is GltfShape.GltfPrimitive gltfPrimitive)
@@ -1264,12 +1264,9 @@ namespace Orts.Viewer3D
                         shader.TextureCoordinates2 = gltfPrimitive.TexCoords2;
                         shader.TexturePacking = gltfPrimitive.TexturePacking;
 
-                        if (gltfPrimitive.BonesTexture != null)
-                        {
                             gltfPrimitive.BonesTexture?.SetData(MemoryMarshal.Cast<Matrix, Vector4>(gltfPrimitive.RenderBonesRendered).ToArray());
-                            shader.BonesTexture = gltfPrimitive.BonesTexture;
-                            shader.BonesCount = gltfPrimitive.Joints.Length;
-                        }
+                        shader.BonesTexture = gltfPrimitive.BonesTexture;
+                        shader.BonesCount = gltfPrimitive.BonesTexture == null ? 0 : gltfPrimitive.Joints.Length;
 
                         if (gltfPrimitive.HasMorphTargets())
                             (shader.MorphConfig, shader.MorphWeights) = gltfPrimitive.GetMorphingData();

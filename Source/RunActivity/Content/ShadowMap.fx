@@ -29,7 +29,7 @@ float4x4 WorldViewProjection;  // model -> world -> view -> projection
 float3   SideVector;
 float    ImageBlurStep;  // = 1 / shadow map texture width and height
 texture  ImageTexture;
-int      MorphConfig[9]; // 0-5: position of POSITION, NORMAL, TANGENT, TEXCOORD_0, TEXCOORD_1, COLOR_0 data within MorphTargets, respectively. 6: if the model has skin, set to 1. All: set to -1 if not available. 7: targets count. 8: attributes count.
+int      MorphConfig[8]; // 0-5: position of POSITION, NORMAL, TANGENT, TEXCOORD_0, TEXCOORD_1, COLOR_0 data within MorphTargets, respectively. All: set to -1 if not available. 6: targets count. 7: attributes count.
 float    MorphWeights[MAX_MORPH_TARGETS]; // the actual morphing animation state
 
 texture  BonesTexture;
@@ -270,18 +270,18 @@ VERTEX_OUTPUT VSShadowMapMorphed(in VERTEX_INPUT_MORPHED In)
 {
 	VERTEX_OUTPUT Out = (VERTEX_OUTPUT)0;
 
-    float4x4 skinTransform = MorphConfig[6] == 1 ? _VSSkinTransform(In.Joints, In.Weights) : Identity;
+    float4x4 skinTransform = BonesCount > 0 ? _VSSkinTransform(In.Joints, In.Weights) : Identity;
 
     Out.Position = In.Position;
     Out.TexCoord_Depth.xy = In.TexCoords;
     
     [unroll(MAX_MORPH_TARGETS)]
-    for (int i = 0; i < MorphConfig[7]; i++)
+    for (int i = 0; i < MorphConfig[6]; i++)
     {
         if (MorphConfig[0] != -1)
-            Out.Position.xyz += In.MorphTargets[MorphConfig[8] * i + MorphConfig[0]].xyz * MorphWeights[i];
+            Out.Position.xyz += In.MorphTargets[MorphConfig[7] * i + MorphConfig[0]].xyz * MorphWeights[i];
         if (MorphConfig[3] != -1)
-            Out.TexCoord_Depth.xy += In.MorphTargets[MorphConfig[8] * i + MorphConfig[3]].xy * MorphWeights[i];
+            Out.TexCoord_Depth.xy += In.MorphTargets[MorphConfig[7] * i + MorphConfig[3]].xy * MorphWeights[i];
     }
 
     Out.Position = mul(Out.Position, skinTransform);
