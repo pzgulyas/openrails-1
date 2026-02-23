@@ -260,6 +260,7 @@ namespace Orts.Simulation.RollingStocks
         float CounterPressureMEP;
         public float CounterPressureBrakeWaterUsedLBpS; // Water used per second
         float ActualCounterPressureBrakeWaterUsedLB; // Actual water used by Counter pressure brake
+        Interpolator CounterPressureMEPDropRatioRpMtoX;
 
         /// <summary>
         /// Grate limit of locomotive exceedeed?
@@ -1595,6 +1596,8 @@ public readonly SmoothedData StackSteamVelocityMpS = new SmoothedData(2);
 
             CutoffInitialPressureDropRatioUpper = SteamTable.CutoffInitialPressureUpper();
             CutoffInitialPressureDropRatioLower = SteamTable.CutoffInitialPressureLower();
+
+            CounterPressureMEPDropRatioRpMtoX = SteamTable.CounterPressureMEPDropRatioInterpolatorRpMtoX();
 
             // Type of fuel selected
             if (SteamLocomotiveFuelType == SteamLocomotiveFuelTypes.Unknown)
@@ -6697,8 +6700,6 @@ public readonly SmoothedData StackSteamVelocityMpS = new SmoothedData(2);
                 float CylinderVolumePoint_compression = (currentDynamicBrakeFraction * absCutoff * Me.ToIn(SteamEngines[numberofengine].CylindersStrokeM)) + CylinderClearancePC;
                 float CylinderVolumePoint_release = (Me.ToIn(SteamEngines[numberofengine].CylindersStrokeM) + 2 * CylinderClearancePC) - CylinderVolumePoint_compression;
 
-                //                Trace.TraceInformation("Vol-release {0} Vol-compression {1} Stroke {2}", CylinderVolumePoint_release, CylinderVolumePoint_compression, Me.ToIn(SteamEngines[numberofengine].CylindersStrokeM));
-
                 // Ratio of compression = stroke during compression = stroke @ start of compression / stroke and end of compression
                 float CylinderRatio_compression = CylinderVolumePoint_compression / CylinderClearancePC;
                 float CylinderRatio_release = CylinderVolumePoint_compression / (Me.ToIn(SteamEngines[numberofengine].CylindersStrokeM) + 2 * CylinderClearancePC);
@@ -6707,12 +6708,8 @@ public readonly SmoothedData StackSteamVelocityMpS = new SmoothedData(2);
                 float CompMeanPressure_compressionAtmPSI = OneAtmospherePSI * CylinderRatio_compression * (2.0f * (float)Math.Log(CylinderRatio_compression, 10) / (CylinderRatio_compression - 1.0f));
                 float CompMeanPressure_releaseAtmPSI = CompMeanPressure_compressionAtmPSI * CylinderRatio_release * (2.0f * (float)Math.Log(CylinderRatio_release) / (CylinderRatio_release - 1.0f));
 
-                //                Trace.TraceInformation("MEPcomp {0} Log {1} CompRatio {2}", CompMeanPressure_compressionAtmPSI, (float)Math.Log(CylinderRatio_compression), CylinderRatio_compression);
-
                 float CylinderWork_compression_InLbs = CompMeanPressure_compressionAtmPSI * CylinderVolumePoint_compression;
                 float CylinderWork_release_InLbs = CompMeanPressure_releaseAtmPSI * CylinderVolumePoint_release;
-
-                //                Trace.TraceInformation("Workc {0} Workr {1} Pc {2} Pr {3}", CylinderWork_compression_InLbs, CylinderWork_release_InLbs, CompMeanPressure_compressionAtmPSI, CompMeanPressure_releaseAtmPSI);
 
                 float TotalWorkCounterPressure = CylinderWork_compression_InLbs + CylinderWork_release_InLbs;
 
@@ -6721,16 +6718,16 @@ public readonly SmoothedData StackSteamVelocityMpS = new SmoothedData(2);
                 // Assume no impact of "return" stroke as air is being drawn into cylinder
                 float CounterBalanceWheelDiamM = 2 * SteamEngines[numberofengine].AttachedAxle.WheelRadiusM;
 
-                float CounterPressureReductionFactor = 0.62f; // To allow for losses due to flow and other factors - to be refined.
+                float CounterPressureReductionFactor = 0.65f; // To allow for losses due to flow and other factors - to be refined.
                                                               // Described in Koffman paper adjusted to approximate Fig 18. 
 
                 // Calculate tractive retarding force
                 SteamEngines[numberofengine].CylinderCounterPressureBrakeForceN = N.FromLbf(SteamEngines[numberofengine].CounterPressureMEP * Me.ToIn(SteamEngines[numberofengine].CylindersDiameterM) * Me.ToIn(SteamEngines[numberofengine].CylindersDiameterM) * Me.ToIn(SteamEngines[numberofengine].CylindersStrokeM) / Me.ToIn(CounterBalanceWheelDiamM));
 
-                // Adjust Brake Force to take into account losses due to flow and other factors, and the use of the number of cylinders
-                SteamEngines[numberofengine].CylinderCounterPressureBrakeForceN *= CounterPressureReductionFactor * (SteamEngines[numberofengine].NumberCylinders / 2.0f);
+                var CylinderWireDrawingFactor = CounterPressureMEPDropRatioRpMtoX[pS.TopM(DrvWheelRevRpS)];
 
-                //              Trace.TraceInformation("CogRetardForce {0} lbf, Dynamic brake {1}, MEP {2} Ratio-Comp {3} Ratio-Rel {4} Pc {5} Pr {6} WheelDia {7} CylDia {8} CylStroke {9}", N.ToLbf(SteamEngines[numberofengine].CylinderCounterPressureBrakeForceN), currentDynamicBrakeFraction, SteamEngines[numberofengine].CounterPressureMEP, CylinderRatio_compression, CylinderRatio_release, CompMeanPressure_compressionAtmPSI, CompMeanPressure_releaseAtmPSI, Me.ToIn(CounterBalanceWheelDiamM), Me.ToIn(SteamEngines[numberofengine].CylindersDiameterM), Me.ToIn(SteamEngines[numberofengine].CylindersStrokeM));
+                // Adjust Brake Force to take into account losses due to flow and other factors, and the use of the number of cylinders
+                SteamEngines[numberofengine].CylinderCounterPressureBrakeForceN *= CounterPressureReductionFactor * CylinderWireDrawingFactor * (SteamEngines[numberofengine].NumberCylinders / 2.0f);
 
                 // Calculate water usage
                 var CylinderPistonAreaIn2 = Me2.ToIn2(MathHelper.Pi * SteamEngines[numberofengine].CylindersDiameterM * SteamEngines[numberofengine].CylindersDiameterM / 4.0f);
