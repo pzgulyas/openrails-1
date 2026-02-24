@@ -2672,7 +2672,7 @@ namespace Orts.Viewer3D
                         var hi = shapePrimitive.HierarchyIndex;
                         if (matrixVisible != null && !matrixVisible[hi]) continue;
 
-                        var xnaMatrix = SetRenderMatrices(shapePrimitive, animatedXNAMatrices, ref xnaDTileTranslation, out var bones);
+                        var xnaMatrix = SetRenderMatrices(shapePrimitive, animatedXNAMatrices, ref xnaDTileTranslation);
 
                         if (StoredResultMatrixes.ContainsKey(shapePrimitive.HierarchyIndex))
                             StoredResultMatrixes[shapePrimitive.HierarchyIndex] = xnaMatrix;
@@ -2680,15 +2680,14 @@ namespace Orts.Viewer3D
                         // TODO make shadows depend on shape overrides
 
                         var interior = (flags & ShapeFlags.Interior) != 0;
-                        frame.AddAutoPrimitive(mstsLocation, distanceDetail.ViewSphereRadius, distanceDetail.ViewingDistance * lodBias, shapePrimitive.Material, shapePrimitive, interior ? RenderPrimitiveGroup.Interior : RenderPrimitiveGroup.World, ref xnaMatrix, flags, bones);
+                        frame.AddAutoPrimitive(mstsLocation, distanceDetail.ViewSphereRadius, distanceDetail.ViewingDistance * lodBias, shapePrimitive.Material, shapePrimitive, interior ? RenderPrimitiveGroup.Interior : RenderPrimitiveGroup.World, ref xnaMatrix, flags);
                     }
                 }
             }
         }
 
-        public virtual Matrix SetRenderMatrices(ShapePrimitive shapePrimitive, Matrix[] animatedXNAMatrices, ref Matrix xnaDTileTranslation, out Matrix[] bones)
+        public virtual Matrix SetRenderMatrices(ShapePrimitive shapePrimitive, Matrix[] animatedXNAMatrices, ref Matrix xnaDTileTranslation)
         {
-            bones = null; // standard scenery material has no skin and bones
             var xnaMatrix = Matrix.Identity;
             var hi = shapePrimitive.HierarchyIndex;
             while (hi >= 0 && hi < shapePrimitive.Hierarchy.Length)

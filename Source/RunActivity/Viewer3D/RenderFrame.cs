@@ -652,10 +652,6 @@ namespace Orts.Viewer3D
             }
         }
 
-        [CallOnThread("Updater")]
-        public void AddAutoPrimitive(Vector3 mstsLocation, float objectRadius, float objectViewingDistance, Material material, RenderPrimitive primitive, RenderPrimitiveGroup group, ref Matrix xnaMatrix, ShapeFlags flags)
-            => AddAutoPrimitive(mstsLocation, objectRadius, objectViewingDistance, material, primitive, group, ref xnaMatrix, flags, null);
-
         /// <summary>
         /// Automatically adds or culls a <see cref="RenderPrimitive"/> based on a location, radius and max viewing distance.
         /// </summary>
@@ -668,13 +664,16 @@ namespace Orts.Viewer3D
         /// <param name="xnaMatrix"></param>
         /// <param name="flags"></param>
         [CallOnThread("Updater")]
-        public void AddAutoPrimitive(Vector3 mstsLocation, float objectRadius, float objectViewingDistance, Material material, RenderPrimitive primitive, RenderPrimitiveGroup group, ref Matrix xnaMatrix, ShapeFlags flags, object itemData)
+        public void AddAutoPrimitive(Vector3 mstsLocation, float objectRadius, float objectViewingDistance, Material material, RenderPrimitive primitive, RenderPrimitiveGroup group, ref Matrix xnaMatrix, ShapeFlags flags)
         {
+            if (xnaMatrix == new Matrix()) // invisible object
+                return;
+
             if (float.IsPositiveInfinity(objectViewingDistance) || (Camera != null && Camera.InRange(mstsLocation, objectRadius, objectViewingDistance)))
             {
                 if (Camera != null && Camera.InFov(mstsLocation, objectRadius))
                 {
-                    AddPrimitive(material, primitive, group, ref xnaMatrix, flags, itemData);
+                    AddPrimitive(material, primitive, group, ref xnaMatrix, flags);
 
                     if (primitive?.AttachedLight != null && primitive.AttachedLight.Range > 0 && Camera.InRange(mstsLocation, objectRadius, primitive.AttachedLight.Range))
                     {
@@ -1112,8 +1111,8 @@ namespace Orts.Viewer3D
             LightColorIntensities[NumLights] = color * intensity;
             LightRangesRcp[NumLights] = range * (ignoreDayNight ? 1 : LightDayNightMultiplier);
             LightRangesRcp[NumLights] = LightRangesRcp[NumLights] == 0 ? float.MaxValue : 1f / LightRangesRcp[NumLights];
-            LightInnerConeCos[NumLights] = (float)Math.Cos(innerConeAngle / 2);
-            LightOuterConeCos[NumLights] = (float)Math.Cos(outerConeAngle / 2);
+            LightInnerConeCos[NumLights] = (float)Math.Cos(innerConeAngle);
+            LightOuterConeCos[NumLights] = (float)Math.Cos(outerConeAngle);
             NumLights++;
         }
 

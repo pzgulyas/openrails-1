@@ -1266,7 +1266,7 @@ namespace Orts.Viewer3D
 
                         if (gltfPrimitive.BonesTexture != null)
                         {
-                            gltfPrimitive.BonesTexture?.SetData(MemoryMarshal.Cast<Matrix, Vector4>(gltfPrimitive.RenderBonesCurrent).ToArray());
+                            gltfPrimitive.BonesTexture?.SetData(MemoryMarshal.Cast<Matrix, Vector4>(gltfPrimitive.RenderBonesRendered).ToArray());
                             shader.BonesTexture = gltfPrimitive.BonesTexture;
                             shader.BonesCount = gltfPrimitive.Joints.Length;
                         }
