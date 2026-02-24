@@ -37,22 +37,24 @@ namespace Orts.Viewer3D
 {
     public class GltfShape : SharedShape
     {
-        public static bool EnableAnimations { get; set; }
-        public static bool ShapeWarnings { get; set; }
-        public static bool TangentsAlwaysCalculatedPerPixel { get; set; }
-
-        public static List<string> ExtensionsSupported = new List<string>
+        public static readonly List<string> ExtensionsSupported = new List<string>
         {
             "KHR_animation_pointer",
             "KHR_lights_punctual",
             "KHR_materials_unlit",
             "KHR_materials_clearcoat",
             "KHR_materials_emissive_strength",
+            "KHR_node_visibility",
             "MSFT_lod",
             "MSFT_texture_dds",
             "MSFT_packing_normalRoughnessMetallic",
             "MSFT_packing_occlusionRoughnessMetallic",
         };
+
+        // Settings
+        public static bool EnableAnimations { get; set; }
+        public static bool ShapeWarnings { get; set; }
+        public static bool TangentsAlwaysCalculatedPerPixel { get; set; }
 
         string FileDir { get; set; }
         public bool MsfsFlavoured;
@@ -61,6 +63,7 @@ namespace Orts.Viewer3D
         internal Quaternion[] Rotations;
         internal Vector3[] Translations;
         internal float[][] Weights;
+        internal bool[] NodeVisibility;
 
         // Need these at load time to connect the pointers
         internal Dictionary<int, PbrMaterial> Materials = new Dictionary<int, PbrMaterial>();
@@ -173,10 +176,9 @@ namespace Orts.Viewer3D
             }
         }
 
-        public override Matrix SetRenderMatrices(ShapePrimitive baseShapePrimitive, Matrix[] animatedMatrices, ref Matrix tileTranslation, out Matrix[] bones)
+        public override Matrix SetRenderMatrices(ShapePrimitive baseShapePrimitive, Matrix[] animatedMatrices, ref Matrix tileTranslation)
         {
             var shapePrimitive = baseShapePrimitive as GltfPrimitive;
-            (shapePrimitive.RenderBonesCurrent, shapePrimitive.RenderBonesNext) = (shapePrimitive.RenderBonesNext, shapePrimitive.RenderBonesCurrent);
 
             if (LodChanged && ExternalLods.Count > 1)
             {
@@ -185,12 +187,16 @@ namespace Orts.Viewer3D
             }
             LodChanged = false;
 
+            var bone = Matrix.Identity;
             for (var j = 0; j < shapePrimitive.Joints.Length; j++)
             {
-                var bone = MsfsFlavoured ? Matrix.Identity : shapePrimitive.InverseBindMatrices[j];
+                bone = MsfsFlavoured ? Matrix.Identity : shapePrimitive.InverseBindMatrices[j];
                 var hi = shapePrimitive.Joints[j];
                 while (hi >= 0 && hi < shapePrimitive.Hierarchy.Length)
                 {
+                    if (!NodeVisibility[hi])
+                        bone = new Matrix();
+
                     Matrix.Multiply(ref bone, ref animatedMatrices[hi], out bone);
                     hi = shapePrimitive.Hierarchy[hi];
                 }
@@ -202,19 +208,11 @@ namespace Orts.Viewer3D
                 
                 Matrix.Multiply(ref bone, ref tileTranslation, out bone);
 
-                // Non-skinned primitive
-                if (shapePrimitive.Joints.Length == 1)
-                {
-                    bones = null;
-                    return bone;
-                }
-
-                shapePrimitive.RenderBonesCurrent[j] = bone;
+                shapePrimitive.RenderBonesAltered?.SetValue(bone, j);
             }
+            (shapePrimitive.RenderBonesAltered, shapePrimitive.RenderBonesRendered) = (shapePrimitive.RenderBonesRendered, shapePrimitive.RenderBonesAltered);
 
-            // Skinned primitive
-            bones = shapePrimitive.RenderBonesCurrent;
-            return Matrix.Identity;
+            return shapePrimitive.Joints.Length == 1 ? bone : Matrix.Identity; // unskinned vs. skinned
         }
 
         public GltfDistanceLevel SetLod(int lodId)
@@ -230,6 +228,7 @@ namespace Orts.Viewer3D
                 MatrixNames = lod.MatrixNames;
                 BoundingBoxNodes = lod.BoundingBoxNodes;
                 GltfAnimations = lod.GltfAnimations;
+                NodeVisibility = lod.NodeVisibility;
                 LodChanged = true;
                 LastLod = lodId;
 
@@ -337,6 +336,7 @@ namespace Orts.Viewer3D
             internal List<string> MatrixNames;
             internal Vector4[] BoundingBoxNodes;
             internal List<GltfAnimation> GltfAnimations;
+            internal bool[] NodeVisibility;
 
             internal readonly Viewer Viewer;
             internal readonly GltfShape Shape;
@@ -707,9 +707,9 @@ namespace Orts.Viewer3D
                         var outputAccessor = gltfFile.Accessors[sampler.Output];
 
                         var inputFloats = new Span<float>(new float[inputAccessor.Count * GetComponentNumber(inputAccessor.Type)]);
-                        Denormalize(inputAccessor, shape.MsfsFlavoured, GetBufferViewSpan(inputAccessor), ref inputFloats);
+                        Denormalize(inputAccessor, GetBufferViewSpan(inputAccessor), ref inputFloats);
                         var outputFloats = new Span<float>(new float[outputAccessor.Count * GetComponentNumber(outputAccessor.Type)]);
-                        Denormalize(outputAccessor, shape.MsfsFlavoured, GetBufferViewSpan(outputAccessor), ref outputFloats);
+                        Denormalize(outputAccessor, GetBufferViewSpan(outputAccessor), ref outputFloats);
 
                         GltfAnimationChannel channel;
                         animation.Channels.Add(channel = new GltfAnimationChannel
@@ -744,6 +744,7 @@ namespace Orts.Viewer3D
                                 {
                                     switch (PointerTemplates[template])
                                     {
+                                        case PointerTypes.Boolean:
                                         case PointerTypes.FloatVector:
                                         case PointerTypes.Float: channel.OutputFloats = outputFloats.ToArray(); break;
                                         case PointerTypes.Quaternion: channel.OutputQuaternion = MemoryMarshal.Cast<float, Quaternion>(outputFloats).ToArray(); break;
@@ -764,6 +765,9 @@ namespace Orts.Viewer3D
                 var dimensions = gltfFile.Nodes.Select(n => (n.Extras?.TryGetValue("OPENRAILS_animation_wheelradius", out extension) ?? false) && extension is string dim && float.TryParse(dim, out var d) ? d : 0f);
                 GltfAnimations.AddRange(names.Select(n => new GltfAnimation(n.Item1) { ExtrasWheelRadius = dimensions.ElementAt(n.i), Channels = { new GltfAnimationChannel() { TargetNode = n.i } } }));
                 MatrixNames.AddRange(names.Select(n => n.Item1));
+                NodeVisibility = gltfFile.Nodes.Select(n => 
+                    (n.Extensions?.TryGetValue("KHR_node_visibility", out extension) ?? false) &&
+                        Newtonsoft.Json.JsonConvert.DeserializeObject<KHR_node_Visibility>(extension.ToString()).Visible is bool v ? v : true).ToArray();
             }
 
             internal void ConnectPointers()
@@ -804,6 +808,7 @@ namespace Orts.Viewer3D
                                 case "/rotation": channel.Path = AnimationChannelTarget.PathEnum.rotation; break;
                                 case "/scale": channel.Path = AnimationChannelTarget.PathEnum.scale; break;
                                 case "/weights": channel.Path = AnimationChannelTarget.PathEnum.weights; break;
+                                case "/extensions/KHR_node_visibility/visible": channel.SetTargetFloat = (f) => NodeVisibility?.SetValue(f > 0, (int)channel.TargetNode); break;
                                 default:
                                     if (property.StartsWith("/weights/".AsSpan()) && property.LastIndexOf('/') is var i2 && i2 < property.Length
                                         && int.TryParse(property.Slice(i2).ToString(), out var index2))
@@ -875,18 +880,14 @@ namespace Orts.Viewer3D
                 }
             }
 
-            internal static void Denormalize(Accessor accessor, bool msfsFlavoured, Span<byte> bytes, ref Span<float> floats)
+            internal static void Denormalize(Accessor accessor, Span<byte> bytes, ref Span<float> floats)
             {
                 switch (accessor.ComponentType)
                 {
                     case Accessor.ComponentTypeEnum.BYTE: for (var i = 0; i < accessor.Count; i++) floats[i] = Math.Max(bytes[i] / 127f, -1f); break;
                     case Accessor.ComponentTypeEnum.UNSIGNED_BYTE: for (var i = 0; i < accessor.Count; i++) floats[i] = bytes[i] / 255f; break;
                     case Accessor.ComponentTypeEnum.UNSIGNED_SHORT: for (var i = 0; i < accessor.Count; i++) floats[i] = MemoryMarshal.Read<ushort>(bytes.Slice(i * sizeof(ushort))) / 65535f; break;
-                    case Accessor.ComponentTypeEnum.SHORT:
-                        // Component type 5122 "SHORT" is a 16 bit int by the glTF specification, but is used as a 16 bit float (half) by asobo-msfs: 
-                        for (var i = 0; i < accessor.Count; i++)
-                            floats[i] = msfsFlavoured ? (float)MemoryMarshal.Read<SharpDX.Half>(bytes.Slice(i * sizeof(short))) : Math.Max(MemoryMarshal.Read<short>(bytes.Slice(i * sizeof(short))) / 32767f, -1f);
-                        break;
+                    case Accessor.ComponentTypeEnum.SHORT: for (var i = 0; i < accessor.Count; i++) floats[i] = Math.Max(MemoryMarshal.Read<short>(bytes.Slice(i * sizeof(short))) / 32767f, -1f); break;
                     case Accessor.ComponentTypeEnum.FLOAT:
                     default: floats = MemoryMarshal.Cast<byte, float>(bytes.Slice(0, floats.Length * sizeof(float))); break;
                 }
@@ -1520,8 +1521,8 @@ namespace Orts.Viewer3D
             /// However the data usually is not getting uploaded before a new calculation begins, so two set of bones needs to be stored:
             /// one is being recalculated while the other is waiting for the upload.
             /// </summary>
-            public Matrix[] RenderBonesCurrent;
-            public Matrix[] RenderBonesNext;
+            public Matrix[] RenderBonesAltered;
+            public Matrix[] RenderBonesRendered;
 
             /// <summary>
             /// When the primitive has a skin, this texture is used to upload the current bones matrices to GPU.
@@ -1597,8 +1598,8 @@ namespace Orts.Viewer3D
                 {
                     // Skinned model
                     Joints = skin.Joints;
-                    RenderBonesCurrent = Enumerable.Repeat(Matrix.Identity, Joints.Length).ToArray();
-                    RenderBonesNext = Enumerable.Repeat(Matrix.Identity, Joints.Length).ToArray();
+                    RenderBonesAltered = Enumerable.Repeat(Matrix.Identity, Joints.Length).ToArray();
+                    RenderBonesRendered = Enumerable.Repeat(Matrix.Identity, Joints.Length).ToArray();
                     BonesTexture = Joints.Length > 0 ? new Texture2D(material.Viewer.GraphicsDevice, 4, Joints.Length, false, SurfaceFormat.Vector4) : null;
 
                     if (!distanceLevel.InverseBindMatrices.TryGetValue((int)skin.InverseBindMatrices, out InverseBindMatrices))
@@ -1611,7 +1612,7 @@ namespace Orts.Viewer3D
                         {
                             var accessor = gltfFile.Accessors[(int)skin.InverseBindMatrices];
                             Span<float> inputFloats = stackalloc float[accessor.Count * distanceLevel.GetComponentNumber(accessor.Type)];
-                            GltfDistanceLevel.Denormalize(accessor, distanceLevel.Shape.MsfsFlavoured, distanceLevel.GetBufferViewSpan(accessor), ref inputFloats);
+                            GltfDistanceLevel.Denormalize(accessor, distanceLevel.GetBufferViewSpan(accessor), ref inputFloats);
                             InverseBindMatrices = MemoryMarshal.Cast<float, Matrix>(inputFloats).ToArray();
                         }
                         distanceLevel.InverseBindMatrices.Add((int)skin.InverseBindMatrices, InverseBindMatrices);
@@ -1783,6 +1784,11 @@ namespace Orts.Viewer3D
             public float EmissiveStrength { get; set; }
         }
 
+        class KHR_node_Visibility
+        {
+            public bool Visible { get; set; }
+        }
+
         public class KHR_animation_pointer
         {
             [DefaultValue("")]
@@ -1902,6 +1908,7 @@ namespace Orts.Viewer3D
             { "/nodes/{}/scale", PointerTypes.Vector3 },
             { "/nodes/{}/weights", PointerTypes.FloatVector },
             { "/nodes/{}/weights/{}", PointerTypes.Float },
+            { "/nodes/{}/extensions/KHR_node_visibility/visible", PointerTypes.Boolean },
 
             // Extension pointers
             { "/extensions/KHR_lights_punctual/lights/{}/color", PointerTypes.Vector3 },
@@ -1918,7 +1925,8 @@ namespace Orts.Viewer3D
             Float,
             Quaternion,
             Vector3,
-            Vector4
+            Vector4,
+            Boolean
         }
 
         /// <summary>
