@@ -436,6 +436,7 @@ namespace Orts.Viewer3D
         public bool IsScreenChanged { get; internal set; }
         ShadowMapMaterial ShadowMapMaterial;
         SceneryShader SceneryShader;
+        ShadowMapShader ShadowMapShader;
         Vector3 SolarDirection;
         Camera Camera;
         Vector3 CameraLocation;
@@ -562,6 +563,8 @@ namespace Orts.Viewer3D
                 ShadowMapMaterial = (ShadowMapMaterial)viewer.MaterialManager.Load("ShadowMap");
             if (SceneryShader == null)
                 SceneryShader = viewer.MaterialManager.SceneryShader;
+            if (ShadowMapShader == null)
+                ShadowMapShader = viewer.MaterialManager.ShadowMapShader;
 
             // Ensure that the first light is always the sun/moon, because the ambient and shadow effects will be calculated based on the first light.
             if (SolarDirection.Y > -0.05)
@@ -857,6 +860,8 @@ namespace Orts.Viewer3D
         void DrawShadows(GraphicsDevice graphicsDevice, bool logging, int shadowMapIndex)
         {
             if (logging) Console.WriteLine("    {0} {{", shadowMapIndex);
+
+            ShadowMapShader?.SetPerShadowMap(ref ShadowMapLightView[shadowMapIndex], ref ShadowMapLightProj[shadowMapIndex]);
 
             // Prepare renderer for drawing the shadow map.
             graphicsDevice.SetRenderTarget(ShadowMapRenderTarget[shadowMapIndex]);

@@ -1365,16 +1365,13 @@ namespace Orts.Viewer3D
         public override void Render(GraphicsDevice graphicsDevice, IEnumerable<RenderItem> renderItems, ref Matrix XNAViewMatrix, ref Matrix XNAProjectionMatrix)
         {
             var shader = Viewer.MaterialManager.ShadowMapShader;
-            var viewproj = XNAViewMatrix * XNAProjectionMatrix;
 
-            shader.SetData(ref XNAViewMatrix);
             ShaderPasses.Reset();
             while (ShaderPasses.MoveNext())
             {
                 foreach (var item in renderItems)
                 {
-                    var wvp = item.XNAMatrix * viewproj;
-                    shader.SetData(ref wvp, item.Material.GetShadowTexture());
+                    shader.SetData(item.XNAMatrix, item.Material.GetShadowTexture());
 
                     if (item.RenderPrimitive is GltfShape.GltfPrimitive gltfPrimitive)
                     {
@@ -1398,11 +1395,8 @@ namespace Orts.Viewer3D
 
         public RenderTarget2D ApplyBlur(GraphicsDevice graphicsDevice, RenderTarget2D shadowMap, RenderTarget2D renderTarget)
         {
-            var wvp = Matrix.Identity;
-
             var shader = Viewer.MaterialManager.ShadowMapShader;
             shader.CurrentTechnique = shader.Techniques["ShadowMapBlur"];
-            shader.SetBlurData(ref wvp);
             if (ShaderPassesBlur == null) ShaderPassesBlur = shader.CurrentTechnique.Passes.GetEnumerator();
 
             graphicsDevice.RasterizerState = RasterizerState.CullNone;

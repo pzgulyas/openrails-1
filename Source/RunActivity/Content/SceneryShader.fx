@@ -76,10 +76,10 @@ cbuffer PerMaterial
     float ClearcoatNormalScale;
     bool HasNormals; // 0: no, 1: yes
     bool HasTangents; // true: tangents were pre-calculated, false: tangents must be calculated in the pixel shader
-};
+//};
 
-cbuffer PerObject
-{
+//cbuffer PerObject
+//{
     float4x4 World; // model -> world [max number of bones]
     float4 ZBias_Lighting; // x = z-bias, y = diffuse (not unlit), z = specular, w = step(1, z) // zBias is PerDraw, Lighting could be PerMaterial
     int MorphConfig[8]; // 0-5: position of POSITION, NORMAL, TANGENT, TEXCOORD_0, TEXCOORD_1, COLOR_0 data within MorphTargets, respectively. All: set to -1 if not available. 6: targets count. 7: attributes count.

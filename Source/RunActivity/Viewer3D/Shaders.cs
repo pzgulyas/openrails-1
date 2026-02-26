@@ -406,7 +406,9 @@ namespace Orts.Viewer3D
     [CallOnThread("Render")]
     public class ShadowMapShader : Shader
     {
-        readonly EffectParameter worldViewProjection;
+        readonly EffectParameter world;
+        readonly EffectParameter view;
+        readonly EffectParameter projection;
         readonly EffectParameter sideVector;
         readonly EffectParameter imageBlurStep;
         readonly EffectParameter imageTexture;
@@ -415,21 +417,19 @@ namespace Orts.Viewer3D
         readonly EffectParameter morphConfig;
         readonly EffectParameter morphWeights;
 
-        public void SetData(ref Matrix v)
+        public void SetPerShadowMap(ref Matrix v, ref Matrix p)
         {
             var eyeVector = Vector3.Normalize(new Vector3(v.M13, v.M23, v.M33));
             sideVector.SetValue(Vector3.Normalize(Vector3.Cross(eyeVector, Vector3.Down)));
-        }
 
-        public void SetData(ref Matrix wvp, Texture2D texture)
+            view.SetValue(v);
+            projection.SetValue(p);
+        }
+        
+        public void SetData(Matrix w, Texture2D texture)
         {
-            worldViewProjection.SetValue(wvp);
+            world.SetValue(w);
             imageTexture.SetValue(texture);
-        }
-
-        public void SetBlurData(ref Matrix wvp)
-        {
-            worldViewProjection.SetValue(wvp);
         }
 
         public void SetBlurData(Texture2D texture)
@@ -446,7 +446,9 @@ namespace Orts.Viewer3D
         public ShadowMapShader(GraphicsDevice graphicsDevice)
             : base(graphicsDevice, "ShadowMap")
         {
-            worldViewProjection = Parameters["WorldViewProjection"];
+            world = Parameters["World"];
+            view = Parameters["View"];
+            projection = Parameters["Projection"];
             sideVector = Parameters["SideVector"];
             imageBlurStep = Parameters["ImageBlurStep"];
             imageTexture = Parameters["ImageTexture"];

@@ -25,15 +25,24 @@
 
 #define MAX_MORPH_TARGETS 8
 
-float4x4 WorldViewProjection;  // model -> world -> view -> projection
-float3   SideVector;
-float    ImageBlurStep;  // = 1 / shadow map texture width and height
-texture  ImageTexture;
-int      MorphConfig[8]; // 0-5: position of POSITION, NORMAL, TANGENT, TEXCOORD_0, TEXCOORD_1, COLOR_0 data within MorphTargets, respectively. All: set to -1 if not available. 6: targets count. 7: attributes count.
-float    MorphWeights[MAX_MORPH_TARGETS]; // the actual morphing animation state
+cbuffer PerFrame
+{
+    float4x4 View; // world -> view
+    float4x4 Projection; // view -> projection
+    float3 SideVector;
+};
 
-texture  BonesTexture;
-float    BonesCount;
+cbuffer PerObject
+{
+    float4x4 World; // model -> world [max number of bones]
+    float ImageBlurStep; // = 1 / shadow map texture width and height
+    int MorphConfig[8]; // 0-5: position of POSITION, NORMAL, TANGENT, TEXCOORD_0, TEXCOORD_1, COLOR_0 data within MorphTargets, respectively. All: set to -1 if not available. 6: targets count. 7: attributes count.
+    float MorphWeights[MAX_MORPH_TARGETS]; // the actual morphing animation state
+    float BonesCount;
+};
+
+texture ImageTexture;
+texture BonesTexture;
 
 static const float4x4 Identity = { 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1 };
 
@@ -152,7 +161,7 @@ VERTEX_OUTPUT VSShadowMap(in VERTEX_INPUT In)
 		In.Normal = mul(In.Normal, (float3x3)transpose(In.Instance));
 	}
 
-	Out.Position = mul(In.Position, WorldViewProjection);
+    Out.Position = mul(mul(mul(In.Position, World), View), Projection);
 	Out.TexCoord_Depth.xy = In.TexCoord;
 	Out.TexCoord_Depth.z = Out.Position.z;
 
@@ -173,7 +182,7 @@ VERTEX_OUTPUT VSShadowMapForest(in VERTEX_INPUT_FOREST In)
 	In.Position = float4(newPosition, 1);
 
 	// Project vertex with fixed w=1 and normal=eye.
-	Out.Position = mul(In.Position, WorldViewProjection);
+    Out.Position = mul(mul(mul(In.Position, World), View), Projection);
 	Out.TexCoord_Depth.xy = In.TexCoord;
 	Out.TexCoord_Depth.z = Out.Position.z;
 
@@ -186,7 +195,7 @@ VERTEX_OUTPUT_BLUR VSShadowMapHorzBlur(in VERTEX_INPUT_BLUR In)
 	
 	float2 offsetTexCoord = In.TexCoord + float2(0.5, 0.5);
 
-	Out.Position = mul(In.Position, WorldViewProjection);
+	Out.Position = mul(In.Position, Identity);
 	Out.SampleCentre = offsetTexCoord * ImageBlurStep;
 	Out.Sample_01 = (offsetTexCoord - float2(1.5, 0)) * ImageBlurStep;
 	Out.Sample_23 = (offsetTexCoord + float2(1.5, 0)) * ImageBlurStep;
@@ -200,7 +209,7 @@ VERTEX_OUTPUT_BLUR VSShadowMapVertBlur(in VERTEX_INPUT_BLUR In)
 	
 	float2 offsetTexCoord = In.TexCoord + float2(0.5, 0.5);
 
-	Out.Position = mul(In.Position, WorldViewProjection);
+	Out.Position = mul(In.Position, Identity);
 	Out.SampleCentre = offsetTexCoord * ImageBlurStep;
 	Out.Sample_01 = (offsetTexCoord - float2(0, 1.5)) * ImageBlurStep;
 	Out.Sample_23 = (offsetTexCoord + float2(0, 1.5)) * ImageBlurStep;
@@ -216,7 +225,7 @@ VERTEX_OUTPUT VSShadowMapNormalMap(in VERTEX_INPUT_NORMALMAP In)
 		In.Position = mul(In.Position, transpose(In.Instance));
 	}
 
-	Out.Position = mul(In.Position, WorldViewProjection);
+    Out.Position = mul(mul(mul(In.Position, World), View), Projection);
 	Out.TexCoord_Depth.xy = In.TexCoord;
 	Out.TexCoord_Depth.z = Out.Position.z;
 
@@ -259,7 +268,7 @@ VERTEX_OUTPUT VSShadowMapSkinned(in VERTEX_INPUT_SKINNED In)
 
 	In.Position = mul(In.Position, skinTransform);
 
-	Out.Position = mul(In.Position, WorldViewProjection);
+    Out.Position = mul(mul(mul(In.Position, World), View), Projection);
 	Out.TexCoord_Depth.xy = In.TexCoord;
 	Out.TexCoord_Depth.z = Out.Position.z;
 
@@ -285,7 +294,7 @@ VERTEX_OUTPUT VSShadowMapMorphed(in VERTEX_INPUT_MORPHED In)
     }
 
     Out.Position = mul(Out.Position, skinTransform);
-	Out.Position = mul(Out.Position, WorldViewProjection);
+    Out.Position = mul(mul(mul(Out.Position, World), View), Projection);
 	Out.TexCoord_Depth.z = Out.Position.z;
 
 	return Out;
