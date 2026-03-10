@@ -20,10 +20,6 @@
 // Define this to check every material is resetting the RenderState correctly.
 // #define DEBUG_RENDER_STATE
 
-// Define this to enable sorting of blended render primitives. This is a
-// complex feature and performance is not guaranteed.
-#define RENDER_BLEND_SORTING
-
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -169,9 +165,14 @@ namespace Orts.Viewer3D
 
         public class Comparer : IComparer<RenderItem>
         {
-            readonly Vector3 XNAViewerPos;
+            Vector3 XNAViewerPos;
 
             public Comparer(Vector3 viewerPos)
+            {
+                SetViewerPosition(viewerPos);
+            }
+
+            public void SetViewerPosition(Vector3 viewerPos)
             {
                 XNAViewerPos = viewerPos;
                 XNAViewerPos.Z *= -1;
@@ -254,7 +255,10 @@ namespace Orts.Viewer3D
 		{
 			get
 			{
-				throw new NotSupportedException();
+                if (index < 0 || index >= ItemCount)
+                    throw new IndexOutOfRangeException();
+
+                return Items[index];
 			}
 			set
 			{
@@ -414,15 +418,19 @@ namespace Orts.Viewer3D
         internal RenderTarget2D RenderSurface;
         SpriteBatchMaterial RenderSurfaceMaterial;
 
-        readonly Material DummyBlendedMaterial;
-		readonly Dictionary<Material, RenderItemCollection>[] RenderItems = new Dictionary<Material, RenderItemCollection>[(int)RenderPrimitiveSequence.Sentinel];
+		readonly Dictionary<ulong, RenderItemCollection>[] RenderItems = new Dictionary<ulong, RenderItemCollection>[(int)RenderPrimitiveSequence.Sentinel];
+        readonly ulong[][] RenderItemsSortedKeys = new ulong[(int)RenderPrimitiveSequence.Sentinel][];
         readonly RenderItemCollection[] RenderShadowSceneryItems;
         readonly RenderItemCollection[] RenderShadowPbrNormalMapItems;
         readonly RenderItemCollection[] RenderShadowPbrSkinnedItems;
         readonly RenderItemCollection[] RenderShadowPbrMorphedItems;
         readonly RenderItemCollection[] RenderShadowForestItems;
         readonly RenderItemCollection[] RenderShadowTerrainItems;
-        readonly RenderItemCollection RenderItemsSequence = new RenderItemCollection();
+        const ulong BlendedKey = ulong.MaxValue;
+        static RenderItem.Comparer RenderItemComparer;
+
+        static readonly Func<Material, bool> SkyDM = material => material is TerrainSharedDistantMountain || material is SkyMaterial || material is MSTSSkyMaterial;
+        static readonly Func<Material, bool> NonSkyDM = material => !(material is TerrainSharedDistantMountain || material is SkyMaterial || material is MSTSSkyMaterial);
 
         int NumLights;
         readonly Vector3[] LightPositions = new Vector3[RenderProcess.MAX_LIGHTS];
@@ -447,10 +455,12 @@ namespace Orts.Viewer3D
         public RenderFrame(Game game)
         {
             Game = game;
-            DummyBlendedMaterial = new EmptyMaterial(null);
 
             for (int i = 0; i < RenderItems.Length; i++)
-				RenderItems[i] = new Dictionary<Material, RenderItemCollection>();
+            {
+                RenderItems[i] = new Dictionary<ulong, RenderItemCollection>();
+                RenderItemsSortedKeys[i] = new ulong[2];
+            }
 
             if (Game.Settings.DynamicShadows)
             {
@@ -541,10 +551,6 @@ namespace Orts.Viewer3D
             NumLights = 0;
         }
 
-        static bool lastLightState;
-        static double fadeStartTimer;
-        static float fadeDuration = -1;
-        
         public void PrepareFrame(Viewer viewer)
         {
             if (RenderSurfaceMaterial == null)
@@ -694,10 +700,6 @@ namespace Orts.Viewer3D
             AddPrimitive(material, primitive, group, ref xnaMatrix, ShapeFlags.None, null);
         }
 
-        static readonly bool[] PrimitiveBlendedScenery = new bool[] { true, false }; // Search for opaque pixels in alpha blended primitives, thus maintaining correct DepthBuffer
-        static readonly bool[] PrimitiveBlended = new bool[] { true };
-        static readonly bool[] PrimitiveNotBlended = new bool[] { false };
-
         [CallOnThread("Updater")]
         public void AddPrimitive(Material material, RenderPrimitive primitive, RenderPrimitiveGroup group, ref Matrix xnaMatrix, ShapeFlags flags)
         {
@@ -707,22 +709,31 @@ namespace Orts.Viewer3D
         [CallOnThread("Updater")]
         public void AddPrimitive(Material material, RenderPrimitive primitive, RenderPrimitiveGroup group, ref Matrix xnaMatrix, ShapeFlags flags, object itemData)
         {
-            var getBlending = material.GetBlending();
-            var blending = getBlending && material is SceneryMaterial ? PrimitiveBlendedScenery : getBlending ? PrimitiveBlended : PrimitiveNotBlended;
+            // SceneryMaterial primitives may contain both opaque and blended/transparent parts,
+            // so they may be added to both types of sequences.
+            bool? blending = material.GetBlending();
+            if (material is SceneryMaterial && blending == true)
+                blending = null;
 
-            RenderItemCollection items;
-            foreach (var blended in blending)
+            if (blending ?? true)
             {
-                var sortingMaterial = blended ? DummyBlendedMaterial : material;
-                var sequence = RenderItems[(int)GetRenderSequence(group, blended)];
+                var sequence = RenderItems[(int)GetRenderSequence(group, true)];
+                var key = BlendedKey;
 
-                if (!sequence.TryGetValue(sortingMaterial, out items))
-                {
-                    items = new RenderItemCollection();
-                    sequence.Add(sortingMaterial, items);
-                }
+                if (!sequence.TryGetValue(key, out var items))
+                    sequence.Add(key, items = new RenderItemCollection());
                 items.Add(new RenderItem(material, primitive, ref xnaMatrix, flags, itemData));
             }
+            if (!blending ?? true)
+            {
+                var sequence = RenderItems[(int)GetRenderSequence(group, false)];
+                var key = material.SortingKey;
+
+                if (!sequence.TryGetValue(key, out var items))
+                    sequence.Add(key, items = new RenderItemCollection());
+                items.Add(new RenderItem(material, primitive, ref xnaMatrix, flags, itemData));
+            }
+
             if (((flags & ShapeFlags.AutoZBias) != 0) && (primitive.ZBias == 0))
                 primitive.ZBias = 1;
         }
@@ -746,20 +757,47 @@ namespace Orts.Viewer3D
                 Debug.Fail("Only scenery, forest and terrain materials allowed in shadow map.");
         }
 
+        /// <summary>
+        /// Z-sort the blended/transparent primitives for correct rendering.
+        /// </summary>
         [CallOnThread("Updater")]
         public void Sort()
         {
-            var renderItemComparer = new RenderItem.Comparer(CameraLocation);
-            foreach (var sequence in RenderItems)
+            if (RenderItemComparer == null)
+                RenderItemComparer = new RenderItem.Comparer(XNACameraLocation);
+            else
+                RenderItemComparer.SetViewerPosition(XNACameraLocation);
+
+            for (var i = 0; i < RenderItems.Length; i++)
             {
-                foreach (var sequenceMaterial in sequence)
+                var sequence = RenderItems[i];
+
+                if (sequence.TryGetValue(BlendedKey, out var blendedSequence) && blendedSequence.Count > 0)
                 {
-                    if (sequenceMaterial.Value.Count == 0)
-                        continue;
-                    if (sequenceMaterial.Key != DummyBlendedMaterial)
-                        continue;
-                    sequenceMaterial.Value.Sort(renderItemComparer);
+                    blendedSequence.Sort(RenderItemComparer);
+
+                    // Blended: multiple materials sorted by depth, create render batches without destroying the ordering.
+                    ulong j = 0;
+                    var sortingKey = ulong.MaxValue;
+                    RenderItemCollection renderItems = null;
+                    foreach (var renderItem in blendedSequence)
+                    {
+                        if (sortingKey != renderItem.Material.SortingKey)
+                        {
+                            sortingKey = renderItem.Material.SortingKey;
+                            j++;
+                            if (!sequence.TryGetValue(j, out renderItems))
+                                sequence.Add(j, renderItems = new RenderItemCollection());
+                        }
+                        renderItems?.Add(renderItem);
+                    }
+                    blendedSequence.Clear();
                 }
+
+                if (RenderItemsSortedKeys[i].Length < sequence.Count)
+                    RenderItemsSortedKeys[i] = new ulong[sequence.Count * 2];
+                sequence.Keys.CopyTo(RenderItemsSortedKeys[i], 0);
+                Array.Sort(RenderItemsSortedKeys[i], 0, sequence.Count);
             }
         }
 
@@ -935,24 +973,27 @@ namespace Orts.Viewer3D
                 graphicsDevice.SetRenderTarget(RenderSurface);
             }
 
+            graphicsDevice.Clear(ClearOptions.Target | ClearOptions.DepthBuffer | ClearOptions.Stencil, Color.Transparent, 1, 0);
+
             if (Game.Settings.DistantMountains)
             {
                 if (logging) Console.WriteLine("  DrawSimple (Distant Mountains) {");
-                graphicsDevice.Clear(ClearOptions.Target | ClearOptions.DepthBuffer | ClearOptions.Stencil, Color.Transparent, 1, 0);
-                DrawSequencesDistantMountains(graphicsDevice, logging);
+                DrawSequences(graphicsDevice, ref Camera.XnaDistantMountainProjection, logging, excludeMaterial: NonSkyDM);
                 if (logging) Console.WriteLine("  }");
-                if (logging) Console.WriteLine("  DrawSimple {");
+
                 graphicsDevice.Clear(ClearOptions.DepthBuffer, Color.Transparent, 1, 0);
-                DrawSequences(graphicsDevice, logging);
-                if (logging) Console.WriteLine("  }");
             }
-            else
-            {
-                if (logging) Console.WriteLine("  DrawSimple {");
-                graphicsDevice.Clear(ClearOptions.Target | ClearOptions.DepthBuffer | ClearOptions.Stencil, Color.Transparent, 1, 0);
-                DrawSequences(graphicsDevice, logging);
-                if (logging) Console.WriteLine("  }");
-            }
+
+            if (Game.Settings.DynamicShadows && RenderProcess.ShadowMapCount > 0)
+                SceneryShader?.SetShadowMap(ShadowMapLightViewProjShadowProj, ShadowMap, RenderProcess.ShadowMapLimit);
+
+            var excludeMaterial = Game.Settings.DistantMountains ? SkyDM : null;
+            if (logging) Console.WriteLine("  DrawSimple {");
+            DrawSequences(graphicsDevice, ref XNACameraProjection, logging, excludeMaterial);
+            if (logging) Console.WriteLine("  }");
+
+            if (Game.Settings.DynamicShadows && RenderProcess.ShadowMapCount > 0)
+                SceneryShader?.ClearShadowMap();
 
             if (RenderSurfaceMaterial != null)
             {
@@ -964,106 +1005,32 @@ namespace Orts.Viewer3D
             }
         }
 
-        void DrawSequences(GraphicsDevice graphicsDevice, bool logging)
+        void DrawSequences(GraphicsDevice graphicsDevice, ref Matrix projection, bool logging, Func<Material, bool> excludeMaterial)
         {
-            if (Game.Settings.DynamicShadows && RenderProcess.ShadowMapCount > 0)
-                SceneryShader?.SetShadowMap(ShadowMapLightViewProjShadowProj, ShadowMap, RenderProcess.ShadowMapLimit);
-
-            SceneryShader?.SetPerFrame(ref XNACameraView, ref XNACameraProjection);
-
-            var renderItems = RenderItemsSequence;
-            renderItems.Clear();
+            SceneryShader?.SetPerFrame(ref XNACameraView, ref projection);
+            
             for (var i = 0; i < (int)RenderPrimitiveSequence.Sentinel; i++)
             {
                 if (logging) Console.WriteLine("    {0} {{", (RenderPrimitiveSequence)i);
                 var sequence = RenderItems[i];
-                foreach (var sequenceMaterial in sequence)
+                var keys = RenderItemsSortedKeys[i];
+
+                for (var j = 0; j < sequence.Count; j++)
                 {
-                    if (sequenceMaterial.Value.Count == 0)
+                    var renderItems = sequence[keys[j]];
+
+                    if (renderItems.Count == 0 || !(renderItems[0].Material is Material sequenceMaterial) || excludeMaterial != null && excludeMaterial(sequenceMaterial))
                         continue;
-                    if (sequenceMaterial.Key == DummyBlendedMaterial)
-                    {
-                        // Blended: multiple materials, group by material as much as possible without destroying ordering.
-                        Material lastMaterial = null;
-                        foreach (var renderItem in sequenceMaterial.Value)
-                        {
-                            if (lastMaterial != renderItem.Material)
-                            {
-                                if (renderItems.Count > 0)
-                                {
-                                    if (logging) Console.WriteLine("      {0,-5} * {1}", renderItems.Count, lastMaterial);
-                                    lastMaterial.Render(graphicsDevice, renderItems, ref XNACameraView, ref XNACameraProjection);
-                                    renderItems.Clear();
-                                }
-                                if (lastMaterial != null)
-                                    lastMaterial.ResetState(graphicsDevice);
-#if DEBUG_RENDER_STATE
-                                if (lastMaterial != null)
-                                    DebugRenderState(graphicsDevice, lastMaterial.ToString());
-#endif
-                                renderItem.Material.SetState(graphicsDevice, lastMaterial);
-                                lastMaterial = renderItem.Material;
-                            }
-                            renderItems.Add(renderItem);
-                        }
-                        if (renderItems.Count > 0)
-                        {
-                            if (logging) Console.WriteLine("      {0,-5} * {1}", renderItems.Count, lastMaterial);
-                            lastMaterial.Render(graphicsDevice, renderItems, ref XNACameraView, ref XNACameraProjection);
-                            renderItems.Clear();
-                        }
-                        if (lastMaterial != null)
-                            lastMaterial.ResetState(graphicsDevice);
-#if DEBUG_RENDER_STATE
-                        if (lastMaterial != null)
-                            DebugRenderState(graphicsDevice, lastMaterial.ToString());
-#endif
-                    }
-                    else
-                    {
-                        if (Game.Settings.DistantMountains && (sequenceMaterial.Key is TerrainSharedDistantMountain || sequenceMaterial.Key is SkyMaterial
-                            || sequenceMaterial.Key is MSTSSkyMaterial))
-                            continue;
-                        // Opaque: single material, render in one go.
-                        sequenceMaterial.Key.SetState(graphicsDevice, null);
-                        if (logging) Console.WriteLine("      {0,-5} * {1}", sequenceMaterial.Value.Count, sequenceMaterial.Key);
-                        sequenceMaterial.Key.Render(graphicsDevice, sequenceMaterial.Value, ref XNACameraView, ref XNACameraProjection);
-                        sequenceMaterial.Key.ResetState(graphicsDevice);
-#if DEBUG_RENDER_STATE
-                        DebugRenderState(graphicsDevice, sequenceMaterial.Key.ToString());
-#endif
-                    }
-                }
-                if (logging) Console.WriteLine("    }");
-            }
 
-            if (Game.Settings.DynamicShadows && (RenderProcess.ShadowMapCount > 0) && SceneryShader != null)
-                SceneryShader.ClearShadowMap();
-        }
-
-        void DrawSequencesDistantMountains(GraphicsDevice graphicsDevice, bool logging)
-        {
-            SceneryShader?.SetPerFrame(ref XNACameraView, ref Camera.XnaDistantMountainProjection);
-
-            for (var i = 0; i < (int)RenderPrimitiveSequence.Sentinel; i++)
-            {
-                if (logging) Console.WriteLine("    {0} {{", (RenderPrimitiveSequence)i);
-                var sequence = RenderItems[i];
-                foreach (var sequenceMaterial in sequence)
-                {
-                    if (sequenceMaterial.Value.Count == 0)
-                        continue;
-                    if (sequenceMaterial.Key is TerrainSharedDistantMountain || sequenceMaterial.Key is SkyMaterial || sequenceMaterial.Key is MSTSSkyMaterial)
-                    {
-                        // Opaque: single material, render in one go.
-                        sequenceMaterial.Key.SetState(graphicsDevice, null);
-                        if (logging) Console.WriteLine("      {0,-5} * {1}", sequenceMaterial.Value.Count, sequenceMaterial.Key);
-                        sequenceMaterial.Key.Render(graphicsDevice, sequenceMaterial.Value, ref XNACameraView, ref Camera.XnaDistantMountainProjection);
-                        sequenceMaterial.Key.ResetState(graphicsDevice);
+                    if (logging) Console.WriteLine("      {0,-5} * {1}", renderItems.Count, sequenceMaterial);
 #if DEBUG_RENDER_STATE
-                        DebugRenderState(graphicsDevice, sequenceMaterial.Key.ToString());
+                    DebugRenderState(graphicsDevice, sequenceMaterial.ToString());
 #endif
-                    }
+                    var transparentPass = !RenderPrimitive.SequenceForOpaque.Contains((RenderPrimitiveSequence)i) ? sequenceMaterial : null;
+
+                    sequenceMaterial.SetState(graphicsDevice, transparentPass);
+                    sequenceMaterial.Render(graphicsDevice, renderItems, ref XNACameraView, ref projection);
+                    sequenceMaterial.ResetState(graphicsDevice);
                 }
                 if (logging) Console.WriteLine("    }");
             }
@@ -1147,5 +1114,41 @@ namespace Orts.Viewer3D
             // TODO: Check graphicsDevice.ScissorRectangle? Tricky because we struggle to know what the default Width/Height should be (different for shadows vs normal)
         }
 #endif
+    }
+
+    public static class RenderSortHelper
+    {
+        private static readonly Dictionary<EffectTechnique, byte> EffectIds = new Dictionary<EffectTechnique, byte>();
+        private static readonly Dictionary<RasterizerState, byte> RasterIds = new Dictionary<RasterizerState, byte>();
+        private static readonly Dictionary<BlendState, byte> BlendIds = new Dictionary<BlendState, byte>();
+        private static readonly Dictionary<DepthStencilState, byte> DepthIds = new Dictionary<DepthStencilState, byte>();
+        private static readonly Dictionary<SamplerState, byte> SamplerIds = new Dictionary<SamplerState, byte>();
+        private static readonly Dictionary<string, ushort> TextureIds = new Dictionary<string, ushort>();
+        private static readonly Dictionary<Material, ushort> MaterialIds = new Dictionary<Material, ushort>();
+
+        public static byte GetEffectId(EffectTechnique effect) => GetOrCreate(EffectIds, effect);
+        public static byte GetRasterizerId(RasterizerState state) => GetOrCreate(RasterIds, state);
+        public static byte GetBlendId(BlendState state) => GetOrCreate(BlendIds, state);
+        public static byte GetDepthStencilId(DepthStencilState state) => GetOrCreate(DepthIds, state);
+        public static byte GetSamplerId(SamplerState state) => GetOrCreate(SamplerIds, state);
+        public static ushort GetTextureId(string tex) => GetOrCreate(TextureIds, tex);
+        public static ushort GetMaterialId(Material material) => GetOrCreate(MaterialIds, material);
+
+        private static TId GetOrCreate<TObj, TId>(Dictionary<TObj, TId> dict, TObj obj)
+            where TObj : class
+            where TId : struct, IConvertible
+        {
+            if (obj == null) return default;
+            if (dict.TryGetValue(obj, out TId id)) return id;
+
+            TId newId = (TId)Convert.ChangeType(dict.Count, typeof(TId));
+            dict[obj] = newId;
+            return newId;
+        }
+
+        public static void ClearCache()
+        {
+            MaterialIds.Clear();
+        }
     }
 }

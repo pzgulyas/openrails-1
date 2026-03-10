@@ -150,8 +150,6 @@ namespace Orts.Viewer3D
         Vector3 _sunDirection;
         bool _imageTextureIsNight;
 
-        public string CurrentTechniqueName;
-
         /// <summary>
         /// The position of the sampler states inside the hlsl shader:
         /// baseColor, metallicRoughness, occlusion, normal, emissive
@@ -268,9 +266,10 @@ namespace Orts.Viewer3D
 
         public Vector3 ViewerPos { set { viewerPos.SetValue(value); } }
 
-        public bool ImageTextureIsNight { set { _imageTextureIsNight = value; imageTextureIsNight.SetValue(value ? 1f : 0f); } }
+        public bool ImageTextureIsNight { set { _imageTextureIsNight = value; imageTextureIsNight.SetValue(value ? 1f : 0f); } get => _imageTextureIsNight; }
 
-        public Texture2D ImageTexture { set { imageTexture.SetValue(value); } }
+        Texture2D ImageTextureCache;
+        public Texture2D ImageTexture { set { if (ImageTextureCache != value) imageTexture.SetValue(ImageTextureCache = value); } }
 
         public Texture2D OverlayTexture { set { overlayTexture.SetValue(value); } }
 

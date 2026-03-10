@@ -1049,7 +1049,7 @@ namespace Orts.Viewer3D
                                         var texture2D = srgbColors
                                             ? Viewer.TextureManager.GetSrgbTexture(Viewer.GraphicsDevice, stream)
                                             : Texture2D.FromStream(Viewer.GraphicsDevice, stream);
-                                        if (Debugger.IsAttached) texture2D.Name = imagePath;
+                                        texture2D.Name = imagePath;
                                         return texture2D;
                                     }
                                 }
@@ -1068,7 +1068,7 @@ namespace Orts.Viewer3D
                                     var texture2D = srgbColors
                                         ? Viewer.TextureManager.GetSrgbTexture(Viewer.GraphicsDevice, stream)
                                         : Texture2D.FromStream(Viewer.GraphicsDevice, stream);
-                                    if (Debugger.IsAttached) texture2D.Name = $"{GltfFileName}:{image.BufferView}";
+                                    texture2D.Name = $"{GltfFileName}:{image.BufferView}";
                                     return texture2D;
                                 }
                             }
