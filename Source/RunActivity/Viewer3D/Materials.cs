@@ -447,6 +447,7 @@ namespace Orts.Viewer3D
             Texture2D specularTexture, float specularFactor,
             Texture2D specularColorTexture, Vector3 specularColorFactor, float ior,
             float referenceAlpha, bool doubleSided,
+            Vector4 texCoords1, Vector4 texCoords2, Vector4 texCoords3,
             (TextureFilter, TextureAddressMode, TextureAddressMode) samplerStateBaseColor,
             (TextureFilter, TextureAddressMode, TextureAddressMode) samplerStateMetallicRoughness,
             (TextureFilter, TextureAddressMode, TextureAddressMode) samplerStateNormal,
@@ -477,6 +478,7 @@ namespace Orts.Viewer3D
                             specularTexture, specularFactor,
                             specularColorTexture, specularColorFactor, ior,
                             referenceAlpha, doubleSided,
+                            texCoords1, texCoords2, texCoords3,
                             samplerStateBaseColor,
                             samplerStateMetallicRoughness,
                             samplerStateNormal,
@@ -863,7 +865,7 @@ namespace Orts.Viewer3D
         protected Texture2D NightTexture;
         byte AceAlphaBits;   // the number of bits in the ace file's alpha channel 
         readonly float LightingSpecular;
-        readonly float LightingDiffuse;
+        protected float LightingDiffuse;
 
         protected RasterizerState RasterizerState;
         protected BlendState BlendState;
@@ -1167,6 +1169,10 @@ namespace Orts.Viewer3D
         protected readonly Texture2D SpecularTexture;
         protected readonly Texture2D SpecularColorTexture;
 
+        protected readonly Vector4 TexCoords1;
+        protected readonly Vector4 TexCoords2;
+        protected readonly Vector4 TexCoords3;
+
         // Animatable attributes
         protected Vector4 BaseColorFactor;
         protected float MetallicFactor;
@@ -1223,6 +1229,7 @@ namespace Orts.Viewer3D
             Texture2D specularTexture, float specularFactor,
             Texture2D specularColorTexture, Vector3 specularColorFactor, float ior,
             float referenceAlpha, bool doubleSided,
+            Vector4 texCoords1, Vector4 texCoords2, Vector4 texCoords3,
             (TextureFilter, TextureAddressMode, TextureAddressMode) samplerStateBaseColor,
             (TextureFilter, TextureAddressMode, TextureAddressMode) samplerStateMetallicRoughness,
             (TextureFilter, TextureAddressMode, TextureAddressMode) samplerStateNormal,
@@ -1257,6 +1264,11 @@ namespace Orts.Viewer3D
             SpecularColorTexture = specularColorTexture;
             SpecularColorFactor = specularColorFactor;
             Ior = ior;
+            TexCoords1 = texCoords1;
+            TexCoords2 = texCoords2;
+            TexCoords3 = texCoords3;
+
+            LightingDiffuse = (Options & SceneryMaterialOptions.Diffuse) != 0 ? 1 : 0;
 
             RasterizerState = doubleSided ? RasterizerState.CullNone :
                 ((Options & SceneryMaterialOptions.PbrCullClockWise) != 0) ? RasterizerState.CullClockwise : RasterizerState.CullCounterClockwise;
@@ -1322,8 +1334,11 @@ namespace Orts.Viewer3D
                 shader.SpecularColorTexture = SpecularColorTexture;
             }
             shader.IorFactor = Ior;
+            shader.TextureCoordinates1 = TexCoords1;
+            shader.TextureCoordinates2 = TexCoords2;
+            shader.TextureCoordinates3 = TexCoords3;
 
-            shader.LightingDiffuse = (Options & SceneryMaterialOptions.Diffuse) != 0 ? 1 : 0;
+            shader.LightingDiffuse = LightingDiffuse;
 
             var transparentPass = previousMaterial != null;
 
@@ -1380,14 +1395,9 @@ namespace Orts.Viewer3D
 
                     if (item.RenderPrimitive is GltfShape.GltfPrimitive gltfPrimitive)
                     {
-                        shader.TextureCoordinates1 = gltfPrimitive.TexCoords1;
-                        shader.TextureCoordinates2 = gltfPrimitive.TexCoords2;
-                        shader.TextureCoordinates3 = gltfPrimitive.TexCoords3;
-                        shader.TexturePacking = gltfPrimitive.TexturePacking;
-
                         gltfPrimitive.BonesTexture?.SetData(MemoryMarshal.Cast<Matrix, Vector4>(gltfPrimitive.RenderBonesRendered).ToArray());
                         shader.BonesTexture = gltfPrimitive.BonesTexture;
-                        shader.BonesCount = gltfPrimitive.BonesTexture == null ? 0 : gltfPrimitive.Joints.Length;
+                        shader.HasSkin = gltfPrimitive.BonesTexture != null;
 
                         if (gltfPrimitive.HasMorphTargets())
                             (shader.MorphConfig, shader.MorphWeights) = gltfPrimitive.GetMorphingData();
@@ -1474,7 +1484,7 @@ namespace Orts.Viewer3D
                         if (gltfPrimitive.BonesTexture != null)
                         {
                             shader.BonesTexture = gltfPrimitive.BonesTexture;
-                            shader.BonesCount = gltfPrimitive.Joints.Length;
+                            shader.HasSkin = gltfPrimitive.BonesTexture != null;
                         }
 
                         if (gltfPrimitive.HasMorphTargets())

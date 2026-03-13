@@ -184,18 +184,19 @@ namespace Orts.Viewer3D
             {
                 // For unknown reasons, this would crash with an ArgumentException (saying Compare(x, x) != 0)
                 // sometimes when calculated as two values and subtracted. Presumed cause is floating point.
-                var xd = (x.XNAMatrix.Translation - XNAViewerPos).Length();
-                var yd = (y.XNAMatrix.Translation - XNAViewerPos).Length();
+                var xd = (x.XNAMatrix.Translation - XNAViewerPos).LengthSquared();
+                var yd = (y.XNAMatrix.Translation - XNAViewerPos).LengthSquared();
+                var diff = yd - xd;
                 // The following avoids water levels flashing, by forcing that higher water levels are nearer to the
                 // camera, which is always true except when camera is under water level, which is quite abnormal
-                if (x.Material is WaterMaterial && y.Material is WaterMaterial && Math.Abs(yd - xd) < 1.0 && x.XNAMatrix.Translation.Y < XNAViewerPos.Y)
+                if (Math.Abs(diff) < 1.0 && x.Material is WaterMaterial && y.Material is WaterMaterial && x.XNAMatrix.Translation.Y < XNAViewerPos.Y)
                 {
                     return Math.Sign(x.XNAMatrix.Translation.Y - y.XNAMatrix.Translation.Y);
                 }
                 // If the absolute difference is >= 1mm use that; otherwise, they're effectively in the same
                 // place so fall back to the SortIndex.
-                if (Math.Abs(yd - xd) >= 0.001)
-                    return Math.Sign(yd - xd);
+                if (Math.Abs(diff) >= 0.000001)
+                    return diff > 0 ? 1 : -1;
                 return Math.Sign(x.RenderPrimitive.SortIndex - y.RenderPrimitive.SortIndex);
             }
 
@@ -418,8 +419,10 @@ namespace Orts.Viewer3D
         internal RenderTarget2D RenderSurface;
         SpriteBatchMaterial RenderSurfaceMaterial;
 
-		readonly Dictionary<ulong, RenderItemCollection>[] RenderItems = new Dictionary<ulong, RenderItemCollection>[(int)RenderPrimitiveSequence.Sentinel];
-        readonly ulong[][] RenderItemsSortedKeys = new ulong[(int)RenderPrimitiveSequence.Sentinel][];
+        readonly RenderItemCollection[][] RenderItems = new RenderItemCollection[(int)RenderPrimitiveSequence.Sentinel][];
+        readonly ulong[][] RenderItemKeys = new ulong[(int)RenderPrimitiveSequence.Sentinel][];
+        readonly int[] RenderItemCount = new int[(int)RenderPrimitiveSequence.Sentinel];
+
         readonly RenderItemCollection[] RenderShadowSceneryItems;
         readonly RenderItemCollection[] RenderShadowPbrNormalMapItems;
         readonly RenderItemCollection[] RenderShadowPbrSkinnedItems;
@@ -458,8 +461,8 @@ namespace Orts.Viewer3D
 
             for (int i = 0; i < RenderItems.Length; i++)
             {
-                RenderItems[i] = new Dictionary<ulong, RenderItemCollection>();
-                RenderItemsSortedKeys[i] = new ulong[2];
+                RenderItemKeys[i] = new ulong[2];
+                RenderItems[i] = new RenderItemCollection[2];
             }
 
             if (Game.Settings.DynamicShadows)
@@ -516,23 +519,14 @@ namespace Orts.Viewer3D
 
         public void Clear()
         {
-            // Attempt to clean up unused materials over time (max 1 per RenderPrimitiveSequence).
-            for (var i = 0; i < RenderItems.Length; i++)
-            {
-                foreach (var mat in RenderItems[i].Keys)
-                {
-                    if (RenderItems[i][mat].Count == 0)
-                    {
-                        RenderItems[i].Remove(mat);
-                        break;
-                    }
-                }
-            }
-            
             // Clear out (reset) all of the RenderItem lists.
             for (var i = 0; i < RenderItems.Length; i++)
-                foreach (var mat in RenderItems[i].Keys)
-                    RenderItems[i][mat].Clear();
+            {
+                for (var j = 0; j < RenderItemCount[i]; j++)
+                    RenderItems[i][j].Clear();
+
+                RenderItemCount[i] = 0;
+            }
 
             // Clear out (reset) all of the shadow mapping RenderItem lists.
             if (Game.Settings.DynamicShadows)
@@ -709,33 +703,34 @@ namespace Orts.Viewer3D
         [CallOnThread("Updater")]
         public void AddPrimitive(Material material, RenderPrimitive primitive, RenderPrimitiveGroup group, ref Matrix xnaMatrix, ShapeFlags flags, object itemData)
         {
-            // SceneryMaterial primitives may contain both opaque and blended/transparent parts,
-            // so they may be added to both types of sequences.
-            bool? blending = material.GetBlending();
-            if (material is SceneryMaterial && blending == true)
-                blending = null;
-
-            if (blending ?? true)
-            {
-                var sequence = RenderItems[(int)GetRenderSequence(group, true)];
-                var key = BlendedKey;
-
-                if (!sequence.TryGetValue(key, out var items))
-                    sequence.Add(key, items = new RenderItemCollection());
-                items.Add(new RenderItem(material, primitive, ref xnaMatrix, flags, itemData));
-            }
-            if (!blending ?? true)
-            {
-                var sequence = RenderItems[(int)GetRenderSequence(group, false)];
-                var key = material.SortingKey;
-
-                if (!sequence.TryGetValue(key, out var items))
-                    sequence.Add(key, items = new RenderItemCollection());
-                items.Add(new RenderItem(material, primitive, ref xnaMatrix, flags, itemData));
-            }
-
             if (((flags & ShapeFlags.AutoZBias) != 0) && (primitive.ZBias == 0))
                 primitive.ZBias = 1;
+
+            var blending = material.GetBlending();
+            var sortingKey = blending ? BlendedKey : material.SortingKey;
+            getSequence(blending, sortingKey).Add(new RenderItem(material, primitive, ref xnaMatrix, flags, itemData));
+
+            // SceneryMaterial primitives may contain both opaque and blended/transparent parts, put these into both sequences
+            if (blending && material is SceneryMaterial)
+                getSequence(false, material.SortingKey).Add(new RenderItem(material, primitive, ref xnaMatrix, flags, itemData));
+
+            RenderItemCollection getSequence(bool blended, ulong key)
+            {
+                var s = (int)(blended ? RenderPrimitive.SequenceForBlended[(int)group] : RenderPrimitive.SequenceForOpaque[(int)group]);
+
+                var index = Array.IndexOf(RenderItemKeys[s], key, 0, RenderItemCount[s]);
+                if (index == -1)
+                    index = RenderItemCount[s]++;
+
+                if (RenderItemKeys[s].Length <= index)
+                {
+                    Array.Resize(ref RenderItemKeys[s], RenderItemCount[s] * 2);
+                    Array.Resize(ref RenderItems[s], RenderItemCount[s] * 2);
+                }
+                RenderItemKeys[s][index] = key;
+                RenderItems[s][index] = RenderItems[s][index] ?? new RenderItemCollection();
+                return RenderItems[s][index];
+            }
         }
 
         [CallOnThread("Updater")]
@@ -770,34 +765,30 @@ namespace Orts.Viewer3D
 
             for (var i = 0; i < RenderItems.Length; i++)
             {
-                var sequence = RenderItems[i];
-
-                if (sequence.TryGetValue(BlendedKey, out var blendedSequence) && blendedSequence.Count > 0)
+                if (RenderItemKeys[i][0] == BlendedKey)
                 {
-                    blendedSequence.Sort(RenderItemComparer);
+                    RenderItems[i][0].Sort(RenderItemComparer);
 
                     // Blended: multiple materials sorted by depth, create render batches without destroying the ordering.
-                    ulong j = 0;
                     var sortingKey = ulong.MaxValue;
-                    RenderItemCollection renderItems = null;
-                    foreach (var renderItem in blendedSequence)
+                    foreach (var renderItem in RenderItems[i][0])
                     {
                         if (sortingKey != renderItem.Material.SortingKey)
                         {
                             sortingKey = renderItem.Material.SortingKey;
-                            j++;
-                            if (!sequence.TryGetValue(j, out renderItems))
-                                sequence.Add(j, renderItems = new RenderItemCollection());
+                            if (RenderItems[i].Length <= RenderItemCount[i])
+                                Array.Resize(ref RenderItems[i], RenderItemCount[i] * 2);
+                            RenderItemCount[i]++;
                         }
-                        renderItems?.Add(renderItem);
+                        RenderItems[i][RenderItemCount[i] - 1] = RenderItems[i][RenderItemCount[i] - 1] ?? new RenderItemCollection();
+                        RenderItems[i][RenderItemCount[i] - 1].Add(renderItem);
                     }
-                    blendedSequence.Clear();
+                    RenderItems[i][0].Clear();
                 }
-
-                if (RenderItemsSortedKeys[i].Length < sequence.Count)
-                    RenderItemsSortedKeys[i] = new ulong[sequence.Count * 2];
-                sequence.Keys.CopyTo(RenderItemsSortedKeys[i], 0);
-                Array.Sort(RenderItemsSortedKeys[i], 0, sequence.Count);
+                else
+                {
+                    Array.Sort(RenderItemKeys[i], RenderItems[i], 0, RenderItemCount[i]);
+                }
             }
         }
 
@@ -834,13 +825,6 @@ namespace Orts.Viewer3D
             return true;
         }
 
-        static RenderPrimitiveSequence GetRenderSequence(RenderPrimitiveGroup group, bool blended)
-        {
-            if (blended)
-                return RenderPrimitive.SequenceForBlended[(int)group];
-            return RenderPrimitive.SequenceForOpaque[(int)group];
-        }
-
         [CallOnThread("Render")]
         public void Draw(GraphicsDevice graphicsDevice)
         {
@@ -866,7 +850,7 @@ namespace Orts.Viewer3D
             DrawSimple(graphicsDevice, logging);
 
             for (var i = 0; i < (int)RenderPrimitiveSequence.Sentinel; i++)
-                Game.RenderProcess.PrimitiveCount[i] = RenderItems[i].Values.Sum(l => l.Count);
+                Game.RenderProcess.PrimitiveCount[i] = RenderItems[i].Take(RenderItemCount[i]).Sum(l => l?.Count ?? 0);
 
             if (logging)
             {
@@ -1013,13 +997,13 @@ namespace Orts.Viewer3D
             {
                 if (logging) Console.WriteLine("    {0} {{", (RenderPrimitiveSequence)i);
                 var sequence = RenderItems[i];
-                var keys = RenderItemsSortedKeys[i];
 
-                for (var j = 0; j < sequence.Count; j++)
+                for (var j = 0; j < sequence.Length; j++)
                 {
-                    var renderItems = sequence[keys[j]];
+                    var renderItems = sequence[j];
 
-                    if (renderItems.Count == 0 || !(renderItems[0].Material is Material sequenceMaterial) || excludeMaterial != null && excludeMaterial(sequenceMaterial))
+                    if (renderItems == null || renderItems.Count == 0 ||
+                        !(renderItems[0].Material is Material sequenceMaterial) || excludeMaterial != null && excludeMaterial(sequenceMaterial))
                         continue;
 
                     if (logging) Console.WriteLine("      {0,-5} * {1}", renderItems.Count, sequenceMaterial);
