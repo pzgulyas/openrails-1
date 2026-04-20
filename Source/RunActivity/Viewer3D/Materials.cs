@@ -561,18 +561,36 @@ namespace Orts.Viewer3D
 
             SceneryShader.Fog = FogColor;
 
+            var weatherDimmer = Viewer.Simulator.Weather.GetDimmingFactor();
+            var ambientLightIntensity = CalculateAmbientIntensity(sunDirection, weatherDimmer);
+
             if (Viewer.Settings.UseMSTSEnv == false)
             {
-                SceneryShader.Overcast = Viewer.Simulator.Weather.CloudCoverFactor;
+                SceneryShader.Overcast = new Vector2(Viewer.Simulator.Weather.CloudCoverFactor, ambientLightIntensity);
                 ParticleEmitterShader.SetFog(Viewer.Simulator.Weather.VisibilityM, ref SharedMaterialManager.FogColor);
                 SceneryShader.SetViewerPos(Viewer.Camera.XnaLocation(Viewer.Camera.CameraWorldLocation), Viewer.Simulator.Weather.VisibilityM);
             }
             else
             {
-                SceneryShader.Overcast = Viewer.World.MSTSSky.mstsskyovercastFactor;
+                SceneryShader.Overcast = new Vector2(Viewer.World.MSTSSky.mstsskyovercastFactor, ambientLightIntensity);
                 ParticleEmitterShader.SetFog(Viewer.World.MSTSSky.mstsskyfogDistance, ref SharedMaterialManager.FogColor);
                 SceneryShader.SetViewerPos(Viewer.Camera.XnaLocation(Viewer.Camera.CameraWorldLocation), Viewer.World.MSTSSky.mstsskyfogDistance);
             }
+        }
+
+        float CalculateAmbientIntensity(Vector3 solarDirection, float weatherDimmingFactor)
+        {
+            float sunHeight = MathHelper.Clamp(solarDirection.Y, -1f, 1f);
+            float dayNightFactor = MathHelper.Clamp((sunHeight + 0.2f) * 2.0f, 0.05f, 1.0f);
+
+            // When weatherDimmingFactor is high (overcast/fog), push the ambient upward to compensate for the lost direct light.
+            float weatherBoost = MathHelper.Lerp(1.0f, 1.5f, weatherDimmingFactor);
+
+            float baseAmbient = 0.5f;
+            float finalAmbient = baseAmbient * dayNightFactor * weatherBoost;
+
+            // The metals need a minimum amount of ambient to be visible, and this also prevents the scene from going completely black at night.
+            return Math.Max(finalAmbient, 0.05f);
         }
     }
 
@@ -1298,7 +1316,7 @@ namespace Orts.Viewer3D
             RoughnessFactor = material.PbrMetallicRoughness?.RoughnessFactor ?? 1f;
             NormalScale = material.NormalTexture?.Scale ?? 1f;
             OcclusionStrength = material.OcclusionTexture?.Strength ?? 1;
-            EmissiveFactor = MemoryMarshal.Cast<float, Vector3>(material.EmissiveFactor ?? new[] { 0f, 0f, 0f })[0] * emissiveStrength;
+            EmissiveFactor = Vector3.Min(MemoryMarshal.Cast<float, Vector3>(material.EmissiveFactor ?? new[] { 0f, 0f, 0f })[0], Vector3.One) * emissiveStrength;
             ClearcoatFactor = clearcoat?.ClearcoatFactor ?? 0;
             ClearcoatRoughnessFactor = clearcoat?.ClearcoatRoughnessFactor ?? 0;
             ClearcoatNormalScale = clearcoat?.ClearcoatNormalTexture?.Scale ?? 1f;
@@ -1653,9 +1671,9 @@ namespace Orts.Viewer3D
         EffectPass ShaderPass;
         BloomShader Shader;
         VertexBuffer BloomVertexBuffer;
-        bool UseLuminance = true;
-        float[] Strengths = new[] { 0.5f, 1, 2, 1, 2 };
-        float[] Radiuses = new[] { 1.0f, 2, 2, 4, 4 };
+        bool UseLuminance = false;
+        static readonly float[] Strengths = new[] { 0.5f, 1, 2, 1, 2 };
+        static readonly float[] Radiuses = new[] { 1.0f, 2, 2, 4, 4 };
         
         float StrengthMultiplier = 1f;
 
@@ -1720,10 +1738,7 @@ namespace Orts.Viewer3D
             }
 
             graphicsDevice.RasterizerState = RasterizerState.CullNone;
-            graphicsDevice.BlendState =
-                pass == Pass.Merge ? BlendState.Opaque :
-                pass == Pass.UpSample ? BlendState.AlphaBlend :
-                BlendState.Opaque;
+            graphicsDevice.BlendState = pass == Pass.UpSample ? BlendState.Additive : BlendState.Opaque;
             graphicsDevice.DepthStencilState = pass == Pass.Extract ? BloomStencilState : DepthStencilState.Default;
 
             Shader.ScreenTexture = sourceTexture;
@@ -1746,10 +1761,12 @@ namespace Orts.Viewer3D
 
         public void ApplyBloom(GraphicsDevice graphicsDevice, RenderTarget2D screen, RenderTarget2D mip0, RenderTarget2D mip1, RenderTarget2D mip2, RenderTarget2D mip3, RenderTarget2D mip4, RenderTarget2D mip5, RenderTarget2D result)
         {
-            // Extract the pixels to be bloomed
             Shader.InverseResolution = new Vector2(1f / screen.Width, 1f / screen.Height);
-            SetState(graphicsDevice, screen, mip0, Pass.Extract);
-            Render(graphicsDevice);
+
+            // Extracting is not needed with deferred bloom shading.
+            // Extract the pixels to be bloomed
+            //SetState(graphicsDevice, screen, mip0, Pass.Extract);
+            //Render(graphicsDevice);
 
             SetState(graphicsDevice, mip0, mip1, Pass.DownSample);
             Render(graphicsDevice);

@@ -395,10 +395,10 @@ namespace Orts.Viewer3D
         static RenderTarget2D ShadowMap;
         static RenderTarget2D ShadowMapRenderTarget;
         static Vector3 SteppedSolarDirection = Vector3.UnitX;
-        static readonly Vector3 SunColor = Vector3.One;
-        static readonly Vector3 MoonGlow = new Vector3(245f / 255f, 243f / 255f, 206f / 255f);
-        const float SunIntensity = 1;
-        const float MoonIntensity = SunIntensity / 380000;
+        static readonly Vector3 BaseSunColor = Vector3.One;
+        static readonly Vector3 BaseMoonGlow = new Vector3(245f / 255f, 243f / 255f, 206f / 255f);
+        const float BaseSunIntensity = 1;
+        const float BaseMoonIntensity = BaseSunIntensity / 380000;
         //public const float HeadLightIntensity = 250000; // See some sample values: https://docs.unity3d.com/Packages/com.unity.cloud.gltfast@5.2/manual/LightUnits.html
         public const float HeadLightIntensity = 4; // Using the old linear attenuation model
 
@@ -409,6 +409,8 @@ namespace Orts.Viewer3D
         
         float LightDayNightClampTo = 1;
         float LightDayNightMultiplier = 1;
+        float WeatherDimmingFactor = 1;
+        float Exposure = 1;
 
         // Local shadow map data.
         Matrix[] ShadowMapLightView;
@@ -531,30 +533,33 @@ namespace Orts.Viewer3D
             );
 
             RenderSurfaceBloomCombine = new RenderTarget2D(Game.RenderProcess.GraphicsDevice, width, height, false,
-                Game.RenderProcess.GraphicsDevice.PresentationParameters.BackBufferFormat,
-                Game.RenderProcess.GraphicsDevice.PresentationParameters.DepthStencilFormat,
-                Game.RenderProcess.GraphicsDevice.PresentationParameters.MultiSampleCount,
+                RenderSurface.Format,
+                RenderSurface.DepthStencilFormat,
+                RenderSurface.MultiSampleCount,
                 RenderTargetUsage.PreserveContents
             );
 
-            BloomSurfaceMip0 = new RenderTarget2D(Game.RenderProcess.GraphicsDevice,
-                width,
-                height, false, Game.RenderProcess.GraphicsDevice.PresentationParameters.BackBufferFormat, DepthFormat.None, 0, RenderTargetUsage.DiscardContents);
+            BloomSurfaceMip0 = new RenderTarget2D(Game.RenderProcess.GraphicsDevice, width, height, false,
+                RenderSurface.Format,
+                RenderSurface.DepthStencilFormat,
+                RenderSurface.MultiSampleCount,
+                RenderTargetUsage.PreserveContents
+            );
             BloomSurfaceMip1 = new RenderTarget2D(Game.RenderProcess.GraphicsDevice,
                 width / 2,
-                height / 2, false, Game.RenderProcess.GraphicsDevice.PresentationParameters.BackBufferFormat, DepthFormat.None, 0, RenderTargetUsage.PreserveContents);
+                height / 2, false, RenderSurface.Format, DepthFormat.None, 0, RenderTargetUsage.PreserveContents);
             BloomSurfaceMip2 = new RenderTarget2D(Game.RenderProcess.GraphicsDevice,
                 width / 4,
-                height / 4, false, Game.RenderProcess.GraphicsDevice.PresentationParameters.BackBufferFormat, DepthFormat.None, 0, RenderTargetUsage.PreserveContents);
+                height / 4, false, RenderSurface.Format, DepthFormat.None, 0, RenderTargetUsage.PreserveContents);
             BloomSurfaceMip3 = new RenderTarget2D(Game.RenderProcess.GraphicsDevice,
                 width / 8,
-                height / 8, false, Game.RenderProcess.GraphicsDevice.PresentationParameters.BackBufferFormat, DepthFormat.None, 0, RenderTargetUsage.PreserveContents);
+                height / 8, false, RenderSurface.Format, DepthFormat.None, 0, RenderTargetUsage.PreserveContents);
             BloomSurfaceMip4 = new RenderTarget2D(Game.RenderProcess.GraphicsDevice,
                 width / 16,
-                height / 16, false, Game.RenderProcess.GraphicsDevice.PresentationParameters.BackBufferFormat, DepthFormat.None, 0, RenderTargetUsage.PreserveContents);
+                height / 16, false, RenderSurface.Format, DepthFormat.None, 0, RenderTargetUsage.PreserveContents);
             BloomSurfaceMip5 = new RenderTarget2D(Game.RenderProcess.GraphicsDevice,
                 width / 32,
-                height / 32, false, Game.RenderProcess.GraphicsDevice.PresentationParameters.BackBufferFormat, DepthFormat.None, 0, RenderTargetUsage.PreserveContents);
+                height / 32, false, RenderSurface.Format, DepthFormat.None, 0, RenderTargetUsage.PreserveContents);
         }
 
         void DisposeRenderSurfaces()
@@ -623,15 +628,20 @@ namespace Orts.Viewer3D
             BloomMaterial = BloomMaterial ?? (BloomMaterial)viewer.MaterialManager.Load("Bloom");
             BloomShader = BloomShader ?? viewer.MaterialManager.BloomShader;
 
+            WeatherDimmingFactor = viewer.Simulator.Weather.GetDimmingFactor();
+
+            var lightColor = BaseSunColor * (1.0f - WeatherDimmingFactor * 0.8f);
+            var lightIntensity = MathHelper.Lerp(1.0f, 0.01f, WeatherDimmingFactor);
+
             // Ensure that the first light is always the sun/moon, because the ambient and shadow effects will be calculated based on the first light.
             if (SolarDirection.Y > -0.05)
             {
-                AddLight(LightMode.Directional, Vector3.Zero, SolarDirection, SunColor, SunIntensity, 0, 0, 0, 1, true);
+                AddLight(LightMode.Directional, Vector3.Zero, SolarDirection, BaseSunColor * lightColor, BaseSunIntensity * lightIntensity, 0, 0, 0, 1, true);
             }
             else
             {
                 var moonDirection = viewer.Settings.UseMSTSEnv ? viewer.World.MSTSSky.mstsskylunarDirection : viewer.World.Sky.LunarDirection;
-                AddLight(LightMode.Directional, Vector3.Zero, moonDirection, MoonGlow, MoonIntensity, 0, 0, 0, 1, true);
+                AddLight(LightMode.Directional, Vector3.Zero, moonDirection, BaseMoonGlow * lightColor, BaseMoonIntensity * lightIntensity, 0, 0, 0, 1, true);
             }
 
             if (SolarDirection.Y <= -0.05)
@@ -649,6 +659,28 @@ namespace Orts.Viewer3D
                 LightDayNightClampTo = 1 - 2.5f * (SolarDirection.Y + 0.05f); // in the meantime interpolate
                 LightDayNightMultiplier = 1 - 4.5f * (SolarDirection.Y + 0.05f);
             }
+        }
+
+        public void UpdateExposure(Vector3 solarDirection, ElapsedTime elapsedTime)
+        {
+            const float maxDayExposure = 0.8f;
+            const float nightExposure = 2.5f;
+            const float overcastMultiplier = 0.7f;
+            const float adaptationSpeed = 2.0f;
+
+            // By Sun height
+            float sunHeight = MathHelper.Clamp(solarDirection.Y, -1f, 1f);
+            float dayNightLerp = MathHelper.Clamp((-sunHeight + 1f) / 2f, 0f, 1f);
+            float baseExposure = MathHelper.Lerp(maxDayExposure, nightExposure, dayNightLerp);
+
+            // By weather
+            float weatherMultiplier = MathHelper.Lerp(1.0f, overcastMultiplier, WeatherDimmingFactor);
+            weatherMultiplier = Math.Max(weatherMultiplier, 0.5f);
+
+            float targetExposure = baseExposure / weatherMultiplier;
+
+            float dt = elapsedTime.RealSeconds;
+            Exposure = MathHelper.Lerp(Exposure, targetExposure, dt * adaptationSpeed);
         }
 
         public void SetCamera(Camera camera)
@@ -673,6 +705,8 @@ namespace Orts.Viewer3D
                 solarDirection.Normalize();
                 if (Vector3.Dot(SteppedSolarDirection, solarDirection) < 0.99999)
                     SteppedSolarDirection = solarDirection;
+
+                UpdateExposure(SolarDirection, elapsedTime);
 
                 var cameraDirection = new Vector3(-XNACameraView.M13, -XNACameraView.M23, -XNACameraView.M33);
                 cameraDirection.Normalize();
@@ -1021,7 +1055,7 @@ namespace Orts.Viewer3D
         {
             if (RenderSurfaceMaterial != null)
             {
-                graphicsDevice.SetRenderTarget(RenderSurface);
+                graphicsDevice.SetRenderTargets(RenderSurface, BloomSurfaceMip0);
             }
 
             graphicsDevice.Clear(ClearOptions.Target | ClearOptions.DepthBuffer | ClearOptions.Stencil, Color.Transparent, 1, 0);
@@ -1048,6 +1082,9 @@ namespace Orts.Viewer3D
 
             if (RenderSurfaceMaterial != null)
             {
+                BloomMaterial.ApplyBloom(graphicsDevice, RenderSurface, BloomSurfaceMip0, BloomSurfaceMip1, BloomSurfaceMip2, BloomSurfaceMip3, BloomSurfaceMip4, BloomSurfaceMip5, RenderSurfaceBloomCombine);
+                (RenderSurface, RenderSurfaceBloomCombine) = (RenderSurfaceBloomCombine, RenderSurface);
+
                 graphicsDevice.SetRenderTarget(null);
                 graphicsDevice.Clear(ClearOptions.Target | ClearOptions.DepthBuffer | ClearOptions.Stencil, Color.Transparent, 1, 0);
                 RenderSurfaceMaterial.SetState(graphicsDevice, null);
@@ -1059,6 +1096,7 @@ namespace Orts.Viewer3D
         void DrawSequences(GraphicsDevice graphicsDevice, ref Matrix projection, bool logging, Func<Material, bool> excludeMaterial)
         {
             SceneryShader?.SetPerFrame(ref XNACameraView, ref projection);
+            BloomShader?.SetPerFrame(Exposure);
             
             for (var i = 0; i < (int)RenderPrimitiveSequence.Sentinel; i++)
             {
@@ -1084,14 +1122,6 @@ namespace Orts.Viewer3D
                     sequenceMaterial.ResetState(graphicsDevice);
                 }
                 if (logging) Console.WriteLine("    }");
-
-                // At the end of all 3D draws apply the bloom effect.
-                if ((RenderPrimitiveSequence)i == RenderPrimitiveSequence.InteriorBlended && RenderSurfaceMaterial != null)
-                {
-                    BloomMaterial.ApplyBloom(graphicsDevice, RenderSurface, BloomSurfaceMip0, BloomSurfaceMip1, BloomSurfaceMip2, BloomSurfaceMip3, BloomSurfaceMip4, BloomSurfaceMip5, RenderSurfaceBloomCombine);
-                    // The combined image is now on RenderSurfaceBloomCombine, so swap it with the RenderSurface.
-                    (RenderSurface, RenderSurfaceBloomCombine) = (RenderSurfaceBloomCombine, RenderSurface);
-                }
             }
         }
 

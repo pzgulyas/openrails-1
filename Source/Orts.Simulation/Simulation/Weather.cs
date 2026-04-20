@@ -108,5 +108,14 @@ namespace Orts.Simulation
             get => (float)Math.Atan2(WindInstantaneousDirection.X, -WindInstantaneousDirection.Y);
             set => WindInstantaneousDirection = new Vector2((float)Math.Sin(value), -(float)Math.Cos(value));
         }
+
+        public float GetDimmingFactor()
+        {
+            float maxVisibility = 2000f;
+            float minVisibility = 50f;
+            float fogFactor = 1f - MathHelper.Clamp((VisibilityM - minVisibility) / (maxVisibility - minVisibility), 0f, 1f);
+
+            return Math.Max(CloudCoverFactor, fogFactor);
+        }
     }
 }

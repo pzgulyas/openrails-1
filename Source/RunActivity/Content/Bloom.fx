@@ -1,38 +1,16 @@
-﻿
-
-// Bloom filter by Kosmonaut3d
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////
-//  VARIABLES
-////////////////////////////////////////////////////////////////////////////////////////////////////////////
+﻿// Bloom filter by Kosmonaut3d
 
 //Needed for pixel offset
 float2 InverseResolution;
+float Radius;
+float Strength;
+float Exposure;
 
 //The threshold of pixels that are brighter than that.
 float Threshold = 0.9f;
 
-//MODIFIED DURING RUNTIME, CHANGING HERE MAKES NO DIFFERENCE;
-float Radius;
-float Strength;
-
 //How far we stretch the pixels
 float StreakLength = 1;
-
-// Input texture
-Texture2D ScreenTexture;
-
-SamplerState LinearSampler
-{
-	Texture = <ScreenTexture>;
-
-	MagFilter = LINEAR;
-	MinFilter = LINEAR;
-	Mipfilter = LINEAR;
-
-	AddressU = CLAMP;
-	AddressV = CLAMP;
-};
 
 // Variables for the merge
 const float BloomSaturation = 1;
@@ -40,8 +18,21 @@ const float BloomIntensity = 1;
 const float BaseSaturation = 1;
 const float BaseIntensity = 1;
 
-Texture2D BloomTexture;
+// Input texture
+Texture2D ScreenTexture;
+SamplerState LinearSampler
+{
+    Texture = <ScreenTexture>;
 
+    MagFilter = LINEAR;
+    MinFilter = LINEAR;
+    Mipfilter = LINEAR;
+
+    AddressU = CLAMP;
+    AddressV = CLAMP;
+};
+
+Texture2D BloomTexture;
 SamplerState BloomSampler
 {
     Texture = <BloomTexture>;
@@ -53,10 +44,6 @@ SamplerState BloomSampler
     AddressU = CLAMP;
     AddressV = CLAMP;
 };
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////
-//  STRUCTS
-////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 struct VertexShaderInput
 {
@@ -70,13 +57,7 @@ struct VertexShaderOutput
 	float2 TexCoord : TEXCOORD0;
 }; 
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////
-//  FUNCTIONS
-////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-	////////////////////////////////////////////////////////////////////////////////////////////////////////////
-	//  VERTEX SHADER
-	////////////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////    V E R T E X   S H A D E R    ///////////////////////////
 
 VertexShaderOutput VertexShaderFunction(VertexShaderInput input)
 {
@@ -85,9 +66,8 @@ VertexShaderOutput VertexShaderFunction(VertexShaderInput input)
 	output.TexCoord = input.TexCoord;
 	return output;
 }
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-	//  PIXEL SHADER
-	////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+////////////////////    P I X E L   S H A D E R S    ///////////////////////////
 
 //Just an average of 4 values.
 float4 Box4(float4 p0, float4 p1, float4 p2, float4 p3)
@@ -173,7 +153,6 @@ float4 UpsamplePS(float4 pos : SV_POSITION,  float2 texCoord : TEXCOORD0) : SV_T
 
     //Tentfilter  0.0625f    
     return 0.0625f * (c0 + 2 * c1 + c2 + 2 * c3 + 4 * c4 + 2 * c5 + c6 + 2 * c7 + c8) * Strength + float4(0, 0,0,0); //+ 0.5f * ScreenTexture.Sample(c_texture, texCoord);
-
 }
 
 //Upsample to the former MIP, blur in the process, change offset depending on luminance
@@ -181,30 +160,46 @@ float4 UpsampleLuminancePS(float4 pos : SV_POSITION,  float2 texCoord : TEXCOORD
 {
     float4 c4 = ScreenTexture.Sample(LinearSampler, texCoord);  //middle one
  
-    /*float luminance = c4.r * 0.21f + c4.g * 0.72f + c4.b * 0.07f;
+    /*
+    float luminance = c4.r * 0.21f + c4.g * 0.72f + c4.b * 0.07f;
     luminance = max(luminance, 0.4f);
-*/
+    */
 	float2 offset = float2(StreakLength * InverseResolution.x, 1 * InverseResolution.y) * Radius; /// luminance;
 
     float4 c0 = ScreenTexture.Sample(LinearSampler, texCoord + float2(-1, -1) * offset);
     float4 c1 = ScreenTexture.Sample(LinearSampler, texCoord + float2(0, -1) * offset);
     float4 c2 = ScreenTexture.Sample(LinearSampler, texCoord + float2(1, -1) * offset);
     float4 c3 = ScreenTexture.Sample(LinearSampler, texCoord + float2(-1, 0) * offset);
+
     float4 c5 = ScreenTexture.Sample(LinearSampler, texCoord + float2(1, 0) * offset);
     float4 c6 = ScreenTexture.Sample(LinearSampler, texCoord + float2(-1, 1) * offset);
     float4 c7 = ScreenTexture.Sample(LinearSampler, texCoord + float2(0, 1) * offset);
     float4 c8 = ScreenTexture.Sample(LinearSampler, texCoord + float2(1, 1) * offset);
  
     return 0.0625f * (c0 + 2 * c1 + c2 + 2 * c3 + 4 * c4 + 2 * c5 + c6 + 2 * c7 + c8) * Strength + float4(0, 0, 0, 0); //+ 0.5f * ScreenTexture.Sample(c_texture, texCoord);
-
 }
 
 float4 AdjustSaturation(float4 color, float saturation)
 {
     // The constants 0.3, 0.59, and 0.11 are chosen because the 
     // human eye is more sensitive to green light, and less to blue. 
-    float grey = dot(color, float3(0.3, 0.59, 0.11));
+    float grey = dot(color.rgb, float3(0.3, 0.59, 0.11));
     return lerp(grey, color, saturation);
+}
+
+float3 Reinhard(float3 x) // Tone mapping
+{
+    return x / (x + float3(1.0, 1.0, 1.0));
+}
+
+float3 ACESFilm(float3 x) // Tone mapping
+{
+    float a = 2.51f;
+    float b = 0.03f;
+    float c = 2.43f;
+    float d = 0.59f;
+    float e = 0.14f;
+    return saturate((x * (a * x + b)) / (x * (c * x + d) + e));
 }
 
 float4 MergePS(float4 pos : SV_POSITION, float2 texCoord : TEXCOORD0) : SV_TARGET0
@@ -215,12 +210,15 @@ float4 MergePS(float4 pos : SV_POSITION, float2 texCoord : TEXCOORD0) : SV_TARGE
     //base = AdjustSaturation(base, BaseSaturation) * BaseIntensity;
     //bloom = AdjustSaturation(bloom, BloomSaturation) * BloomIntensity;
 
-    return base + bloom;
+    float3 combined = base.rgb + bloom.rgb;
+    combined *= Exposure;
+    
+    float3 finalColor = combined;// ACESFilm(combined);
+
+    return float4(finalColor, base.a);
 }
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////
-//  TECHNIQUES
-////////////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////    T E C H N I Q U E S    /////////////////////////////////
 
 technique Extract
 {

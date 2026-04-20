@@ -246,7 +246,7 @@ namespace Orts.Viewer3D
 
         public float SignalLightIntensity { set { signalLightIntensity.SetValue(value); } }
 
-        public float Overcast { set { overcast.SetValue(new Vector2(value, value / 2)); } }
+        public Vector2 Overcast { set { overcast.SetValue(value); } }
 
         public Color Fog { set { fog.SetValue(value.ToVector3()); } }
 
@@ -392,6 +392,7 @@ namespace Orts.Viewer3D
         readonly EffectParameter radius;
         readonly EffectParameter strength;
         readonly EffectParameter streakLength;
+        readonly EffectParameter exposure;
 
         public BloomShader(GraphicsDevice graphicsDevice)
             : base(graphicsDevice, "Bloom")
@@ -403,6 +404,7 @@ namespace Orts.Viewer3D
             radius = Parameters["Radius"];
             strength = Parameters["Strength"];
             streakLength = Parameters["StreakLength"];
+            exposure = Parameters["Exposure"];
         }
 
         public Texture2D BloomTexture { set => bloomTexture.SetValue(value); }
@@ -411,6 +413,13 @@ namespace Orts.Viewer3D
         public Vector2 InverseResolution { get => InverseResolutionField; set => inverseResolution.SetValue(InverseResolutionField = value); }
         public float Radius { set => radius.SetValue(value); }
         public float Strength { set => strength.SetValue(value); }
+        public float StreakLength { set => streakLength.SetValue(value); }
+        public float Exposure { set => exposure.SetValue(value); }
+
+        public void SetPerFrame(float exposure)
+        {
+            Exposure = exposure;
+        }
     }
 
     [CallOnThread("Render")]
